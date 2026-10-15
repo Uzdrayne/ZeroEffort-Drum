@@ -1,0 +1,56 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Build Debug",
+			"type": "process",
+			"command": "powershell.exe",
+			"args": [
+				"-NoProfile",
+				"-ExecutionPolicy",
+				"Bypass",
+				"-File",
+				"${workspaceFolder}/scripts/Build.ps1",
+				"-Action",
+				"Build",
+				"-Configuration",
+				"Debug"
+			],
+			"problemMatcher": "$msCompile"
+		},
+		{
+			"label": "Test Release",
+			"type": "process",
+			"command": "powershell.exe",
+			"args": [
+				"-NoProfile",
+				"-ExecutionPolicy",
+				"Bypass",
+				"-File",
+				"${workspaceFolder}/scripts/Build.ps1",
+				"-Action",
+				"Test"
+			],
+			"problemMatcher": []
+		},
+		{
+			"label": "Build and Test Release",
+			"type": "shell",
+			"command": "powershell.exe",
+			"args": [
+				"-NoProfile",
+				"-ExecutionPolicy",
+				"Bypass",
+				"-File",
+				"${workspaceFolder}/scripts/Build.ps1",
+				"-Action",
+				"Verify"
+			],
+			"isBackground": false,
+			"problemMatcher": [
+				"$msCompile"
+			],
+			"group": "build"
+		}
+	]
+}

@@ -1,0 +1,7 @@
+{
+  "cmake.cmakePath": "${env:LOCALAPPDATA}/CubaseVST/tools/cmake-3.31.8-windows-x86_64/bin/cmake.exe",
+  "cmake.useCMakePresets": "always",
+  "cmake.configureOnOpen": false,
+  "files.exclude": { "build": true },
+  "files.associations": { "*.h": "cpp" }
+}
