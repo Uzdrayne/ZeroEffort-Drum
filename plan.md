@@ -2,11 +2,28 @@
 
 ## Feuille De Route Active - ZeroEffort Drum
 
-Mise a jour : 2026-10-15. Produit actuel : ZeroEffort Drum 0.9.0,
+Mise a jour : 2026-10-15. Produit actuel : ZeroEffort Drum 0.10.0,
 C++17/JUCE 8.0.6, Windows x64, VST3 avec ARA, sans Standalone.
-Guide courant : [DrumInstruments08.md](docs/DrumInstruments08.md).
+Guides courants : [KitPhase10.md](docs/KitPhase10.md) (Kit / Phase, interface,
+architecture) et [DrumInstruments08.md](docs/DrumInstruments08.md) (reglages).
 Les sections numerotees plus bas conservent le cahier des charges historique :
 elles ne constituent pas une liste de fonctionnalites actuellement livrees.
+
+### Livraison 0.10 - Kit / Phase Et Interface
+
+- [x] Registre multi-instances par groupe de kit, capture horodatee sans
+  verrou, thread d'analyse commun, slots reutilises (64+ pistes).
+- [x] Retard d'arrivee (premiere arrivee blanchie) et polarite par paire
+  dirigee par les roles ; Snare Bottom / Kick Out / OH et Room L/R.
+- [x] Correction sans latence en tete de chaine, modes Analyse / Suggerer /
+  Auto, Force ; scores phase avant/apres, stereo, room.
+- [x] Prise de reference : Kick +3.03 ms, Snare +2.91 ms, phase 30 -> 91.
+- [x] Interface : LookAndFeel arcs lumineux, onglets dans l'ordre du signal,
+  noms selon l'instrument, page Kit / Phase ; editeur dans Source/UI.
+- [ ] Valider dans Cubase : ASIO Guard, ARA multi-pistes, deux projets ouverts,
+  ecoute avant/apres sur une copie de projet.
+- [ ] Refus explicite des paires peu fiables, rapport sauvegarde, mode latence
+  optionnel pour la room, puis V3 (masquage, equilibre du kit).
 
 ### Etat Actuel
 
@@ -29,6 +46,11 @@ elles ne constituent pas une liste de fonctionnalites actuellement livrees.
 - Courbe dynamique ambre animee par les reductions mesurees, seize indicateurs
   d'activite/unites/OFF/BYP dans la zone haute. Meters ARA par modification
   selectionnee ; spectre ARA encore partage. Output est le gain final.
+- Presets affines : progression plus presente par Intensite, couleur Naturel
+  possible, seuils d'EQ dynamique par energie de bande, clip Rock/Metal >35 %
+  et Naturel >65 %, Bleed Clean adapte aux micros proches sans synthese Kick
+  sur Snare/Toms. Tests de doses et d'action audio sur prise moderee passent
+  a 44.1/48/96 kHz ; trois suites Release passent en environ 40 s.
 - Limites : pas de vraie plate, de limiteur de cretes ni de coordination
   inter-micros. CPU, aliasing et qualite musicale restent a valider.
 - Dernier build : trois suites CTest passent, capture graphique native

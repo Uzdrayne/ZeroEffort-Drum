@@ -1,5 +1,10 @@
 # ZeroEffort Drum 0.9.0
 
+> 0.10.0 ajoute Kit / Phase (alignement et polarite entre pistes) et une
+> nouvelle interface (onglets dans l'ordre du signal, noms selon l'instrument) :
+> voir [KitPhase10.md](KitPhase10.md). Les reglages ci-dessous restent valables ;
+> les positions d'ecran citees ici decrivent l'ancienne interface.
+
 ## Finitions Auto Et Visuels Live
 
 Huit pages, 121 controles sauvegardes. Les 88 IDs precedents sont conserves ;
@@ -19,16 +24,40 @@ les retouches manuelles ; comparer sur une copie. Le bypass existant est conserv
 
 **Selection automatique :** Intensite dose aussi les finitions (ancienne courbe
 douce jusqu'a 50 %, puis accentuee), pas seulement les traitements historiques.
-A zero les nouvelles finitions sont OFF. Crush exige un crest >9 dB (>12 Bus),
-Attack/Sustain vise les micros proches avec crest >8 dB. Couleur est reservee
-aux styles Rock/Metal avec assez d'energie grave/medium ; pas de distorsion,
-Crush, impact ou ambiance automatiques sur Hi-hat/Overheads. Soft clip reste
-rare : Rock/Metal, crest >14 dB et crete source >-6 dBFS.
+A zero les nouvelles finitions sont OFF. Les presets affines sont moins
+restrictifs : Crush exige un crest >5 dB (>7 Bus), Attack/Sustain vise les micros
+proches avec crest >5 dB. Naturel utilise aussi une couleur legere ; Rock/Metal
+accentuent davantage la dose et le drive. Le drive tient compte des prises
+moins fortes, au lieu d'exiger un signal proche de 0 dBFS.
+Pas de distorsion, Crush, impact ou ambiance automatiques sur Hi-hat/Overheads.
+Soft clip entre progressivement au-dessus de 35 % en Rock/Metal, 65 % Naturel,
+si le crest depasse 6 dB (9 Bus). Il n'exige plus des cretes source >-6 dBFS.
+Sa reference reste bornee a -18..-1 dBFS : une prise extremement faible peut
+donc recevoir peu d'arrondi reel, meme si le module est ON. Ce n'est pas un limiteur.
+
+| Intensite | Intention des finitions sur micros proches |
+| --- | --- |
+| 0 % | Nouveaux traitements audio OFF |
+| 1-35 % | Couleur et Crush discrets, impact doux, petits plafonds d'EQ dynamique et de nettoyage si utiles |
+| 35-65 % | Corps/impact et densite plus presents, debut progressif du clip Rock/Metal |
+| 65-100 % | Palette plus complete, couleur/Crush renforces, clip Naturel possible ; reductions toujours bornees |
+
+Exemple Snare Rock transitoire, a 100 % : retour Crush jusqu'a 35.7 %, couleur
+jusqu'a 41.7 %, attaque +4.5 dB, sustain +0.7 dB, clip jusqu'a 27.2 %, nettoyage
+jusqu'a 14.9 dB. Ce sont des reglages/plafonds, pas des reductions garanties.
+Sur le bus, Crush reste <=17.5 % et room <=4 % ; pas de gate/cleanup global.
 
 L'EQ dynamique utilise des dominantes spectrales 220-1600 Hz et 3.5-12 kHz,
-avec contraste local et energie suffisante ; une forte proportion d'aigu peut
-aussi justifier la bande haute des cymbales. C'est un indice spectral global,
-pas un diagnostic certifie de resonance ni une separation des sources.
+avec contraste local, OU des bandes de controle plus larges si suffisamment
+d'energie est presente. Le seuil est estime depuis le RMS et l'energie de la
+bande, pour agir aussi sur une prise moderee. Les resonances utilisent un Q
+plus serre ; les bandes larges ont un plafond plus doux. Ce sont des indices
+spectraux, pas des resonances certifiees ni une separation des sources.
+Bleed Clean peut maintenant travailler sur Snare/Toms : detecteur 70-400 Hz
+Snare, 40-260 Hz Toms, hold adapte et relachement long, sans activer Focus ou
+le renfort synthetique Kick. Il exige assez d'aigu et >8 dB de contraste entre
+percentiles. Le Bilan rapporte son attenuation mesuree. Il nettoie l'aigu entre
+les coups, pas les cymbales simultanees ; verifier ghost notes et fins de toms.
 La room est dose courte pour Snare/Toms/Bus si la prise est transitoire et
 pas trop brillante ; OFF pour Kick, Room, cymbales et Metal. Niveau A/B est
 active pour comparer. Corps mesure est tente sur Snare/Toms ; l'ecoute mono
@@ -72,7 +101,7 @@ ARA reste partage entre renderers, il n'est pas une analyse multi-pistes liee.
   au-dessus du seuil et reduction maximale bornee. Premiere bande 80-2000 Hz,
   seconde 2-16 kHz. Les libelles Resonance/Cymbales expriment une destination,
   pas une separation des instruments. Chaque reduction est affichee en haut.
-- **Precision / Corps mesure :** option pour le prochain Auto Snare/Toms,
+- **Precision / Corps mesure :** active par Auto Snare/Toms,
   pic spectral 100-200 Hz Snare, 45-200 Hz Toms ; exige au moins 12 % d'energie
   dans cette plage. Sinon, conserve le profil et signale l'incertitude.
   Ni fondamentale certifiee ni mesure de corps Snare au-dessus de 200 Hz.
@@ -101,7 +130,10 @@ peut encore cliquer et un reset coupe la queue.
 Tests : modules actifs/OFF, mono/stereo a 44.1/48/96 kHz, reductions bornees,
 reset, corps mesure, ambiance modifiee, options Auto et migration des archives,
 non-chevauchement des controles, activation Auto/Revenir, courbe dynamique et
-captures pixel du processeur reel sous CTest. Ecoute,
+captures pixel du processeur reel sous CTest. Les presets affines sont aussi
+testes a 0/20/50/80/100 %, pour tous les roles/styles, avec une prise moderee
+et des mesures prouvant l'action du Crush, de l'EQ dynamique, du shape, de la
+couleur, du clip et du nettoyage sur une Snare calibree. Ecoute,
 automation intensive, CPU/aliasing et cycle complet des nouvelles options dans
 Cubase restent des validations distinctes, pas des acquis de ces tests.
 
@@ -153,6 +185,9 @@ un signal sans grave ; ils exigent un signal fini/audible sur au moins 2 s,
 mais ne certifient pas qu'il s'agit bien de l'instrument choisi.
 
 ## Organisation Du Code
+
+Depuis 0.10, l'editeur est dans [Source/UI](../Source/UI) et l'analyse de kit
+dans [Source/Kit](../Source/Kit) ; voir [KitPhase10.md](KitPhase10.md).
 
 L'extraction initiale des profils conservait le comportement sonore ; la
 facade applique maintenant la nouvelle courbe d'intensite :

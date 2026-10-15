@@ -1,8 +1,10 @@
 # ZeroEffort Drum
 
-Plugin batterie actuel : **ZeroEffort Drum 0.9.0**, VST3 avec extension ARA,
-profils instruments, Bus Glue, ambiance et finitions manuelles.
-[Guide et installation](docs/DrumInstruments08.md).
+Plugin batterie actuel : **ZeroEffort Drum 0.10.0**, VST3 avec extension ARA,
+profils instruments, **alignement de phase entre pistes (Kit / Phase)**,
+Bus Glue, ambiance et finitions manuelles.
+[Guide 0.10 Kit / Phase et interface](docs/KitPhase10.md) ;
+[reglages par instrument et installation](docs/DrumInstruments08.md).
 L'ancien exemple Cubase Gain et sa suite de tests ont ete retires du projet.
 
 Base C++17 / JUCE 8.0.6 pour un effet batterie VST3/ARA Windows x64 utilisable
@@ -48,6 +50,23 @@ Voir [Installation et essais](docs/DrumInstruments08.md).
 
 ## ZeroEffort Drum
 
+### Kit / Phase Et Interface 0.10.0
+
+Les instances d'un meme **groupe de kit** se decouvrent entre elles. **Analyser
+le kit** puis lire le projet : retard d'arrivee et polarite de chaque micro
+proche sont mesures contre les overheads (premiere arrivee, pas les
+reflexions), puis appliques en tete de chaine sans latence (mode Auto) ou sur
+**Appliquer** (mode Suggerer), doses par **Force**. Positions Kick In/Out,
+Snare Top/Bottom, Overheads et Room Stereo/Gauche/Droite. Scores de coherence
+de phase avant/apres, stereo et room. Sur la prise de reference : Kick +3.03 ms,
+Snare +2.91 ms, coherence 30 -> 91 / 100.
+
+Nouvelle interface : potards a arc lumineux, panneaux, onglets dans l'ordre du
+signal (Kit / Phase, Filtres, Expander, Focus ou Nettoyage, EQ, Compresseur,
+Bus, Precision, Impact) et noms selon l'instrument (Kick : Poids / Carton /
+Batte / Air ; Snare : Corps / Bague / Claque / Timbre...).
+Architecture, revue critique et limites : [KitPhase10.md](docs/KitPhase10.md).
+
 ### Finitions 0.9.0
 
 Deux nouvelles pages : **Impact** (Crush parallele, couleur surechantillonnee
@@ -62,14 +81,20 @@ verification, Auto active les finitions utiles et applique les reglages.
 **Revenir** restaure l'etat precedent. A zero, les nouvelles finitions sont OFF.
 Crush, couleur, impact, EQ dynamique, clip et ambiance suivent le role, le crest,
 les niveaux et le spectre ; les cymbales ne recoivent pas de distorsion/Crush/room.
+Les presets affines utilisent davantage ces outils : Crush/couleur/impact doses
+progressivement, EQ dynamique corrective ou de controle large, soft clip a partir
+de 35 % en Rock/Metal (65 % Naturel), et Bleed Clean sur Kick/Snare/Toms si la
+repisse et le contraste le justifient. Les seuils suivent le niveau de la prise.
+Le corps Snare/Toms reste mesure lorsque la confiance est suffisante. Relancer
+Analyser pour beneficier des nouveaux presets ; aucun ancien etat n'est reecrit.
 La courbe ambre montre l'EQ dynamique mesuree en direct, superposee a l'EQ verte.
 Seize indicateurs avec activite, unites, OFF/BYP et correlation restent sous le
 graphique, en haut, quelle que soit la page. En ARA ils suivent la premiere
 modification selectionnee, pas la derniere piste rendue.
 
 A/B est une compensation RMS avant le gain Output final, pas LUFS ; soft clip est une
-coloration parallele, pas un plafond garanti. Pas de vraie plate ni de liaison
-automatique entre micros. Details et limites dans le
+coloration parallele, pas un plafond garanti. Pas de vraie plate. La liaison
+entre micros est traitee par Kit / Phase (0.10). Details et limites dans le
 [guide courant](docs/DrumInstruments08.md).
 
 ### Instruments Et Auto Preset 0.8.0
@@ -217,7 +242,12 @@ Le cahier des charges est dans [plan.md](plan.md).
 - [Source/Drum/DrumAutoPreset.h](Source/Drum/DrumAutoPreset.h) : `DrumAnalyser`, validation des options et dispatch explicite des roles.
 - [Source/Drum/Profiles/KickProfile.h](Source/Drum/Profiles/KickProfile.h) : proposition Kick ; profils Snare, Tom, HiHat, Overheads, Room et MasterBus dans le meme dossier.
 - [Source/Drum/Profiles/ProfileAssembly.h](Source/Drum/Profiles/ProfileAssembly.h) : assemblage commun non-Kick, sans decisions sur le role.
-- [tests/ZeroEffortDrumProcessorTests.cpp](tests/ZeroEffortDrumProcessorTests.cpp) : tests DSP, processeur, etats et interface.
+- [tests/ZeroEffortDrumProcessorTests.cpp](tests/ZeroEffortDrumProcessorTests.cpp) : tests DSP, processeur et etats.
+- [Source/Kit/](Source/Kit/) : registre multi-instances, capture horodatee, analyse de phase et alignement temps reel.
+- [Source/UI/](Source/UI/) : editeur, LookAndFeel et noms des reglages selon l'instrument.
+- [tests/KitTests.cpp](tests/KitTests.cpp) et [tests/EditorTests.cpp](tests/EditorTests.cpp) : kit (dont la prise `wav_test_file` si presente) et interface, dans la suite ZeroEffortDrumTests.
+- [tests/Screenshots.cpp](tests/Screenshots.cpp) : captures de presentation (2x) a partir de `wav_test_file`, hors CTest :
+  `build\ZeroEffortDrumTests_artefacts\Release\ZeroEffortDrumTests.exe --screenshots screenshot`.
 - [CMakePresets.json](CMakePresets.json) : Visual Studio 2019 x64, Release et Debug.
 
 Les modules communs portent le prefixe `Drum` (archive, capture, analyse,

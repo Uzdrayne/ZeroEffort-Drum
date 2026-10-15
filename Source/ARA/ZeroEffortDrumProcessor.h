@@ -6,12 +6,19 @@
 #include "../Drum/DrumAutoCapture.h"
 #include "../Drum/DrumAutoPreset.h"
 #include "../Drum/DrumSpectrum.h"
+#include "../Kit/KitRegistry.h"
 
 class ZeroEffortDrumProcessor final : public juce::AudioProcessor,
                                      public juce::AudioProcessorARAExtension,
-                                     public drum::HostOutputObserver
+                                     public drum::HostOutputObserver,
+                                     private juce::Timer
 {
 public:
+    // Kit settings are drum::Settings controls: insert parameters, or values of the ARA audio
+    // modifications like the instrument, so the ARA editor and playback instances agree.
+    enum KitControl { kitGroup, kitMic, kitMode, kitStrength, kitPolarity, kitDelay, kitControlCount };
+    static int kitSetting(KitControl control) noexcept { return drum::kitGroup + static_cast<int>(control); }
+
     ZeroEffortDrumProcessor();
     ~ZeroEffortDrumProcessor() override;
     void prepareToPlay(double sampleRate, int maximumBlockSize) override;
@@ -54,10 +61,44 @@ public:
     drum::SpectrumMailbox& getSpectrumMailbox() noexcept;
     void recordHostOutput(float peak, int channels, bool active, bool fallback,
                           bool previouslySilent) noexcept override;
+    void updateTrackProperties(const TrackProperties& properties) override;
+
+    int currentInstrument() const;
+    juce::String getTrackName() const { return trackName; }
+    float getKitControl(KitControl control) const noexcept;
+    void setKitControl(KitControl control, float value);
+    kit::Mode getKitMode() const noexcept;
+    kit::Identity getKitIdentity() const;
+    kit::GroupView getKitView() const;
+    juce::uint32 getKitMemberId() const noexcept;
+    void startKitAnalysis();
+    void stopKitAnalysis();
+    const kit::Recommendation* findOwnRecommendation(const kit::Report& report) const;
+    void requestKitApply(const std::vector<juce::uint32>& members);
+    void requestKitReset();
+    bool canApplyKitRecommendation() const;
+    bool applyKitRecommendation();
+    void kitTick();
 
     juce::AudioProcessorValueTreeState parameters;
 
 private:
+    void timerCallback() override { kitTick(); }
+    drum::Settings memberSettings() const;
+    juce::String memberKey() const;
+    juce::String selectionKey() const;
+    void writeOwnKit(float delayMs, bool invert);
+    juce::SharedResourcePointer<kit::Registry> kitRegistry;
+    kit::Member* kitMember = nullptr;
+    juce::String trackName;
+    kit::Identity publishedIdentity;
+    bool identityPublished = false;
+    juce::uint32 kitAppliedRevision = 0;
+    float kitAppliedStrength = -1;
+    juce::uint32 kitApplySerial = 0;
+    int kitApplyGroup = -1;
+    double preparedRate = 0;
+
     struct AutoSession;
     std::unique_ptr<AutoSession> autoSession;
     drum::DrumAutoCapture autoCapture;

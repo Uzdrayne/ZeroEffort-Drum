@@ -8,6 +8,7 @@
 #include "DrumInstrument.h"
 #include "DrumBusDSP.h"
 #include "DrumFinishDSP.h"
+#include "../Kit/KitAligner.h"
 
 namespace drum
 {
@@ -33,7 +34,8 @@ enum Control
     shapeOn, shapeAttack, shapeSustain, dynamicOn,
     dynamicLowHz, dynamicLowQ, dynamicLowThreshold, dynamicLowRange,
     dynamicHighHz, dynamicHighQ, dynamicHighThreshold, dynamicHighRange,
-    ambienceCharacter, ambienceCompression, autoMeasuredOn, autoStyleOption, autoIntensityOption, monitorMonoOn, controlCount
+    ambienceCharacter, ambienceCompression, autoMeasuredOn, autoStyleOption, autoIntensityOption, monitorMonoOn,
+    kitGroup, kitMic, kitMode, kitStrength, kitPolarity, kitDelay, controlCount
 };
 
 struct ControlSpec
@@ -166,8 +168,22 @@ inline const std::array<ControlSpec, controlCount> controlSpecs {{
     { "autoMeasuredBodyOn", "Corps mesure", "", 0, 1, 0, 1, true },
     { "autoStyleOption", "Style Auto", "", 0, 2, 0, 1 },
     { "autoIntensityOption", "Intensite Auto", "%", 0, 100, 100, 1 },
-    { "monitorMonoOn", "Mono", "", 0, 1, 0, 1, true }
+    { "monitorMonoOn", "Mono", "", 0, 1, 0, 1, true },
+    { "kitGroup", "Kit groupe", "", 0, 7, 0, 1 },
+    { "kitMic", "Kit micro", "", 0, 3, 0, 1 },
+    { "kitMode", "Kit mode", "", 0, 2, 1, 1 },
+    { "kitStrength", "Kit force", "%", 0, 100, 100, 1 },
+    { "kitPolarity", "Kit polarite", "", 0, 1, 0, 1, true },
+    { "kitDelayMs", "Kit delai", "ms", 0, 20, 0, 1 }
 }};
+
+// Kit settings travel with the instrument (per ARA audio modification, or insert parameters)
+// but are never part of an Auto preset proposal.
+inline void keepKitSettings(std::array<float, controlCount>& target, const std::array<float, controlCount>& source) noexcept
+{
+    for (auto control : { kitGroup, kitMic, kitMode, kitStrength, kitPolarity, kitDelay })
+        target[static_cast<size_t>(control)] = source[static_cast<size_t>(control)];
+}
 
 using Settings = std::array<float, controlCount>;
 
@@ -223,6 +239,7 @@ public:
         multiband.prepare(sampleRate, blockSize, channels);
         bus.prepare(sampleRate, blockSize, channels);
         finish.prepare(sampleRate, blockSize);
+        aligner.prepare(sampleRate, blockSize, static_cast<int>(spec.numChannels));
         for (auto& smooth : smoothed)
             smooth.reset(rate, 0.02);
         for (auto& quality : smoothedQuality)
@@ -243,6 +260,7 @@ public:
         multiband.reset();
         bus.reset();
         finish.reset();
+        aligner.reset();
         for (auto& meter : finishMeters) meter.store(0, std::memory_order_relaxed);
         glueEnvelopeMeter.store(-160);
         glueReductionMeter.store(0);
@@ -264,6 +282,10 @@ public:
     void process(juce::AudioBuffer<float>& buffer, const Settings& requested) noexcept
     {
         juce::ScopedNoDenormals noDenormals;
+        // Kit alignment first (raw requested values: the aligner crossfades its own changes).
+        // Bypass also removes it so A/B compares with the untouched recording.
+        const bool bypassed = std::isfinite(requested[bypass]) && requested[bypass] > 0.5f;
+        aligner.process(buffer, bypassed ? 0.0f : requested[kitDelay], !bypassed && requested[kitPolarity] > 0.5f);
         Settings settings {};
         for (size_t index = 0; index < settings.size(); ++index)
         {
@@ -442,6 +464,7 @@ public:
     std::array<std::atomic<float>, finishMeterCount> finishMeters {};
 
 private:
+    kit::KitAligner aligner;
     unsigned int meterFrame = 0;
     void updateFilters(const Settings& settings) noexcept
     {

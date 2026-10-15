@@ -1,4 +1,5 @@
 #include "ZeroEffortDrumProcessor.h"
+#include "../UI/ZeroEffortDrumEditor.h"
 #include "../Drum/DrumFilterResponse.h"
 #include "RegionCache.h"
 #include "CacheValidity.h"
@@ -81,6 +82,10 @@ public:
                       std::shared_ptr<PrototypeStatus> statusIn)
         : ARAPlaybackRenderer(controller), status(std::move(statusIn)) {}
 
+    // Unprocessed sum of the rendered regions of the last block, used by the kit analysis.
+    const juce::AudioBuffer<float>& rawMix() const noexcept { return raw; }
+    int rawSamples() const noexcept { return rawLength; }
+
     void prepareToPlay(double sampleRate, int blockSize, int channels,
                        juce::AudioProcessor::ProcessingPrecision,
                        AlwaysNonRealtime) override
@@ -105,6 +110,8 @@ public:
         status->endSample.store(0);
         revision = status->revision.load();
         rate = sampleRate;
+        raw.setSize(juce::jmax(1, channels), juce::jmax(1, blockSize));
+        rawLength = 0;
         expectedSample = std::numeric_limits<juce::int64>::min();
         juce::int64 cachedBytes = 0;
 
@@ -189,6 +196,9 @@ public:
         const auto startSample = sample ? *sample : validSeconds
             ? static_cast<juce::int64>(std::llround(*seconds * rate)) : juce::int64 { 0 };
         buffer.clear();
+        rawLength = buffer.getNumSamples() <= raw.getNumSamples() && buffer.getNumChannels() <= raw.getNumChannels()
+            ? buffer.getNumSamples() : 0;
+        if (rawLength > 0) raw.clear(0, rawLength);
         auto state = !position.getIsPlaying() ? drum::PlaybackState::stopped
             : !(sample.hasValue() || validSeconds) ? drum::PlaybackState::missingPosition
             : drum::PlaybackState::outsideRegions;
@@ -214,6 +224,9 @@ public:
                     juce::AudioBuffer<float> block(playback->scratch.getArrayOfWritePointers(), buffer.getNumChannels(), length);
                     if (drum::renderRegions(playback->cache, startSample + offset, block))
                         state = drum::PlaybackState::rendered;
+                    if (rawLength > 0)
+                        for (int channel = 0; channel < buffer.getNumChannels(); ++channel)
+                            raw.addFrom(channel, offset, block, channel, 0, length);
                     playback->engine.process(block, settings);
                     for (int channel = 0; channel < buffer.getNumChannels(); ++channel)
                         buffer.addFrom(channel, offset, block, channel, 0, length);
@@ -261,6 +274,8 @@ public:
 
 private:
     std::shared_ptr<PrototypeStatus> status;
+    juce::AudioBuffer<float> raw;
+    int rawLength = 0;
     unsigned int revision = 0;
     double rate = 48000.0;
     juce::int64 expectedSample = std::numeric_limits<juce::int64>::min();
@@ -356,815 +371,6 @@ protected:
     }
 };
 
-class PrototypeEditor final : public juce::AudioProcessorEditor,
-                              public juce::AudioProcessorEditorARAExtension,
-                              private juce::Timer
-{
-public:
-    explicit PrototypeEditor(ZeroEffortDrumProcessor& processor)
-        : AudioProcessorEditor(processor), AudioProcessorEditorARAExtension(&processor), owner(processor)
-    {
-        look.setColour(juce::Slider::rotarySliderFillColourId, juce::Colour(0xff58d1ad));
-        look.setColour(juce::Slider::rotarySliderOutlineColourId, juce::Colour(0xff3c4548));
-        look.setColour(juce::Slider::backgroundColourId, juce::Colour(0xff657075));
-        look.setColour(juce::Slider::trackColourId, juce::Colour(0xff58d1ad));
-        look.setColour(juce::Slider::thumbColourId, juce::Colour(0xffe8edeb));
-        look.setColour(juce::Slider::textBoxTextColourId, juce::Colour(0xffe8edeb));
-        look.setColour(juce::Slider::textBoxOutlineColourId, juce::Colours::transparentBlack);
-        look.setColour(juce::ToggleButton::textColourId, juce::Colour(0xffe8edeb));
-        look.setColour(juce::ToggleButton::tickColourId, juce::Colour(0xff58d1ad));
-        setLookAndFeel(&look);
-        title.setText("ZeroEffort Drum", juce::dontSendNotification);
-        title.setFont(juce::Font(juce::FontOptions("Bahnschrift", 23.0f, juce::Font::bold)));
-        addAndMakeVisible(title);
-        for (size_t index = 0; index < drum::instrumentNames.size(); ++index)
-            instrumentMenu.addItem(drum::instrumentNames[index], static_cast<int>(index) + 1);
-        instrumentMenu.setTooltip("Element traite par cette instance. Choisir puis Analyser ; aucun changement DSP avant Appliquer.");
-        instrumentMenu.onChange = [this] {
-            owner.setControl(drum::instrument, static_cast<float>(instrumentMenu.getSelectedId() - 1));
-            owner.cancelAutoPreset();
-            timerCallback();
-        };
-        addAndMakeVisible(instrumentMenu);
-        addAndMakeVisible(status);
-        addAndMakeVisible(context);
-        addAndMakeVisible(diagnostic);
-        diagnostic.setButtonText("Diagnostic");
-        diagnostic.setClickingTogglesState(true);
-        diagnostic.onClick = [this] { resized(); repaint(); };
-        diagnostic.setTooltip("Afficher les mesures techniques ARA et la sortie hote");
-        addAndMakeVisible(presenceView);
-        busView.setButtonText("Bus");
-        busView.setClickingTogglesState(true);
-        busView.setColour(juce::TextButton::buttonOnColourId, juce::Colour(0xff58d1ad));
-        busView.setColour(juce::TextButton::textColourOnId, juce::Colour(0xff131819));
-        busView.onClick = [this] { selectPage(5); };
-        busView.setTooltip("Compression de cohesion et petite ambiance. Pour le master : utiliser un insert sur le groupe Drum.");
-        addAndMakeVisible(busView);
-        for (size_t index = 0; index < finishPages.size(); ++index)
-        {
-            auto& button = finishPages[index];
-            button.setButtonText(index == 0 ? "Impact" : "Precision");
-            button.setClickingTogglesState(true);
-            button.setColour(juce::TextButton::buttonOnColourId, juce::Colour(0xff58d1ad));
-            button.setColour(juce::TextButton::textColourOnId, juce::Colour(0xff131819));
-            button.onClick = [this, index] { selectPage(6 + static_cast<int>(index)); };
-            addAndMakeVisible(button);
-        }
-        const std::array<const char*, 16> meterTips {
-            "Crush : reduction de la voie parallele, en dB.",
-            "EQ dynamique grave : frequence et attenuation mesuree, en dB.",
-            "EQ dynamique aigu : frequence et attenuation mesuree, en dB.",
-            "Attack/Sustain : plus grand changement de gain du bloc, en dB.",
-            "Couleur : crete du residu harmonique a 4x, en dBFS ; pas une reduction de gain.",
-            "Clip : crete du residu d'arrondi a 4x, en dBFS ; pas un plafond de sortie.",
-            "Room : crete du retour ajoute au direct, avant Output, en dBFS.",
-            "Niveau A/B : compensation RMS avant Output, en dB ; pas LUFS.",
-            "Glue : reduction mesuree du compresseur bus, en dB.",
-            "Multibande grave : reduction mesuree, en dB.",
-            "Multibande medium : reduction mesuree, en dB.",
-            "Multibande aigu : reduction mesuree, en dB.",
-            "Nettoyage Kick : attenuation selective de l'aigu, en dB.",
-            "Renfort Kick : crete du corps synthetique, en dBFS.",
-            "Room : reduction du compresseur de retour, en dB.",
-            "Correlation L/R avant ecoute mono : -1 oppose, +1 similaire. Pas une analyse inter-micros."
-        };
-        for (size_t index = 0; index < headerIndicators.size(); ++index)
-        {
-            auto& indicator = headerIndicators[index];
-            indicator.setFont(juce::Font(juce::FontOptions("Bahnschrift", 10.0f, juce::Font::plain)));
-            indicator.setJustificationType(juce::Justification::centredLeft);
-            indicator.setTooltip(meterTips[index]);
-            addAndMakeVisible(indicator);
-        }
-        presenceView.setButtonText("Focus / Presence");
-        presenceView.setClickingTogglesState(true);
-        presenceView.setColour(juce::TextButton::buttonOnColourId, juce::Colour(0xff58d1ad));
-        presenceView.setColour(juce::TextButton::textColourOnId, juce::Colour(0xff131819));
-        presenceView.setTooltip("Reglages du detecteur kick, nettoyage selectif et renfort accorde");
-        presenceView.onClick = [this] { selectPage(4); };
-        const std::array<const char*, 4> pageNames { "Filtres", "Expander", "EQ", "Compresseur" };
-        for (size_t index = 0; index < pages.size(); ++index)
-        {
-            pages[index].setButtonText(pageNames[index]);
-            pages[index].setClickingTogglesState(true);
-            pages[index].setColour(juce::TextButton::buttonOnColourId, juce::Colour(0xff58d1ad));
-            pages[index].setColour(juce::TextButton::textColourOnId, juce::Colour(0xff131819));
-            pages[index].setTooltip(juce::String("Reglages / ") + pageNames[index]);
-            pages[index].onClick = [this, index] { selectPage(static_cast<int>(index)); };
-            addAndMakeVisible(pages[index]);
-        }
-        spectrumSwitch.setButtonText("Spectre OUT");
-        spectrumSwitch.setTooltip("FFT de la sortie : echelle droite en dBFS, canal de plus forte amplitude. Aucun effet audio.");
-        spectrumSwitch.onClick = [this] {
-            owner.getSpectrumMailbox().subscribers.fetch_add(spectrumSwitch.getToggleState() ? 1 : -1);
-            repaint();
-        };
-        addAndMakeVisible(spectrumSwitch);
-        spectrumSwitch.setToggleState(true, juce::dontSendNotification);
-        owner.getSpectrumMailbox().subscribers.fetch_add(1);
-        for (auto* button : { &analyse, &apply, &revert }) addAndMakeVisible(*button);
-        analyse.setButtonText("Analyser");
-        apply.setButtonText("Appliquer");
-        revert.setButtonText("Revenir");
-        analyse.setTooltip("ARA : un evenement. Insert : capturer 8 secondes d'audio entrant.");
-        apply.setTooltip("Remplacer les reglages par la proposition prudente");
-        revert.setTooltip("Retablir les reglages precedant la derniere application Auto");
-        analyse.onClick = [this] {
-            if (owner.autoPresetBusy()) owner.cancelAutoPreset(); else owner.startAutoPreset();
-            timerCallback();
-        };
-        apply.onClick = [this] { owner.applyAutoPreset(); timerCallback(); };
-        revert.onClick = [this] { owner.revertAutoPreset(); timerCallback(); };
-        addAndMakeVisible(autoReport);
-        for (size_t index = 0; index < styles.size(); ++index)
-        {
-            auto& button = styles[index];
-            button.setColour(juce::TextButton::buttonOnColourId, juce::Colour(0xff58d1ad));
-            button.setColour(juce::TextButton::textColourOnId, juce::Colour(0xff131819));
-            button.setButtonText(drum::drumStyleName(static_cast<drum::DrumStyle>(index)));
-            button.setTooltip(index == 0 ? "Correction prudente sans coloration imposee" : "Direction sonore volontaire, pas un defaut detecte");
-            button.onClick = [this, index] { owner.setAutoStyle(static_cast<drum::DrumStyle>(index), owner.getAutoIntensity()); timerCallback(); };
-            addAndMakeVisible(button);
-        }
-        addAndMakeVisible(intensity);
-        intensity.setSliderStyle(juce::Slider::LinearHorizontal);
-        intensity.setTextBoxStyle(juce::Slider::TextBoxRight, false, 54, 22);
-        intensity.setRange(0, 100, 1);
-        intensity.setTextValueSuffix(" %");
-        intensity.setTooltip("Intensite du prochain preset : douce jusqu'a 50 %, accentuee vers 100 %. EQ, nettoyage et compression. Aucun effet avant Appliquer.");
-        intensity.onValueChange = [this] { owner.setAutoStyle(owner.getAutoStyle(), static_cast<float>(intensity.getValue()) / 100); timerCallback(); };
-        addAndMakeVisible(intensityLabel);
-        intensityLabel.setText("Intensite", juce::dontSendNotification);
-        addAndMakeVisible(details);
-        details.setButtonText("Bilan");
-        details.setTooltip("Afficher la proposition et les mesures du rendu complet");
-        details.onClick = [this] {
-            auto report = std::make_unique<juce::TextEditor>();
-            report->setMultiLine(true);
-            report->setReadOnly(true);
-            report->setScrollbarsShown(true);
-            report->setText(owner.getAutoPresetText());
-            report->setSize(780, 570);
-            juce::DialogWindow::LaunchOptions options;
-            options.dialogTitle = "Auto / Bilan";
-            options.dialogBackgroundColour = juce::Colour(0xff202729);
-            options.content.setOwned(report.release());
-            options.componentToCentreAround = this;
-            options.useNativeTitleBar = true;
-            options.resizable = true;
-            options.launchAsync();
-        };
-        autoReport.setFont(juce::Font(juce::FontOptions(11.0f)));
-        autoReport.setColour(juce::Label::textColourId, juce::Colour(0xffa4b3b5));
-        status.setFont(juce::Font(juce::FontOptions(13.0f)));
-        status.setColour(juce::Label::backgroundColourId, juce::Colour(0xff202729));
-        for (size_t index = 0; index < drum::controlSpecs.size(); ++index)
-        {
-            const auto& spec = drum::controlSpecs[index];
-            if (spec.toggle)
-            {
-                toggles[index].setButtonText(spec.name);
-                toggles[index].onClick = [this, index] {
-                    owner.setControl(static_cast<int>(index), toggles[index].getToggleState() ? 1.0f : 0.0f);
-                    if (index == drum::multibandOn) { resized(); repaint(); }
-                };
-                toggles[index].setTooltip(juce::String(spec.name) + " : activer / desactiver");
-                addAndMakeVisible(toggles[index]);
-            }
-            else
-            {
-                sliders[index].setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
-                sliders[index].setTextBoxStyle(juce::Slider::TextBoxBelow, false, 86, 22);
-                sliders[index].setRange(spec.minimum, spec.maximum, 0.01);
-                sliders[index].setSkewFactor(spec.skew);
-                sliders[index].setTextValueSuffix(juce::String(" ") + spec.unit);
-                sliders[index].setDoubleClickReturnValue(true, spec.initial);
-                sliders[index].onValueChange = [this, index] { owner.setControl(static_cast<int>(index), static_cast<float>(sliders[index].getValue())); };
-                sliders[index].setTooltip(juce::String(spec.name) + " / " + spec.unit);
-                if (index >= drum::bodyQ && index <= drum::airQ)
-                {
-                    sliders[index].textFromValueFunction = [](double value) {
-                        return value <= 0 ? juce::String("Global") : juce::String(value, 2);
-                    };
-                    sliders[index].valueFromTextFunction = [](const juce::String& text) {
-                        return text.equalsIgnoreCase("Global") ? 0.0 : text.getDoubleValue();
-                    };
-                    sliders[index].setTooltip(juce::String(spec.name) + " / 0 = Q global historique, double-clic pour heriter");
-                    sliders[index].updateText();
-                }
-                labels[index].setText(spec.name, juce::dontSendNotification);
-                labels[index].setJustificationType(juce::Justification::centred);
-                labels[index].setFont(juce::Font(juce::FontOptions(12.0f)));
-                addAndMakeVisible(sliders[index]);
-                addAndMakeVisible(labels[index]);
-            }
-        }
-        setSize(1020, 760);
-        selectPage(2);
-        timerCallback();
-        startTimerHz(20);
-    }
-
-    ~PrototypeEditor() override
-    {
-        if (spectrumSwitch.getToggleState()) owner.getSpectrumMailbox().subscribers.fetch_sub(1);
-        owner.cancelAutoPreset();
-        setLookAndFeel(nullptr);
-    }
-
-    void paint(juce::Graphics& graphics) override
-    {
-        graphics.fillAll(juce::Colour(0xff181e20));
-        graphics.setColour(juce::Colour(0xff283235));
-        graphics.fillRect(0, 76, getWidth(), 270);
-        graphics.setColour(juce::Colour(0xff3c474a));
-        for (int row : { 76, 346, 390, 722 })
-            graphics.drawHorizontalLine(row, 20.0f, static_cast<float>(getWidth() - 20));
-        graphics.saveState();
-        graphics.addTransform(juce::AffineTransform::translation(0, -44));
-        const juce::Rectangle<float> plot(64, 156, 664, 156);
-        graphics.setFont(11.0f);
-        const auto gainY = [&](double decibels) {
-            return plot.getCentreY() - static_cast<float>(juce::jlimit(-18.0, 18.0, decibels)) * plot.getHeight() / 36;
-        };
-        for (int decibels : { -18, -12, -6, 0, 6, 12, 18 })
-        {
-            graphics.setColour(juce::Colour(0xff3c474a));
-            graphics.drawHorizontalLine(static_cast<int>(gainY(decibels)), plot.getX(), plot.getRight());
-            graphics.setColour(juce::Colour(0xffb8c6c8));
-            graphics.drawText(juce::String(decibels > 0 ? "+" : "") + juce::String(decibels),
-                22, static_cast<int>(gainY(decibels)) - 8, 34, 16, juce::Justification::centredRight);
-        }
-        graphics.drawText("EQ dB", 22, 132, 44, 18, juce::Justification::centredLeft);
-        graphics.drawText("OUT dBFS", 700, 132, 76, 18, juce::Justification::centredRight);
-        for (int level : { 0, -20, -40, -60, -80, -100 })
-            graphics.drawText(juce::String(level), 734,
-                static_cast<int>(plot.getY() - level * plot.getHeight() / 100) - 8,
-                40, 16, juce::Justification::centredLeft);
-        for (float frequency : { 30.0f, 60.0f, 100.0f, 300.0f, 1000.0f, 3000.0f, 10000.0f })
-        {
-            const auto horizontal = plot.getX() + plot.getWidth() * std::log(frequency / 20.0f) / std::log(1000.0f);
-            graphics.setColour(juce::Colour(0xff3c474a));
-            graphics.drawVerticalLine(static_cast<int>(horizontal), plot.getY(), plot.getBottom());
-            graphics.setColour(juce::Colour(0xffa4b3b5));
-            graphics.drawText(frequency < 1000 ? juce::String(frequency, 0) : juce::String(frequency / 1000, 0) + "k",
-                static_cast<int>(horizontal) - 20, 316, 40, 16, juce::Justification::centred);
-        }
-        graphics.setColour(juce::Colour(0xff748084));
-        graphics.drawHorizontalLine(static_cast<int>(plot.getCentreY()), plot.getX(), plot.getRight());
-        const auto settings = owner.getSettings();
-        std::array<juce::dsp::IIR::Coefficients<float>::Ptr, 4> response;
-        const std::array<std::pair<int, int>, 4> responseBands {{ { drum::bodyFrequency, drum::bodyGain },
-            { drum::boxFrequency, drum::boxGain }, { drum::attackFrequency, drum::attackGain }, { drum::airFrequency, drum::airGain } }};
-        const auto sampleRate = owner.getSampleRate() > 0 ? owner.getSampleRate() : 48000.0;
-        const drum::DrumFilterResponse filterResponse(settings, sampleRate);
-        const drum::DrumDynamicResponse dynamicResponse(settings, sampleRate, { liveMeters[1], liveMeters[2] });
-        const auto filterColour = juce::Colour(0xffe7c76b);
-        graphics.setColour(filterResponse.enabled ? filterColour : juce::Colour(0xff748084));
-        const auto frequencyText = [](double frequency)
-        {
-            return frequency < 1000 ? juce::String(frequency, 0) + " Hz"
-                : juce::String(frequency / 1000, 1) + " kHz";
-        };
-        const auto stateText = filterResponse.enabled ? " / 12 dB/oct" : " / 12 dB/oct / OFF";
-        graphics.drawText("HP " + frequencyText(filterResponse.highCutoff) + stateText,
-            80, 132, 200, 18, juce::Justification::centredLeft);
-        graphics.setColour(filterResponse.enabled ? juce::Colour(0xffe8909a) : juce::Colour(0xff748084));
-        graphics.drawText("LP " + frequencyText(filterResponse.lowCutoff) + stateText,
-            296, 132, 200, 18, juce::Justification::centredLeft);
-        if (filterResponse.enabled)
-            for (double cutoff : { filterResponse.highCutoff, filterResponse.lowCutoff })
-            {
-                const auto horizontal = plot.getX() + plot.getWidth()
-                    * static_cast<float>(std::log(cutoff / 20.0) / std::log(1000.0));
-                if (horizontal >= plot.getX() && horizontal <= plot.getRight())
-                {
-                    graphics.setColour(filterColour.withAlpha(0.45f));
-                    graphics.drawLine(horizontal, plot.getY(), horizontal, plot.getBottom(), 1.0f);
-                }
-            }
-        for (size_t index = 0; index < response.size(); ++index)
-            response[index] = juce::dsp::IIR::Coefficients<float>::makePeakFilter(sampleRate,
-                juce::jmin(settings[static_cast<size_t>(responseBands[index].first)], static_cast<float>(sampleRate * 0.45)),
-                drum::bandQ(settings, index), juce::Decibels::decibelsToGain(settings[static_cast<size_t>(responseBands[index].second)]));
-        juce::Path curve, highCurve, lowCurve, spectrumCurve, dynamicCurve, dynamicArea;
-        std::array<float, 665> staticY {};
-        for (int pixel = 0; pixel <= 664; ++pixel)
-        {
-            const auto frequency = 20.0 * std::pow(1000.0, static_cast<double>(pixel) / 664.0);
-            const auto filteredMagnitude = filterResponse.magnitude(frequency);
-            double magnitude = filteredMagnitude;
-            if (settings[drum::eqOn] > 0.5f)
-                for (const auto& coefficients : response)
-                    magnitude *= coefficients->getMagnitudeForFrequency(juce::jmin(frequency, sampleRate * 0.49), sampleRate);
-            const auto decibels = juce::Decibels::gainToDecibels(magnitude, -24.0);
-            const auto vertical = gainY(decibels);
-            staticY[static_cast<size_t>(pixel)] = vertical;
-            const auto liveY = gainY(juce::Decibels::gainToDecibels(magnitude * dynamicResponse.magnitude(frequency), -24.0));
-            if (pixel == 0)
-            {
-                dynamicCurve.startNewSubPath(plot.getX(), liveY);
-                dynamicArea.startNewSubPath(plot.getX(), liveY);
-            }
-            else
-            {
-                dynamicCurve.lineTo(plot.getX() + pixel, liveY);
-                dynamicArea.lineTo(plot.getX() + pixel, liveY);
-            }
-            if (pixel == 0) curve.startNewSubPath(plot.getX(), vertical);
-            else curve.lineTo(plot.getX() + static_cast<float>(pixel), vertical);
-            const auto highY = gainY(juce::Decibels::gainToDecibels(filterResponse.highMagnitude(frequency), -100.0));
-            const auto lowY = gainY(juce::Decibels::gainToDecibels(filterResponse.lowMagnitude(frequency), -100.0));
-            const auto spectrumY = plot.getY() - juce::jlimit(-100.0f, 0.0f, spectrumDisplay.magnitudeDb(frequency))
-                * plot.getHeight() / 100;
-            if (pixel == 0)
-            {
-                highCurve.startNewSubPath(plot.getX(), highY);
-                lowCurve.startNewSubPath(plot.getX(), lowY);
-                spectrumCurve.startNewSubPath(plot.getX(), spectrumY);
-            }
-            else
-            {
-                highCurve.lineTo(plot.getX() + pixel, highY);
-                lowCurve.lineTo(plot.getX() + pixel, lowY);
-                spectrumCurve.lineTo(plot.getX() + pixel, spectrumY);
-            }
-        }
-        if (spectrumSwitch.getToggleState())
-        {
-            graphics.setColour(juce::Colour(0xff829dc1).withAlpha(0.6f));
-            graphics.strokePath(spectrumCurve, juce::PathStrokeType(1.0f));
-            auto spectrumFill = spectrumCurve;
-            spectrumFill.lineTo(plot.getRight(), plot.getBottom());
-            spectrumFill.lineTo(plot.getX(), plot.getBottom());
-            spectrumFill.closeSubPath();
-            graphics.setColour(juce::Colour(0xff829dc1).withAlpha(0.13f));
-            graphics.fillPath(spectrumFill);
-        }
-        if (filterResponse.enabled)
-        {
-            graphics.setColour(filterColour.withAlpha(0.6f));
-            graphics.strokePath(highCurve, juce::PathStrokeType(1.4f));
-            graphics.setColour(juce::Colour(0xffe8909a).withAlpha(0.6f));
-            graphics.strokePath(lowCurve, juce::PathStrokeType(1.4f));
-            for (const auto& filterCurve : { highCurve, lowCurve })
-            {
-                auto fill = filterCurve;
-                fill.lineTo(plot.getRight(), plot.getCentreY());
-                fill.lineTo(plot.getX(), plot.getCentreY());
-                fill.closeSubPath();
-                graphics.setColour(filterColour.withAlpha(0.07f));
-                graphics.fillPath(fill);
-            }
-        }
-        graphics.setColour(juce::Colour(0xff58d1ad));
-        graphics.strokePath(curve, juce::PathStrokeType(2.0f));
-        graphics.drawText(settings[drum::eqOn] > 0.5f ? "EQ + HP/LP" : "EQ OFF + HP/LP", 510, 132, 110, 18, juce::Justification::centredLeft);
-        if (dynamicResponse.enabled)
-        {
-            for (int pixel = 664; pixel >= 0; --pixel)
-                dynamicArea.lineTo(plot.getX() + pixel, staticY[static_cast<size_t>(pixel)]);
-            dynamicArea.closeSubPath();
-            graphics.setColour(juce::Colour(0xfff3ac62).withAlpha(0.2f));
-            graphics.fillPath(dynamicArea);
-            graphics.setColour(juce::Colour(0xfff3ac62));
-            graphics.strokePath(dynamicCurve, juce::PathStrokeType(2.0f));
-            graphics.drawText("DYN LIVE", 622, 132, 76, 18, juce::Justification::centredRight);
-        }
-        if (hoverX >= plot.getX() && hoverX <= plot.getRight())
-        {
-            const auto frequency = 20.0 * std::pow(1000.0, (hoverX - plot.getX()) / plot.getWidth());
-            auto magnitude = filterResponse.magnitude(frequency);
-            if (settings[drum::eqOn] > 0.5f)
-                for (const auto& coefficients : response)
-                    magnitude *= coefficients->getMagnitudeForFrequency(juce::jmin(frequency, sampleRate * 0.49), sampleRate);
-            magnitude *= dynamicResponse.magnitude(frequency);
-            graphics.setColour(juce::Colour(0xffd8e3e1).withAlpha(0.5f));
-            graphics.drawVerticalLine(static_cast<int>(hoverX), plot.getY(), plot.getBottom());
-            graphics.setColour(juce::Colour(0xffd8e3e1));
-            graphics.drawText(frequencyText(frequency) + " / EQ + HP/LP + DYN "
-                + juce::String(juce::Decibels::gainToDecibels(magnitude, -100.0), 2) + " dB"
-                + (spectrumSwitch.getToggleState() ? " / OUT " + juce::String(spectrumDisplay.magnitudeDb(frequency), 1) + " dBFS" : ""),
-                64, 334, 680, 16, juce::Justification::centredLeft);
-        }
-        const auto meters = liveMain;
-        const std::array<juce::String, 4> names { "IN", "OUT", settings[drum::gateOn] > 0.5f ? "EXP" : "EXP -",
-            settings[drum::compressorOn] + settings[drum::glueOn] > 0.5f ? "COMP" : "CMP -" };
-        for (size_t index = 0; index < meters.size(); ++index)
-        {
-            const auto horizontal = 790 + static_cast<int>(index) * 54;
-            const auto decibels = index < 2 ? juce::Decibels::gainToDecibels(meters[index], -60.0f) : meters[index];
-            const auto amount = index < 2 ? juce::jlimit(0.0f, 1.0f, (decibels + 60) / 60)
-                : juce::jlimit(0.0f, 1.0f, decibels / 12.0f);
-            graphics.setColour(juce::Colour(0xff131819));
-            graphics.fillRect(horizontal, 164, 18, 144);
-            graphics.setColour(index < 2 ? (meters[index] >= 1 ? juce::Colour(0xffef6d70) : juce::Colour(0xff58d1ad)) : juce::Colour(0xffe7c76b));
-            const auto height = static_cast<int>(144 * amount);
-            graphics.fillRect(horizontal, 308 - height, 18, height);
-            graphics.setColour(juce::Colour(0xffd8e3e1));
-            graphics.drawText(names[index], horizontal - 10, 132, 40, 18, juce::Justification::centred);
-            graphics.drawText(juce::String(decibels, 1), horizontal - 16, 318, 50, 18, juce::Justification::centred);
-            if (index >= 2)
-            {
-                graphics.setFont(9.0f);
-                graphics.drawText("12", horizontal + 22, 160, 24, 12, juce::Justification::centredLeft);
-                graphics.drawText("6", horizontal + 22, 232, 24, 12, juce::Justification::centredLeft);
-                graphics.drawText("0", horizontal + 22, 298, 24, 12, juce::Justification::centredLeft);
-                graphics.setFont(11.0f);
-            }
-        }
-        graphics.restoreState();
-        for (size_t index = 0; index < headerIndicators.size(); ++index)
-        {
-            const auto horizontal = 24 + static_cast<int>(index % 8) * 122;
-            const auto vertical = 323 + static_cast<int>(index / 8) * 20;
-            graphics.setColour(juce::Colour(0xff3c474a));
-            graphics.fillRect(horizontal, vertical, 114, 2);
-            graphics.setColour(index == 1 || index == 2 ? juce::Colour(0xfff3ac62) : juce::Colour(0xff58d1ad));
-            graphics.fillRect(horizontal, vertical, static_cast<int>(114 * activityLevels[index]), 2);
-        }
-        if (activePage == 3 && owner.getSettings()[drum::multibandOn] > 0.5f && !diagnostic.getToggleState())
-        {
-            const auto reductions = owner.getBandMeters();
-            for (size_t band = 0; band < 3; ++band)
-            {
-                const auto horizontal = 24 + static_cast<int>(band) * 282;
-                graphics.setColour(juce::Colour(0xff3c474a));
-                graphics.fillRect(horizontal + 142, 484, 112, 4);
-                graphics.setColour(juce::Colour(0xffe7c76b));
-                graphics.fillRect(horizontal + 142, 484, static_cast<int>(112 * juce::jlimit(0.0f, 1.0f, reductions[band] / 12)), 4);
-                graphics.drawText("GR " + juce::String(reductions[band], 1) + " dB", horizontal + 142, 464, 112, 18,
-                    juce::Justification::centredRight);
-            }
-        }
-        graphics.setColour(juce::Colour(0xffa4b3b5));
-        graphics.drawText("v" JucePlugin_VersionString, getWidth() - 120, 725, 96, 24, juce::Justification::centredRight);
-    }
-
-    void resized() override
-    {
-        title.setBounds(24, 12, 274, 30);
-        instrumentMenu.setBounds(24, 44, 160, 28);
-        context.setBounds(188, 48, 110, 22);
-        for (size_t index = 0; index < styles.size(); ++index)
-            styles[index].setBounds(310 + static_cast<int>(index) * 96, 14, 94, 26);
-        intensityLabel.setBounds(310, 44, 76, 24);
-        intensity.setBounds(386, 44, 276, 24);
-        diagnostic.setBounds(860, 14, 132, 26);
-        for (size_t index = 0; index < pages.size(); ++index)
-            pages[index].setBounds(24 + static_cast<int>(index) * 110, 354, 106, 28);
-        presenceView.setBounds(464, 354, 146, 28);
-        busView.setBounds(614, 354, 66, 28);
-        finishPages[0].setBounds(684, 354, 86, 28);
-        finishPages[1].setBounds(774, 354, 90, 28);
-        for (size_t index = 0; index < headerIndicators.size(); ++index)
-            headerIndicators[index].setBounds(24 + static_cast<int>(index % 8) * 122,
-                306 + static_cast<int>(index / 8) * 20, 116, 16);
-        spectrumSwitch.setButtonText("Spectre");
-        spectrumSwitch.setBounds(672, 48, 92, 24);
-        analyse.setBounds(24, 728, 96, 26);
-        apply.setBounds(128, 728, 96, 26);
-        revert.setBounds(232, 728, 88, 26);
-        details.setBounds(328, 728, 64, 26);
-        autoReport.setBounds(400, 725, 478, 32);
-        status.setBounds(24, 396, 830, 316);
-        std::array<bool, drum::controlCount> shown {};
-        const auto place = [this, &shown](int control, int horizontal, int vertical, int width = 154)
-        {
-            const auto index = static_cast<size_t>(control);
-            shown[index] = true;
-            labels[index].setBounds(horizontal, vertical, width, 18);
-            sliders[index].setBounds(horizontal, vertical + 18, width, 78);
-        };
-        const auto toggle = [this, &shown](int control, int horizontal, int vertical, int width = 190)
-        {
-            shown[static_cast<size_t>(control)] = true;
-            toggles[static_cast<size_t>(control)].setBounds(horizontal, vertical, width, 26);
-        };
-        toggles[drum::bypass].setBounds(714, 14, 120, 26);
-        shown[drum::bypass] = true;
-        toggles[drum::levelMatchOn].setBounds(766, 48, 140, 24);
-        toggles[drum::levelMatchOn].setTooltip("Compensation RMS progressive +/-6 dB avant Output. Comparer avec Bypass ; ni LUFS ni limiteur.");
-        shown[drum::levelMatchOn] = true;
-        toggles[drum::monitorMonoOn].setBounds(908, 48, 86, 24);
-        toggles[drum::monitorMonoOn].setTooltip("Ecoute mono de la sortie. Aucun alignement automatique entre micros.");
-        shown[drum::monitorMonoOn] = true;
-        place(drum::input, 876, 418, 118);
-        place(drum::output, 876, 544, 118);
-        if (activePage == 0)
-        {
-            toggle(drum::filtersOn, 24, 396);
-            place(drum::highPass, 100, 452, 230);
-            place(drum::lowPass, 430, 452, 230);
-        }
-        else if (activePage == 1)
-        {
-            toggle(drum::gateOn, 24, 396);
-            const std::array<int, 5> gate { drum::gateThreshold, drum::gateRatio, drum::gateRange, drum::gateAttack, drum::gateRelease };
-            for (size_t index = 0; index < gate.size(); ++index)
-                place(gate[index], 24 + static_cast<int>(index % 3) * 250, 450 + static_cast<int>(index / 3) * 126, 210);
-        }
-        else if (activePage == 2)
-        {
-            toggle(drum::eqOn, 24, 396);
-            const std::array<int, 4> frequencies { drum::bodyFrequency, drum::boxFrequency, drum::attackFrequency, drum::airFrequency };
-            const std::array<int, 4> gains { drum::bodyGain, drum::boxGain, drum::attackGain, drum::airGain };
-            const std::array<int, 4> qualities { drum::bodyQ, drum::boxQ, drum::attackQ, drum::airQ };
-            for (size_t index = 0; index < frequencies.size(); ++index)
-            {
-                const auto horizontal = 24 + static_cast<int>(index) * 182;
-                place(frequencies[index], horizontal, 428);
-                place(gains[index], horizontal, 526);
-                place(qualities[index], horizontal, 624);
-            }
-            place(drum::eqQ, 752, 624, 108);
-        }
-        else if (activePage == 3)
-        {
-            toggle(drum::compressorOn, 24, 396);
-            toggle(drum::multibandOn, 230, 396);
-            if (owner.getSettings()[drum::multibandOn] > 0.5f)
-            {
-                const std::array<int, 4> globals { drum::crossoverLow, drum::crossoverHigh, drum::makeup, drum::mix };
-                for (size_t index = 0; index < globals.size(); ++index)
-                {
-                    const auto control = static_cast<size_t>(globals[index]);
-                    shown[control] = true;
-                    labels[control].setBounds(24 + static_cast<int>(index) * 210, 424, 196, 18);
-                    sliders[control].setSliderStyle(juce::Slider::LinearHorizontal);
-                    sliders[control].setTextBoxStyle(juce::Slider::TextBoxRight, false, 70, 22);
-                    sliders[control].setBounds(24 + static_cast<int>(index) * 210, 442, 196, 24);
-                }
-                for (size_t band = 0; band < 3; ++band)
-                {
-                    const auto base = static_cast<int>(drum::lowThreshold) + static_cast<int>(band) * 7;
-                    toggle(base + 6, 24 + static_cast<int>(band) * 282, 472, 134);
-                    for (int control = 0; control < 6; ++control)
-                    {
-                        place(base + control, 24 + static_cast<int>(band) * 282 + (control % 2) * 132,
-                            504 + (control / 2) * 70, 126);
-                        sliders[static_cast<size_t>(base + control)].setSliderStyle(juce::Slider::LinearHorizontal);
-                        sliders[static_cast<size_t>(base + control)].setTextBoxStyle(juce::Slider::TextBoxRight, false, 76, 22);
-                        sliders[static_cast<size_t>(base + control)].setBounds(24 + static_cast<int>(band) * 282 + (control % 2) * 132,
-                            526 + (control / 2) * 70, 126, 32);
-                    }
-                }
-            }
-            else
-            {
-                for (const auto control : { drum::makeup, drum::mix })
-                {
-                    sliders[static_cast<size_t>(control)].setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
-                    sliders[static_cast<size_t>(control)].setTextBoxStyle(juce::Slider::TextBoxBelow, false, 86, 22);
-                }
-                const std::array<int, 6> compressor { drum::threshold, drum::ratio, drum::attack, drum::release, drum::makeup, drum::mix };
-                for (size_t index = 0; index < compressor.size(); ++index)
-                    place(compressor[index], 24 + static_cast<int>(index % 3) * 250, 450 + static_cast<int>(index / 3) * 126, 210);
-            }
-        }
-        else if (activePage == 5)
-        {
-            toggle(drum::glueOn, 24, 396);
-            toggle(drum::ambienceOn, 562, 396);
-            const std::array<int, 9> glue { drum::glueThreshold, drum::glueRatio, drum::glueAttack,
-                drum::glueRelease, drum::glueMakeup, drum::glueMix, drum::glueSidechain, drum::glueKnee, drum::glueRange };
-            for (size_t index = 0; index < glue.size(); ++index)
-            {
-                const auto horizontal = 24 + static_cast<int>(index % 3) * 172;
-                const auto vertical = 434 + static_cast<int>(index / 3) * 92;
-                place(glue[index], horizontal, vertical, 160);
-                sliders[static_cast<size_t>(glue[index])].setBounds(horizontal, vertical + 18, 160, 70);
-            }
-            const std::array<int, 5> room { drum::ambienceAmount, drum::ambienceSize, drum::ambiencePredelay,
-                drum::ambienceHighPass, drum::ambienceLowPass };
-            for (size_t index = 0; index < room.size(); ++index)
-            {
-                const auto horizontal = 562 + static_cast<int>(index % 2) * 146;
-                const auto vertical = 434 + static_cast<int>(index / 2) * 66;
-                place(room[index], horizontal, vertical, 140);
-                sliders[static_cast<size_t>(room[index])].setSliderStyle(juce::Slider::LinearHorizontal);
-                sliders[static_cast<size_t>(room[index])].setTextBoxStyle(juce::Slider::TextBoxRight, false, 62, 22);
-                sliders[static_cast<size_t>(room[index])].setBounds(horizontal, vertical + 18, 140, 32);
-            }
-            for (int control = 0; control < 2; ++control)
-            {
-                const auto index = drum::ambienceCharacter + control;
-                const auto horizontal = 562 + ((5 + control) % 2) * 146;
-                const auto vertical = 434 + ((5 + control) / 2) * 66;
-                place(index, horizontal, vertical, 140);
-                sliders[static_cast<size_t>(index)].setSliderStyle(juce::Slider::LinearHorizontal);
-                sliders[static_cast<size_t>(index)].setTextBoxStyle(juce::Slider::TextBoxRight, false, 62, 22);
-                sliders[static_cast<size_t>(index)].setBounds(horizontal, vertical + 18, 140, 32);
-            }
-        }
-        else if (activePage == 6)
-        {
-            toggle(drum::crushOn, 24, 396);
-            toggle(drum::colourOn, 304, 396);
-            toggle(drum::clipOn, 584, 396);
-            const std::array<int, 11> controls { drum::crushAmount, drum::crushThreshold, drum::crushRatio,
-                drum::crushAttack, drum::crushRelease, drum::crushHP, drum::crushLP,
-                drum::colourDrive, drum::colourMix, drum::clipCeiling, drum::clipMix };
-            for (size_t index = 0; index < controls.size(); ++index)
-            {
-                const auto horizontal = 24 + static_cast<int>(index % 4) * 210;
-                const auto vertical = 428 + static_cast<int>(index / 4) * 88;
-                place(controls[index], horizontal, vertical, 196);
-                sliders[static_cast<size_t>(controls[index])].setBounds(horizontal, vertical + 18, 196, 66);
-            }
-        }
-        else if (activePage == 7)
-        {
-            toggle(drum::shapeOn, 24, 396);
-            toggle(drum::dynamicOn, 304, 396);
-            toggle(drum::autoMeasuredOn, 584, 396);
-            const std::array<int, 10> controls { drum::shapeAttack, drum::shapeSustain,
-                drum::dynamicLowHz, drum::dynamicLowQ, drum::dynamicLowThreshold, drum::dynamicLowRange,
-                drum::dynamicHighHz, drum::dynamicHighQ, drum::dynamicHighThreshold, drum::dynamicHighRange };
-            for (size_t index = 0; index < controls.size(); ++index)
-                place(controls[index], 24 + static_cast<int>(index % 5) * 168,
-                    434 + static_cast<int>(index / 5) * 126, 156);
-        }
-        else
-        {
-            toggle(drum::focusOn, 24, 396);
-            toggle(drum::cleanupOn, 634, 396);
-            toggle(drum::presenceOn, 24, 550);
-            toggle(drum::reinforceInvert, 634, 550);
-            const std::array<int, 5> detection { drum::focusLow, drum::focusHigh, drum::gateHold,
-                drum::gateHysteresis, drum::cleanupDepth };
-            const std::array<int, 5> enhancement { drum::reinforceFrequency, drum::reinforceAmount,
-                drum::reinforceDecay, drum::transientAmount, drum::saturationDrive };
-            for (size_t index = 0; index < detection.size(); ++index)
-            {
-                place(detection[index], 24 + static_cast<int>(index) * 164, 434, 152);
-                place(enhancement[index], 24 + static_cast<int>(index) * 164, 592, 152);
-            }
-        }
-        for (size_t index = 0; index < drum::controlSpecs.size(); ++index)
-        {
-            const auto visible = index == drum::bypass || index == drum::input || index == drum::output || (!diagnostic.getToggleState()
-                && shown[index]);
-            sliders[index].setVisible(visible && !drum::controlSpecs[index].toggle);
-            labels[index].setVisible(visible && !drum::controlSpecs[index].toggle);
-            toggles[index].setVisible(visible && drum::controlSpecs[index].toggle);
-        }
-        status.setVisible(diagnostic.getToggleState());
-        if (diagnostic.getToggleState()) status.toFront(false);
-    }
-
-    void mouseMove(const juce::MouseEvent& event) override
-    {
-        hoverX = event.position.y >= 112 && event.position.y <= 300 ? event.position.x : -1;
-        repaint();
-    }
-
-    void mouseExit(const juce::MouseEvent&) override { hoverX = -1; repaint(); }
-
-private:
-    void selectPage(int page)
-    {
-        activePage = page;
-        diagnostic.setToggleState(false, juce::dontSendNotification);
-        for (size_t index = 0; index < pages.size(); ++index)
-            pages[index].setToggleState(static_cast<int>(index) == page, juce::dontSendNotification);
-        presenceView.setToggleState(page == 4, juce::dontSendNotification);
-        busView.setToggleState(page == 5, juce::dontSendNotification);
-        for (size_t index = 0; index < finishPages.size(); ++index)
-            finishPages[index].setToggleState(page == 6 + static_cast<int>(index), juce::dontSendNotification);
-        resized();
-        repaint();
-    }
-
-    void timerCallback() override
-    {
-        if (spectrumSwitch.getToggleState()) spectrumDisplay.update(owner.getSpectrumMailbox());
-        owner.updateAutoPreset();
-        const auto finishMeters = owner.getFinishMeters();
-        if (finishMeters[10] != lastMeterFrame) staleMeterTicks = 0;
-        else ++staleMeterTicks;
-        lastMeterFrame = finishMeters[10];
-        for (size_t index = 0; index < styles.size(); ++index)
-            styles[index].setToggleState(static_cast<drum::DrumStyle>(index) == owner.getAutoStyle(), juce::dontSendNotification);
-        if (!intensity.isMouseButtonDown()) intensity.setValue(owner.getAutoIntensity() * 100, juce::dontSendNotification);
-        analyse.setButtonText(owner.autoPresetBusy() ? "Annuler" : "Analyser");
-        analyse.setEnabled(owner.autoPresetBusy() || owner.canEditSettings());
-        apply.setEnabled(owner.canApplyAutoPreset());
-        revert.setEnabled(owner.canRevertAutoPreset());
-        const auto reportText = owner.getAutoPresetText();
-        const auto detail = reportText.indexOf(7, " / ");
-        autoReport.setText((detail >= 0 ? reportText.substring(0, detail)
-            : reportText.upToFirstOccurrenceOf("\n", false, false)).substring(0, 75), juce::dontSendNotification);
-        autoReport.setTooltip(owner.getAutoPresetText());
-        status.setText(owner.getDiagnosticText(), juce::dontSendNotification);
-        context.setText(owner.isBoundToARA() ? (owner.canEditSettings() ? "ARA / Selection active" : "ARA / Aucune region selectionnee")
-            : "VST3 / Insert", juce::dontSendNotification);
-        const auto settings = owner.getSettings();
-        const bool bypassed = settings[drum::bypass] > 0.5f;
-        const bool streamFresh = staleMeterTicks <= 3;
-        const bool fresh = streamFresh && !bypassed;
-        for (size_t index = 0; index < liveMeters.size(); ++index)
-        {
-            const auto target = fresh ? finishMeters[index] : 0.0f;
-            liveMeters[index] = std::abs(target) >= std::abs(liveMeters[index]) ? target
-                : liveMeters[index] + 0.35f * (target - liveMeters[index]);
-        }
-        const auto rawBands = owner.getBandMeters();
-        const auto rawMain = owner.getMeters();
-        for (size_t index = 0; index < liveMain.size(); ++index)
-            liveMain[index] = juce::jmax(streamFresh && (index < 2 || !bypassed) ? rawMain[index] : 0.0f,
-                liveMain[index] * 0.65f);
-        for (size_t band = 0; band < liveBands.size(); ++band)
-        {
-            const auto target = fresh ? rawBands[band] : 0.0f;
-            liveBands[band] = juce::jmax(target, liveBands[band] * 0.65f);
-        }
-        const auto db = [](float value) { return juce::String(value, 1) + " dB"; };
-        const auto peak = [](float value) {
-            return value > 0.000001f ? juce::String(static_cast<int>(std::lround(juce::Decibels::gainToDecibels(value))))
-                + " dBFS" : juce::String("-- dBFS");
-        };
-        const auto hz = [](float value) { return value < 1000 ? juce::String(value, 0) : juce::String(value / 1000, 1) + "k"; };
-        const auto report = [&](size_t index, const juce::String& name, bool enabled, const juce::String& text, float activity) {
-            headerIndicators[index].setText(name + " " + (bypassed ? "BYP" : enabled ? text : "OFF"), juce::dontSendNotification);
-            headerIndicators[index].setColour(juce::Label::textColourId, juce::Colour(enabled && !bypassed ? 0xffd8e3e1 : 0xff748084));
-            activityLevels[index] = enabled && !bypassed ? juce::jlimit(0.0f, 1.0f, activity) : 0.0f;
-        };
-        const auto peakActivity = [](float value) { return value > 0.000001f
-            ? juce::jlimit(0.0f, 1.0f, (juce::Decibels::gainToDecibels(value) + 72) / 72) : 0.0f; };
-        report(0, "CRUSH", settings[drum::crushOn] > 0.5f, db(liveMeters[0]), liveMeters[0] / 12);
-        report(1, "DYN G " + hz(settings[drum::dynamicLowHz]), settings[drum::dynamicOn] > 0.5f,
-            db(liveMeters[1]), liveMeters[1] / 6);
-        report(2, "DYN A " + hz(settings[drum::dynamicHighHz]), settings[drum::dynamicOn] > 0.5f,
-            db(liveMeters[2]), liveMeters[2] / 6);
-        report(3, "IMPACT", settings[drum::shapeOn] > 0.5f, db(liveMeters[5]), std::abs(liveMeters[5]) / 6);
-        report(4, "COULEUR", settings[drum::colourOn] > 0.5f, peak(liveMeters[6]), peakActivity(liveMeters[6]));
-        report(5, "CLIP", settings[drum::clipOn] > 0.5f, peak(liveMeters[7]), peakActivity(liveMeters[7]));
-        report(6, "ROOM", settings[drum::ambienceOn] > 0.5f, peak(liveMeters[8]), peakActivity(liveMeters[8]));
-        report(7, "A/B", settings[drum::levelMatchOn] > 0.5f, db(liveMeters[3]), std::abs(liveMeters[3]) / 6);
-        report(8, "GLUE", settings[drum::glueOn] > 0.5f, db(liveMeters[11]), liveMeters[11] / 12);
-        for (size_t band = 0; band < liveBands.size(); ++band)
-            report(9 + band, band == 0 ? "MB G" : band == 1 ? "MB M" : "MB A",
-                settings[drum::compressorOn] * settings[drum::multibandOn] > 0.5f, db(liveBands[band]), liveBands[band] / 12);
-        report(12, "NETT", settings[drum::cleanupOn] > 0.5f, db(liveMeters[12]), liveMeters[12] / 18);
-        report(13, "CORPS", settings[drum::presenceOn] > 0.5f, peak(liveMeters[13]), peakActivity(liveMeters[13]));
-        report(14, "ROOM GR", settings[drum::ambienceOn] > 0.5f, db(liveMeters[9]), liveMeters[9] / 12);
-        report(15, "CORREL", true, juce::String(liveMeters[4], 2), std::abs(liveMeters[4]));
-        instrumentMenu.setSelectedId(static_cast<int>(drum::instrumentFromValue(settings[drum::instrument])) + 1, juce::dontSendNotification);
-        instrumentMenu.setEnabled(owner.canEditSettings());
-        if (lastMultiband != (settings[drum::multibandOn] > 0.5f))
-        {
-            lastMultiband = settings[drum::multibandOn] > 0.5f;
-            resized();
-        }
-        const auto enabled = owner.canEditSettings();
-        for (size_t index = 0; index < settings.size(); ++index)
-        {
-            if (!sliders[index].isMouseButtonDown())
-                sliders[index].setValue(settings[index], juce::dontSendNotification);
-            toggles[index].setToggleState(settings[index] > 0.5f, juce::dontSendNotification);
-            sliders[index].setEnabled(enabled);
-            toggles[index].setEnabled(index == drum::bypass ? owner.canBypass() : enabled);
-        }
-        toggles[drum::bypass].setTooltip(enabled ? "Bypass de la selection active"
-            : owner.canBypass() ? "Bypass de la derniere selection ARA editee, meme sans selection active"
-            : "Selectionner une region ARA au moins une fois pour activer Bypass");
-        repaint();
-    }
-
-    ZeroEffortDrumProcessor& owner;
-    juce::LookAndFeel_V4 look;
-    juce::TooltipWindow tooltip { this, 650 };
-    juce::Label title, status, context;
-    juce::ComboBox instrumentMenu;
-    juce::TextButton diagnostic;
-    juce::TextButton presenceView;
-    juce::TextButton busView;
-    std::array<juce::TextButton, 2> finishPages;
-    std::array<juce::Label, 16> headerIndicators;
-    std::array<float, 16> activityLevels {};
-    std::array<float, drum::finishMeterCount> liveMeters {};
-    std::array<float, 3> liveBands {};
-    std::array<float, 4> liveMain {};
-    float lastMeterFrame = -1;
-    int staleMeterTicks = 0;
-    std::array<juce::TextButton, 4> pages;
-    juce::ToggleButton spectrumSwitch;
-    drum::SpectrumDisplay spectrumDisplay;
-    int activePage = 2;
-    float hoverX = -1;
-    bool lastMultiband = false;
-    juce::TextButton analyse, apply, revert;
-    juce::Label autoReport;
-    std::array<juce::TextButton, 3> styles;
-    juce::Slider intensity;
-    juce::Label intensityLabel;
-    juce::TextButton details;
-    std::array<juce::Slider, drum::controlCount> sliders;
-    std::array<juce::Label, drum::controlCount> labels;
-    std::array<juce::ToggleButton, drum::controlCount> toggles;
-};
 }
 
 struct ZeroEffortDrumProcessor::AutoSession
@@ -1184,7 +390,11 @@ struct ZeroEffortDrumProcessor::AutoSession
     bool busy = false, ready = false, changed = false;
 };
 
-ZeroEffortDrumProcessor::~ZeroEffortDrumProcessor() = default;
+ZeroEffortDrumProcessor::~ZeroEffortDrumProcessor()
+{
+    stopTimer();
+    kitRegistry->leave(kitMember);
+}
 
 ZeroEffortDrumProcessor::ZeroEffortDrumProcessor()
     : AudioProcessor(BusesProperties().withInput("Input", juce::AudioChannelSet::mono(), true)
@@ -1194,25 +404,40 @@ ZeroEffortDrumProcessor::ZeroEffortDrumProcessor()
     autoSession = std::make_unique<AutoSession>();
     for (size_t index = 0; index < controls.size(); ++index)
         controls[index] = parameters.getRawParameterValue(drum::controlSpecs[index].id);
+    kitMember = kitRegistry->join();
+    kitTick();
+    startTimerHz(5);
 }
 
 juce::AudioProcessorValueTreeState::ParameterLayout ZeroEffortDrumProcessor::createParameters()
 {
     juce::AudioProcessorValueTreeState::ParameterLayout layout;
+    juce::StringArray groups;
+    for (int group = 1; group <= kit::groupCount; ++group) groups.add("Kit " + juce::String(group));
+    const auto fixed = juce::AudioParameterChoiceAttributes().withAutomatable(false);
     for (const auto& spec : drum::controlSpecs)
     {
-        if (juce::String(spec.id) == "drumInstrument")
+        const juce::String id(spec.id);
+        if (id == "drumInstrument")
         {
             juce::StringArray names;
             for (const auto* name : drum::instrumentNames) names.add(name);
             layout.add(std::make_unique<juce::AudioParameterChoice>(juce::ParameterID { spec.id, 1 }, spec.name, names, 0));
         }
+        else if (id == "kitGroup")
+            layout.add(std::make_unique<juce::AudioParameterChoice>(juce::ParameterID { spec.id, 1 }, spec.name, groups, 0, fixed));
+        else if (id == "kitMic")
+            layout.add(std::make_unique<juce::AudioParameterChoice>(juce::ParameterID { spec.id, 1 }, spec.name,
+                juce::StringArray { "Principal", "Secondaire", "Gauche", "Droite" }, 0, fixed));
+        else if (id == "kitMode")
+            layout.add(std::make_unique<juce::AudioParameterChoice>(juce::ParameterID { spec.id, 1 }, spec.name,
+                juce::StringArray { "Analyse seule", "Suggerer", "Auto" }, 1, fixed));
         else if (spec.toggle)
             layout.add(std::make_unique<juce::AudioParameterBool>(juce::ParameterID { spec.id, 1 }, spec.name, spec.initial > 0));
         else
             layout.add(std::make_unique<juce::AudioParameterFloat>(juce::ParameterID { spec.id, 1 }, spec.name,
                 juce::NormalisableRange<float> { spec.minimum, spec.maximum, 0.01f, spec.skew }, spec.initial,
-                juce::AudioParameterFloatAttributes().withLabel(spec.unit)));
+                juce::AudioParameterFloatAttributes().withLabel(spec.unit).withAutomatable(id != "kitStrength")));
     }
     return layout;
 }
@@ -1221,6 +446,7 @@ void ZeroEffortDrumProcessor::prepareToPlay(double sampleRate, int maximumBlockS
 {
     spectrumCapture.reset();
     engine.prepare(sampleRate, maximumBlockSize, getTotalNumOutputChannels());
+    preparedRate = sampleRate;
     prepareToPlayForARA(sampleRate, maximumBlockSize, getTotalNumOutputChannels(), getProcessingPrecision());
 }
 
@@ -1239,17 +465,37 @@ bool ZeroEffortDrumProcessor::isBusesLayoutSupported(const BusesLayout& layouts)
 void ZeroEffortDrumProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer&)
 {
     juce::ScopedNoDenormals noDenormals;
+    std::optional<juce::int64> timeline;
+    if (auto* head = getPlayHead())
+        if (const auto position = head->getPosition())
+            if (position->getIsPlaying())
+                if (const auto samples = position->getTimeInSamples())
+                    timeline = *samples;
+    const auto capture = [this, &timeline](const juce::AudioBuffer<float>& source, int samples) {
+        if (kitMember == nullptr) return;
+        if (!timeline.has_value() || samples <= 0) kitMember->markIdle();
+        else kitMember->write(source.getArrayOfReadPointers(), source.getNumChannels(), samples, *timeline,
+            getSampleRate() > 0 ? getSampleRate() : preparedRate);
+    };
+    // Kit alignment is the first stage of DrumEngine: per instance in insert, per ARA region.
     if (!processBlockForARA(buffer, isNonRealtime() ? Realtime::no : Realtime::yes, getPlayHead()))
     {
+        capture(buffer, buffer.getNumSamples());
         autoCapture.push(buffer, getSampleRate());
         drum::Settings settings {};
         for (size_t index = 0; index < settings.size(); ++index)
             settings[index] = controls[index]->load(std::memory_order_relaxed);
         engine.process(buffer, settings);
     }
+    else if (isPlaybackRenderer())
+    {
+        if (const auto* renderer = getPlaybackRenderer<PrototypeRenderer>())
+            capture(renderer->rawMix(), renderer->rawSamples());
+    }
     if (!isBoundToARA() || isPlaybackRenderer())
         spectrumCapture.push(buffer, getSpectrumMailbox(), getSampleRate());
 }
+
 
 namespace
 {
@@ -1512,7 +758,9 @@ void ZeroEffortDrumProcessor::writeSettings(const drum::Settings& settings)
 bool ZeroEffortDrumProcessor::applyAutoPreset()
 {
     if (!canApplyAutoPreset()) return false;
-    writeSettings(autoSession->proposal.settings);
+    auto settings = autoSession->proposal.settings;
+    drum::keepKitSettings(settings, getSettings());
+    writeSettings(settings);
     autoSession->applied = getSettings();
     autoSession->ready = false;
     autoSession->changed = true;
@@ -1523,7 +771,9 @@ bool ZeroEffortDrumProcessor::applyAutoPreset()
 bool ZeroEffortDrumProcessor::revertAutoPreset()
 {
     if (!canRevertAutoPreset()) return false;
-    writeSettings(autoSession->before);
+    auto settings = autoSession->before;
+    drum::keepKitSettings(settings, getSettings());
+    writeSettings(settings);
     autoSession->changed = false;
     autoSession->text = "Auto / Reglages precedents retablis";
     return true;
@@ -1612,7 +862,7 @@ drum::SpectrumMailbox& ZeroEffortDrumProcessor::getSpectrumMailbox() noexcept
 
 juce::AudioProcessorEditor* ZeroEffortDrumProcessor::createEditor()
 {
-    return new PrototypeEditor(*this);
+    return drum::ui::createEditor(*this);
 }
 
 void ZeroEffortDrumProcessor::recordHostOutput(float peak, int channels, bool active, bool fallback,
@@ -1707,8 +957,243 @@ void ZeroEffortDrumProcessor::setStateInformation(const void* data, int size)
             parameters.replaceState(state);
             const auto style = juce::jlimit(0, 2, static_cast<int>(state.getProperty("autoStyle", 0)));
             setAutoStyle(static_cast<drum::DrumStyle>(style), static_cast<float>(state.getProperty("autoIntensity", 1.0f)));
+            kitTick();
         }
 }
+
+void ZeroEffortDrumProcessor::updateTrackProperties(const TrackProperties& properties)
+{
+    trackName = properties.name.value_or(juce::String()).trim();
+    kitTick();
+}
+
+namespace
+{
+juce::ARAPlaybackRegion* firstRenderedRegion(const ZeroEffortDrumProcessor& processor)
+{
+    if (const auto* renderer = processor.getPlaybackRenderer())
+    {
+        const auto& regions = renderer->getPlaybackRegions();
+        if (!regions.empty()) return regions.front();
+    }
+    return nullptr;
+}
+
+juce::ARAPlaybackRegion* firstSelectedRegion(const ZeroEffortDrumProcessor& processor)
+{
+    if (auto* view = processor.getEditorView())
+    {
+        const auto& regions = view->getViewSelection().getEffectivePlaybackRegions();
+        if (!regions.empty()) return static_cast<juce::ARAPlaybackRegion*>(regions.front());
+    }
+    return nullptr;
+}
+
+// The ARA region sequence is the Cubase track: shared by the editor and playback instances.
+juce::String trackKey(juce::ARAPlaybackRegion* region)
+{
+    return region == nullptr ? juce::String()
+        : "ara:" + juce::String::toHexString(reinterpret_cast<juce::pointer_sized_int>(region->getRegionSequence()));
+}
+}
+
+drum::Settings ZeroEffortDrumProcessor::memberSettings() const
+{
+    if (isBoundToARA())
+        if (auto* region = firstRenderedRegion(*this))
+            return static_cast<DrumModification*>(region->getAudioModification())->settings.load();
+    return getSettings();
+}
+
+juce::String ZeroEffortDrumProcessor::memberKey() const
+{
+    if (!isBoundToARA()) return "insert:" + juce::String(getKitMemberId());
+    if (auto* region = firstRenderedRegion(*this)) return trackKey(region);
+    return trackKey(firstSelectedRegion(*this));
+}
+
+juce::String ZeroEffortDrumProcessor::selectionKey() const
+{
+    if (!isBoundToARA()) return memberKey();
+    if (auto* region = firstSelectedRegion(*this)) return trackKey(region);
+    return memberKey();
+}
+
+int ZeroEffortDrumProcessor::currentInstrument() const
+{
+    return static_cast<int>(drum::instrumentFromValue(memberSettings()[drum::instrument]));
+}
+
+float ZeroEffortDrumProcessor::getKitControl(KitControl control) const noexcept
+{
+    return control >= 0 && control < kitControlCount ? getSettings()[static_cast<size_t>(kitSetting(control))] : 0.0f;
+}
+
+void ZeroEffortDrumProcessor::setKitControl(KitControl control, float value)
+{
+    if (control < 0 || control >= kitControlCount || !std::isfinite(value)) return;
+    if (getSettings()[static_cast<size_t>(kitSetting(control))] == value) return;
+    setControl(kitSetting(control), value);
+    if (control == kitGroup || control == kitMic) kitTick();
+}
+
+kit::Mode ZeroEffortDrumProcessor::getKitMode() const noexcept
+{
+    return static_cast<kit::Mode>(juce::jlimit(0, 2, static_cast<int>(std::lround(getKitControl(kitMode)))));
+}
+
+kit::Identity ZeroEffortDrumProcessor::getKitIdentity() const
+{
+    const auto settings = memberSettings();
+    kit::Identity identity;
+    identity.group = juce::jlimit(0, kit::groupCount - 1, static_cast<int>(std::lround(settings[drum::kitGroup])));
+    identity.instrument = static_cast<int>(drum::instrumentFromValue(settings[drum::instrument]));
+    identity.position = juce::jlimit(0, 3, static_cast<int>(std::lround(settings[drum::kitMic])));
+    identity.role = kit::roleFor(identity.instrument, identity.position);
+    juce::String label = drum::instrumentNames[static_cast<size_t>(identity.instrument)];
+    const auto secondary = identity.position == kit::positionSecondary;
+    if (identity.instrument == 0) label = secondary ? "Kick Out" : "Kick In";
+    if (identity.instrument == 1) label = secondary ? "Snare Bottom" : "Snare Top";
+    if (identity.instrument == 7 || identity.instrument == 8)
+    {
+        const juce::String base = identity.instrument == 7 ? "OH" : "Room";
+        label = identity.position == kit::positionLeft ? base + " L" : identity.position == kit::positionRight ? base + " R"
+            : identity.instrument == 7 ? juce::String("Overheads") : juce::String("Room");
+    }
+    identity.name = trackName.isNotEmpty() && trackName != label ? trackName + " (" + label + ")" : label;
+    identity.key = memberKey();
+    return identity;
+}
+
+kit::GroupView ZeroEffortDrumProcessor::getKitView() const
+{
+    return kitRegistry->view(juce::jlimit(0, kit::groupCount - 1, static_cast<int>(std::lround(getKitControl(kitGroup)))));
+}
+
+juce::uint32 ZeroEffortDrumProcessor::getKitMemberId() const noexcept
+{
+    return kitMember != nullptr ? kitMember->id() : 0;
+}
+
+void ZeroEffortDrumProcessor::startKitAnalysis()
+{
+    kitTick();
+    kitRegistry->startAnalysis(juce::jlimit(0, kit::groupCount - 1, static_cast<int>(std::lround(getKitControl(kitGroup)))));
+}
+
+void ZeroEffortDrumProcessor::stopKitAnalysis()
+{
+    kitRegistry->stopAnalysis(juce::jlimit(0, kit::groupCount - 1, static_cast<int>(std::lround(getKitControl(kitGroup)))));
+}
+
+const kit::Recommendation* ZeroEffortDrumProcessor::findOwnRecommendation(const kit::Report& report) const
+{
+    if (const auto* recommendation = report.findTrack(selectionKey())) return recommendation;
+    return report.find(getKitMemberId());
+}
+
+bool ZeroEffortDrumProcessor::canApplyKitRecommendation() const
+{
+    if (getKitMode() == kit::Mode::off || !canEditSettings()) return false;
+    const auto view = getKitView();
+    const auto* recommendation = findOwnRecommendation(view.report);
+    return view.report.final && recommendation != nullptr && recommendation->measured;
+}
+
+bool ZeroEffortDrumProcessor::applyKitRecommendation()
+{
+    if (!canApplyKitRecommendation()) return false;
+    const auto view = getKitView();
+    const auto& recommendation = *findOwnRecommendation(view.report);
+    const auto strength = juce::jlimit(0.0f, 1.0f, getKitControl(kitStrength) * 0.01f);
+    setControl(drum::kitDelay, recommendation.delayMs * strength);
+    setControl(drum::kitPolarity, recommendation.invert && strength > 0 ? 1.0f : 0.0f);
+    return true;
+}
+
+// Auto mode writes to what this instance actually plays: its own ARA regions, or its parameters.
+void ZeroEffortDrumProcessor::writeOwnKit(float delayMs, bool invert)
+{
+    if (!isBoundToARA())
+    {
+        setControl(drum::kitDelay, delayMs);
+        setControl(drum::kitPolarity, invert ? 1.0f : 0.0f);
+        return;
+    }
+    std::vector<DrumModification*> written;
+    if (const auto* renderer = getPlaybackRenderer())
+        for (auto* region : renderer->getPlaybackRegions())
+        {
+            auto* modification = static_cast<DrumModification*>(region->getAudioModification());
+            if (std::find(written.begin(), written.end(), modification) != written.end()) continue;
+            written.push_back(modification);
+            modification->settings.values[drum::kitDelay].store(juce::jlimit(0.0f, kit::maxDelayMs, delayMs));
+            modification->settings.values[drum::kitPolarity].store(invert ? 1.0f : 0.0f);
+            modification->notifyContentChanged(juce::ARAContentUpdateScopes::samplesAreAffected(), true);
+        }
+}
+
+void ZeroEffortDrumProcessor::requestKitApply(const std::vector<juce::uint32>& members)
+{
+    kitRegistry->requestApply(juce::jlimit(0, kit::groupCount - 1, static_cast<int>(std::lround(getKitControl(kitGroup)))), members, false);
+    kitTick();
+}
+
+void ZeroEffortDrumProcessor::requestKitReset()
+{
+    const auto view = getKitView();
+    std::vector<juce::uint32> members;
+    for (const auto& member : view.members) members.push_back(member.id);
+    kitRegistry->requestApply(view.group, members, true);
+    kitTick();
+}
+
+void ZeroEffortDrumProcessor::kitTick()
+{
+    if (kitMember == nullptr) return;
+    const auto identity = getKitIdentity();
+    if (!identityPublished || identity != publishedIdentity)
+    {
+        kitRegistry->setIdentity(*kitMember, identity);
+        publishedIdentity = identity;
+        identityPublished = true;
+    }
+    const auto settings = memberSettings();
+    const auto amount = juce::jlimit(0.0f, 1.0f, settings[drum::kitStrength] * 0.01f);
+    const auto mode = static_cast<int>(std::lround(settings[drum::kitMode]));
+    const auto serial = kitRegistry->applySerial(identity.group);
+    if (identity.group != kitApplyGroup)
+    {
+        kitApplyGroup = identity.group;
+        kitApplySerial = serial;
+    }
+    else if (serial != kitApplySerial)
+    {
+        kitApplySerial = serial;
+        const auto request = kitRegistry->applyRequest(identity.group);
+        if (std::find(request.members.begin(), request.members.end(), kitMember->id()) != request.members.end())
+        {
+            if (request.reset)
+                writeOwnKit(0.0f, false);
+            else if (mode != static_cast<int>(kit::Mode::off))
+                if (const auto* recommendation = request.report.find(kitMember->id()))
+                    if (recommendation->measured)
+                        writeOwnKit(recommendation->delayMs * amount, recommendation->invert && amount > 0);
+        }
+    }
+    if (mode != static_cast<int>(kit::Mode::automatic)) return;
+    const auto revision = kitRegistry->revision(identity.group);
+    const auto strength = settings[drum::kitStrength];
+    if (revision == kitAppliedRevision && strength == kitAppliedStrength) return;
+    kitAppliedRevision = revision;
+    kitAppliedStrength = strength;
+    const auto view = kitRegistry->view(identity.group);
+    if (view.report.final && view.report.valid)
+        if (const auto* recommendation = view.report.find(kitMember->id()))
+            if (recommendation->measured)
+                writeOwnKit(recommendation->delayMs * amount, recommendation->invert && amount > 0);
+}
+
 
 juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter()
 {

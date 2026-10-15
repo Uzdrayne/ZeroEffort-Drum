@@ -12,6 +12,9 @@
 
 const ARA::ARAFactory* JUCE_CALLTYPE createARAFactory();
 void testDrumBus();
+void testKit();
+void makeScreenshots(const juce::File& directory);
+void testEditor(ZeroEffortDrumProcessor& processor, const juce::File& imageFile);
 
 namespace
 {
@@ -476,7 +479,13 @@ void testProposalEquivalence()
             for (size_t control = 0; control < actual.settings.size(); ++control)
             {
                 if (actual.valid && normalizedDose > 0 && (control >= drum::ambienceOn
+                    || control == drum::cleanupOn || control == drum::cleanupDepth
                     || (control == drum::bodyFrequency && original[drum::instrument] >= 1 && original[drum::instrument] <= 5))) continue;
+                if (actual.valid && normalizedDose > 0 && actual.settings[drum::cleanupOn] > 0.5f
+                    && original[drum::instrument] >= 1 && original[drum::instrument] <= 5
+                    && (control == drum::gateThreshold || control == drum::gateRatio || control == drum::gateRange
+                        || control == drum::focusLow || control == drum::focusHigh
+                        || control == drum::gateHold || control == drum::gateHysteresis)) continue;
                 check(actual.settings[control] == expected.settings[control]
                     || (std::isnan(actual.settings[control]) && std::isnan(expected.settings[control])), drum::controlSpecs[control].id);
             }
@@ -572,8 +581,105 @@ void testProposalEquivalence()
     std::cout << "PASS: " << comparisons << " proposal checks: historical core, adaptive finishes and intensity\n";
 }
 
+void testAdaptiveFinishing()
+{
+    for (const auto rate : { 44100.0, 48000.0, 96000.0 })
+    {
+        auto analyser = std::make_unique<drum::DrumAnalyser>();
+        std::vector<float> source(static_cast<size_t>(rate * 3.2));
+        for (size_t sample = 0; sample < source.size(); ++sample)
+        {
+            const auto time = sample / rate;
+            const auto age = std::fmod(time, 0.4);
+            const auto velocity = static_cast<int>(time / 0.4) % 2 == 0 ? 1.0 : 0.35;
+            source[sample] = static_cast<float>(0.25 * velocity * std::exp(-age * 25)
+                * (0.75 * std::sin(juce::MathConstants<double>::twoPi * 65 * time)
+                    + 0.6 * std::sin(juce::MathConstants<double>::twoPi * 150 * time)
+                    + 0.25 * std::sin(juce::MathConstants<double>::twoPi * 650 * time)
+                    + 0.3 * std::sin(juce::MathConstants<double>::twoPi * 7000 * time))
+                + 0.003 * std::sin(juce::MathConstants<double>::twoPi * 9000 * time));
+        }
+        analyser->prepare(rate);
+        analyser->push(source.data(), static_cast<int>(source.size()));
+        require(analyser->analysis().peakDb() < -6, "Finishing fixture must exercise a source below the old clip activation threshold");
+        for (int role = 0; role < 10; ++role)
+            for (const auto style : { drum::DrumStyle::natural, drum::DrumStyle::rock, drum::DrumStyle::metal })
+            {
+                auto original = drum::defaultSettings();
+                original[drum::instrument] = static_cast<float>(role);
+                auto previous = analyser->propose(original, style, 0);
+                for (const auto intensity : { 0.2f, 0.5f, 0.8f, 1.0f })
+                {
+                    const auto current = analyser->propose(original, style, intensity);
+                    require(current.valid, "Role-aware finishing proposals must accept the moderate-level percussion fixture");
+                    if (previous.settings[drum::levelMatchOn] > 0.5f)
+                        for (const auto control : { drum::crushAmount, drum::colourDrive, drum::colourMix,
+                            drum::shapeAttack, drum::dynamicLowRange, drum::dynamicHighRange, drum::clipMix, drum::cleanupDepth })
+                            require(current.settings[control] + 0.00001f >= previous.settings[control],
+                                "Finishing amounts must increase monotonically with intensity");
+                    if (role <= 5)
+                    {
+                        require(current.settings[drum::crushOn] == 1 && current.settings[drum::colourOn] == 1
+                            && current.settings[drum::shapeOn] == 1 && current.settings[drum::dynamicOn] == 1
+                            && current.settings[drum::cleanupOn] == 1,
+                            "A measured close-mic performance must engage the complete useful finishing chain");
+                        if (role > 0)
+                            require(current.settings[drum::autoMeasuredOn] == 1 && current.settings[drum::presenceOn] == 0,
+                                "Measured Snare/Tom bodies must not enable synthetic Kick reinforcement");
+                        if (intensity == 1) require(current.settings[drum::clipOn] == 1,
+                            "High intensity must use gentle soft clipping without requiring near-zero source peaks");
+                    }
+                    if (role == 6 || role == 7)
+                        require(current.settings[drum::cleanupOn] + current.settings[drum::crushOn]
+                            + current.settings[drum::colourOn] + current.settings[drum::clipOn] == 0,
+                            "Cymbal roles must retain tails and avoid automatic close-mic cleanup or distortion");
+                    previous = current;
+                }
+            }
+        auto original = drum::defaultSettings();
+        original[drum::instrument] = 1;
+        auto candidate = analyser->propose(original, drum::DrumStyle::rock, 1);
+        require(std::abs(candidate.settings[drum::bodyFrequency] - 150) < 15,
+            "Snare measured body must track the fixture rather than its default 180 Hz");
+        auto preview = std::make_unique<drum::DrumPresetPreview>();
+        juce::AudioBuffer<float> audio(1, 256);
+        for (int pass = 0; pass < 2; ++pass)
+        {
+            preview->prepare(rate, 1, candidate);
+            for (size_t offset = 0; offset < source.size(); offset += 256)
+            {
+                const auto count = static_cast<int>(juce::jmin(size_t { 256 }, source.size() - offset));
+                audio.copyFrom(0, 0, source.data() + offset, count);
+                preview->push(audio, count);
+            }
+            if (pass == 0) preview->refineThreshold(candidate); else preview->finish(candidate);
+        }
+        drum::DrumEngine engine;
+        engine.prepare(rate, 256, 1);
+        std::array<float, drum::finishMeterCount> maximums {};
+        float peak = 0;
+        for (size_t offset = 0; offset < source.size(); offset += 256)
+        {
+            const auto count = static_cast<int>(juce::jmin(size_t { 256 }, source.size() - offset));
+            audio.copyFrom(0, 0, source.data() + offset, count);
+            juce::AudioBuffer<float> block(audio.getArrayOfWritePointers(), 1, count);
+            engine.process(block, candidate.settings);
+            peak = juce::jmax(peak, block.getMagnitude(0, count));
+            for (size_t meter = 0; meter < maximums.size(); ++meter)
+                maximums[meter] = juce::jmax(maximums[meter], std::abs(engine.finishMeters[meter].load()));
+        }
+        require(peak <= juce::Decibels::decibelsToGain(-0.95f), "Stronger adaptive finishes must retain verified sample headroom");
+        require(maximums[0] > 1 && maximums[1] + maximums[2] > 0.5f && maximums[5] > 0.25f,
+            "Crush, dynamic EQ and Attack/Sustain must actually act in the calibrated high-intensity preset");
+        require(maximums[6] > 0.00001f && maximums[7] > 0.00001f && maximums[12] > 1,
+            "Colour, soft clip and Bleed Clean must produce measurable processing rather than decorative ON states");
+        require(candidate.summary.contains("Bleed Clean max"), "Calibrated Snare Bilan must report the measured cleanup rather than claim it is disabled");
+    }
+}
+
 void testAutoPreset()
 {
+    testAdaptiveFinishing();
     testProposalEquivalence();
     for (double rate : { 44100.0, 48000.0, 96000.0 })
     {
@@ -625,8 +731,10 @@ void testAutoPreset()
             const auto profile = analyser.propose(original, drum::DrumStyle::rock);
             require(profile.valid && profile.settings[drum::instrument] == element,
                 "Every selected drum role must route to its own valid proposal and persist the role");
-            require(profile.settings[drum::focusOn] == 0 && profile.settings[drum::presenceOn] == 0
-                && profile.settings[drum::cleanupOn] == 0, "Non-kick profiles must never enable synthetic Kick processing");
+            require(profile.settings[drum::focusOn] == 0 && profile.settings[drum::presenceOn] == 0,
+                "Non-kick profiles must never enable synthetic Kick processing");
+            if (element >= 6) require(profile.settings[drum::cleanupOn] == 0,
+                "Distant microphones and cymbals must not receive automatic Bleed Clean");
             if (element >= 6) require(profile.settings[drum::gateOn] == 0,
                 "Hi-hat, overheads, room and master must preserve tails without automatic gating");
             require(analyser.propose(original, drum::DrumStyle::rock, 0).settings[drum::compressorOn] == 0,
@@ -1155,6 +1263,11 @@ int main(int argumentCount, char** arguments)
     try
     {
         juce::ScopedJuceInitialiser_GUI initialiser;
+        if (argumentCount == 3 && juce::String(arguments[1]) == "--screenshots")
+        {
+            makeScreenshots(juce::File(juce::String::fromUTF8(arguments[2])));
+            return 0;
+        }
         if ((argumentCount == 3 || argumentCount == 4) && juce::String(arguments[1]) == "--analyse-wav")
         {
             const auto style = argumentCount == 4 ? juce::String(arguments[3]).toLowerCase() : juce::String("natural");
@@ -1163,6 +1276,7 @@ int main(int argumentCount, char** arguments)
                 : style == "metal" ? drum::DrumStyle::metal : drum::DrumStyle::natural);
             return 0;
         }
+        testKit();
         testKickResponse();
         testDrumBus();
         testKickArchive();
@@ -1288,7 +1402,7 @@ int main(int argumentCount, char** arguments)
             "ARA plugin name must match ZeroEffort Drum");
         require(factory->manufacturerName != nullptr && juce::String(factory->manufacturerName).isNotEmpty(),
             "ARA manufacturer must be present");
-        require(factory->version != nullptr && juce::String(factory->version) == "0.9.0",
+        require(factory->version != nullptr && juce::String(factory->version) == "0.10.0",
             "ARA factory version must match the corrected prototype");
         require(juce::String(factory->factoryID) == "com.robin.zeroeffortdrum.factory.1",
             "ARA identity must identify ZeroEffort Drum separately from the prototype and gain plugin");
@@ -1313,456 +1427,8 @@ int main(int argumentCount, char** arguments)
         stereoLayout.outputBuses.set(0, juce::AudioChannelSet::stereo());
         require(processor.setBusesLayout(stereoLayout), "Host must still be able to negotiate stereo");
         require(processor.getTotalNumOutputChannels() == 2, "Stereo negotiation must update the output bus");
-        {
-            std::unique_ptr<juce::AudioProcessorEditor> editor(processor.createEditor());
-            require(editor != nullptr && editor->getWidth() == 1020 && editor->getHeight() == 760,
-                "Diagnostic editor must have a stable initial layout");
-            int sliderCount = 0, toggleCount = 0;
-            int autoButtons = 0;
-            int profileButtons = 0;
-            bool intensityFound = false;
-            for (auto* child : editor->getChildren())
-            {
-                if (auto* button = dynamic_cast<juce::TextButton*>(child))
-                {
-                    if (button->getButtonText() == "Naturel" || button->getButtonText() == "Rock" || button->getButtonText() == "Metal")
-                    {
-                        ++profileButtons;
-                        require(editor->getLocalBounds().contains(button->getBounds()), "Profile controls must fit editor bounds");
-                        if (button->getButtonText() == "Metal")
-                        {
-                            button->onClick();
-                            require(processor.getAutoStyle() == drum::DrumStyle::metal, "Profile button must reach the Auto engine");
-                        }
-                    }
-                    if (button->getButtonText() == "Analyser" || button->getButtonText() == "Appliquer"
-                        || button->getButtonText() == "Revenir")
-                    {
-                        ++autoButtons;
-                        require(editor->getLocalBounds().contains(button->getBounds()), "Auto commands must fit in the editor");
-                        if (button->getButtonText() != "Analyser")
-                            require(!button->isEnabled(), "Apply and rollback must start disabled");
-                    }
-                }
-                if (auto* slider = dynamic_cast<juce::Slider*>(child))
-                {
-                    if (slider->getSliderStyle() == juce::Slider::LinearHorizontal)
-                    {
-                        intensityFound = true;
-                        slider->setValue(60, juce::sendNotificationSync);
-                        require(std::abs(processor.getAutoIntensity() - 0.6f) < 0.0001f,
-                            "Intensity slider must reach Auto options without changing manual parameters");
-                    }
-                    if (slider->getTooltip().startsWith("Body gain"))
-                    {
-                        slider->setValue(3.0, juce::sendNotificationSync);
-                        require(processor.getSettings()[drum::bodyGain] == 3.0f,
-                            "Visible EQ control must update the real processor parameter");
-                        slider->setValue(0.0, juce::sendNotificationSync);
-                    }
-                    if (slider->isVisible() && slider->getSliderStyle() == juce::Slider::RotaryHorizontalVerticalDrag) ++sliderCount;
-                    require(editor->getLocalBounds().contains(slider->getBounds()), "Every rotary control must fit the editor");
-                }
-                if (auto* toggle = dynamic_cast<juce::ToggleButton*>(child))
-                {
-                    if (toggle->getButtonText() == "Equalizer")
-                    {
-                        toggle->setToggleState(true, juce::dontSendNotification);
-                        toggle->onClick();
-                        require(processor.getSettings()[drum::eqOn] == 1.0f,
-                            "Visible module activation must update the real processor parameter");
-                        toggle->setToggleState(false, juce::dontSendNotification);
-                        toggle->onClick();
-                    }
-                    if (toggle->isVisible()) ++toggleCount;
-                }
-            }
-            require(sliderCount == 15 && toggleCount == 5, "EQ page must expose bands, Q, gains, level-matched A/B and mono monitoring");
-            require(autoButtons == 3, "Auto workflow must expose all three commands");
-            require(profileButtons == 3 && intensityFound, "Every musical profile and intensity control must be visible");
-            juce::TextButton* presencePage = nullptr;
-            for (auto* child : editor->getChildren())
-                if (auto* button = dynamic_cast<juce::TextButton*>(child))
-                    if (button->getButtonText() == "Focus / Presence") presencePage = button;
-            require(presencePage != nullptr, "Presence controls must have a dedicated accessible view");
-            presencePage->setToggleState(true, juce::dontSendNotification);
-            presencePage->onClick();
-            int presenceSliders = 0, presenceToggles = 0;
-            for (auto* child : editor->getChildren())
-            {
-                if (auto* slider = dynamic_cast<juce::Slider*>(child))
-                    if (slider->isVisible() && slider->getSliderStyle() == juce::Slider::RotaryHorizontalVerticalDrag)
-                    {
-                        ++presenceSliders;
-                        require(editor->getLocalBounds().contains(slider->getBounds()), "Presence knobs must fit the editor");
-                        if (slider->getTooltip().startsWith("Body amount"))
-                        {
-                            slider->setValue(42, juce::sendNotificationSync);
-                            require(processor.getSettings()[drum::reinforceAmount] == 42,
-                                "Presence UI must update the real body reinforcement parameter");
-                        }
-                    }
-                if (auto* toggle = dynamic_cast<juce::ToggleButton*>(child))
-                    if (toggle->isVisible()) ++presenceToggles;
-            }
-            require(presenceSliders == 12 && presenceToggles == 8,
-                "Focus/Presence view must expose fourteen controls, input/output, spectrum and global bypass");
-            presencePage->setToggleState(false, juce::dontSendNotification);
-            presencePage->onClick();
-            const std::array<juce::String, 4> pageNames { "Filtres", "Expander", "EQ", "Compresseur" };
-            const std::array<int, 4> expectedSliders { 4, 7, 15, 8 };
-            for (size_t page = 0; page < pageNames.size(); ++page)
-            {
-                juce::TextButton* selected = nullptr;
-                for (auto* child : editor->getChildren())
-                    if (auto* button = dynamic_cast<juce::TextButton*>(child))
-                        if (button->getButtonText() == pageNames[page]) selected = button;
-                require(selected != nullptr, "Every processing section must have an accessible tab");
-                selected->onClick();
-                require(selected->getToggleState() && !presencePage->getToggleState(), "Section tabs must be mutually exclusive");
-                require(selected->getBounds().getY() >= 346, "Section tabs must remain below the permanent graph and meters");
-                int visibleSliders = 0;
-                std::vector<juce::Rectangle<int>> bounds;
-                for (auto* child : editor->getChildren())
-                    if (auto* slider = dynamic_cast<juce::Slider*>(child))
-                        if (slider->isVisible() && slider->getSliderStyle() == juce::Slider::RotaryHorizontalVerticalDrag)
-                        {
-                            ++visibleSliders;
-                            require(editor->getLocalBounds().contains(slider->getBounds()), "Section knobs must fit editor bounds");
-                            for (const auto& previous : bounds)
-                                require(!previous.intersects(slider->getBounds()), "Visible section knobs must never overlap");
-                            bounds.push_back(slider->getBounds());
-                            if (slider->getTooltip().startsWith("Body Q"))
-                            {
-                                slider->setValue(2.3, juce::sendNotificationSync);
-                                require(std::abs(processor.getSettings()[drum::bodyQ] - 2.3f) < 0.001f,
-                                    "Independent Q control must reach the real processor");
-                                slider->setValue(0, juce::sendNotificationSync);
-                                require(slider->getTextFromValue(0).trim() == "Global", "Inherited Q must display Global, never an invalid zero Q");
-                            }
-                        }
-                require(visibleSliders == expectedSliders[page], "Each section must expose all and only its knobs plus global gains");
-            }
-            for (auto* child : editor->getChildren())
-                if (auto* toggle = dynamic_cast<juce::ToggleButton*>(child))
-                    if (toggle->getButtonText() == "Multibande")
-                    {
-                        toggle->setToggleState(true, juce::dontSendNotification);
-                        toggle->onClick();
-                        require(processor.getSettings()[drum::multibandOn] == 1,
-                            "Multiband mode UI must activate the real processor path");
-                    }
-            int bandKnobs = 0;
-            std::vector<juce::Rectangle<int>> multibandBounds;
-            for (auto* child : editor->getChildren())
-                if (auto* slider = dynamic_cast<juce::Slider*>(child))
-                    if (slider->isVisible() && slider->getY() >= 396)
-                    {
-                        ++bandKnobs;
-                        for (const auto& previous : multibandBounds)
-                            require(!previous.intersects(slider->getBounds()), "Multiband knobs and global gains must not overlap");
-                        multibandBounds.push_back(slider->getBounds());
-                        require(slider->getBounds().getBottom() <= 722, "Multiband knobs must not overlap the Auto footer");
-                        if (slider->getTooltip().startsWith("Medium seuil"))
-                        {
-                            slider->setValue(-33, juce::sendNotificationSync);
-                            require(std::abs(processor.getSettings()[drum::midThreshold] + 33) < 0.001f,
-                                "Per-band threshold UI must reach the actual processing parameters");
-                        }
-                    }
-            require(bandKnobs == 24, "Multiband page must expose eighteen band controls, four globals plus Input and Output");
-            processor.setControl(drum::multibandOn, 0);
-            for (auto* child : editor->getChildren())
-                if (auto* menu = dynamic_cast<juce::ComboBox*>(child))
-                {
-                    require(menu->getNumItems() == 10, "Instrument menu must expose all ten drum roles");
-                    const auto before = processor.getSettings();
-                    menu->setSelectedId(10, juce::dontSendNotification);
-                    menu->onChange();
-                    auto expected = before;
-                    expected[drum::instrument] = 9;
-                    require(processor.getSettings() == expected, "Choosing Master must not alter any audio treatment");
-                    menu->setSelectedId(1, juce::dontSendNotification);
-                    menu->onChange();
-                }
-            for (auto* child : editor->getChildren())
-                if (auto* button = dynamic_cast<juce::TextButton*>(child))
-                    if (button->getButtonText() == "Bus") button->onClick();
-            int busSliders = 0;
-            std::vector<juce::Rectangle<int>> busBounds;
-            for (auto* child : editor->getChildren())
-                if (auto* slider = dynamic_cast<juce::Slider*>(child))
-                    if (slider->isVisible() && slider->getY() >= 396)
-                    {
-                        ++busSliders;
-                        require(slider->getBottom() <= 722, "Bus controls must remain above Auto footer");
-                        for (const auto& previous : busBounds) require(!previous.intersects(slider->getBounds()),
-                            "Bus controls must not overlap each other or Input/Output");
-                        busBounds.push_back(slider->getBounds());
-                    }
-            require(busSliders == 18, "Bus page must expose nine Glue, seven room and two global gain controls");
-            for (const auto& page : { juce::String("Impact"), juce::String("Precision") })
-            {
-                bool found = false;
-                for (auto* child : editor->getChildren())
-                    if (auto* button = dynamic_cast<juce::TextButton*>(child))
-                        if (button->getButtonText() == page) { button->onClick(); found = true; }
-                require(found, "Both finishing pages must be accessible");
-                std::vector<juce::Rectangle<int>> bounds;
-                int controls = 0;
-                for (auto* child : editor->getChildren())
-                    if (auto* slider = dynamic_cast<juce::Slider*>(child))
-                        if (slider->isVisible() && slider->getY() >= 396)
-                        {
-                            ++controls;
-                            require(slider->getBottom() <= 700, "Finishing controls must stay clear of the measurement footer");
-                            for (const auto& previous : bounds) require(!previous.intersects(slider->getBounds()),
-                                "Finishing controls and global gains must not overlap");
-                            for (auto* candidate : editor->getChildren())
-                                if (auto* label = dynamic_cast<juce::Label*>(candidate))
-                                    if (label->isVisible() && label->getY() >= 396)
-                                        require(!label->getBounds().intersects(slider->getBounds()),
-                                            "Finishing labels must not overlap adjacent numeric controls");
-                            bounds.push_back(slider->getBounds());
-                        }
-                require(controls == (page == "Impact" ? 13 : 12), "Finishing pages must expose all their numeric controls");
-            }
-            for (auto* child : editor->getChildren())
-                if (auto* toggle = dynamic_cast<juce::ToggleButton*>(child))
-                    if (toggle->getButtonText() == "Bypass")
-                    {
-                        require(toggle->isEnabled() && processor.canBypass(), "Insert Bypass must remain clickable on Bus page");
-                        toggle->setToggleState(true, juce::dontSendNotification);
-                        toggle->onClick();
-                        require(processor.getSettings()[drum::bypass] == 1, "Clickable Bypass must update the real processor");
-                        toggle->setToggleState(false, juce::dontSendNotification);
-                        toggle->onClick();
-                    }
-            for (auto* child : editor->getChildren())
-                if (auto* toggle = dynamic_cast<juce::ToggleButton*>(child))
-                    if (toggle->getButtonText() == "Spectre")
-                    {
-                        require(processor.getSpectrumMailbox().subscribers.load() == 1, "Editor must subscribe to real output spectrum");
-                        toggle->setToggleState(false, juce::dontSendNotification);
-                        toggle->onClick();
-                        require(processor.getSpectrumMailbox().subscribers.load() == 0, "Disabling spectrum must stop capture");
-                        toggle->setToggleState(true, juce::dontSendNotification);
-                        toggle->onClick();
-                    }
-            {
-                const auto imageFile = argumentCount == 2 ? juce::File(juce::String::fromUTF8(arguments[1]))
-                    : juce::File::getSpecialLocation(juce::File::currentExecutableFile).getSiblingFile("DrumLive.png");
-                ZeroEffortDrumProcessor visual;
-                visual.setRateAndBufferSizeDetails(48000, 256);
-                visual.setControl(drum::filtersOn, 1);
-                visual.setControl(drum::highPass, 35);
-                visual.setControl(drum::lowPass, 12000);
-                visual.setControl(drum::eqOn, 1);
-                visual.setControl(drum::bodyFrequency, 80);
-                visual.setControl(drum::bodyGain, 3.5f);
-                visual.setControl(drum::boxGain, -4);
-                visual.setControl(drum::attackGain, 3);
-                visual.setControl(drum::bodyQ, 2);
-                visual.setControl(drum::boxQ, 1.4f);
-                visual.setControl(drum::attackQ, 1.5f);
-                visual.setControl(drum::eqQ, 1);
-                std::unique_ptr<juce::AudioProcessorEditor> visualEditor(visual.createEditor());
-                const auto blankSpectrum = visualEditor->createComponentSnapshot(visualEditor->getLocalBounds());
-                visual.prepareToPlay(48000, 256);
-                juce::AudioBuffer<float> live(1, 256);
-                for (int block = 0; block < 32; ++block)
-                {
-                    for (int sample = 0; sample < 256; ++sample)
-                    {
-                        const auto time = static_cast<double>(block * 256 + sample) / 48000;
-                        live.setSample(0, sample, static_cast<float>(0.12 * std::sin(juce::MathConstants<double>::twoPi * 80 * time)
-                            + 0.03 * std::sin(juce::MathConstants<double>::twoPi * 3000 * time)));
-                    }
-                    visual.processBlock(live, midi);
-                }
-                juce::MessageManager::getInstance()->runDispatchLoopUntil(70);
-                auto image = visualEditor->createComponentSnapshot(visualEditor->getLocalBounds());
-                require(image.isValid(), "Kick editor snapshot must render");
-                int intensityTrackPixels = 0;
-                for (int horizontal = 400; horizontal < 600; ++horizontal)
-                    for (int vertical = 44; vertical < 68; ++vertical)
-                        if (image.getPixelAt(horizontal, vertical) == juce::Colour(0xff58d1ad))
-                            ++intensityTrackPixels;
-                require(intensityTrackPixels > 100, "Full intensity must display a visible filled track, not only a thumb");
-                int changedSpectrumPixels = 0;
-                for (int horizontal = 64; horizontal < 728; ++horizontal)
-                    for (int vertical = 112; vertical < 300; ++vertical)
-                        if (image.getPixelAt(horizontal, vertical) != blankSpectrum.getPixelAt(horizontal, vertical))
-                            ++changedSpectrumPixels;
-                require(changedSpectrumPixels > 1000, "Real processor output must produce a nonblank moving spectrum in the editor");
-                juce::FileOutputStream stream(imageFile);
-                require(stream.openedOk(), "Snapshot output must open");
-                stream.setPosition(0);
-                stream.truncate();
-                require(juce::PNGImageFormat().writeImageToStream(image, stream), "Kick editor PNG must encode");
-                for (auto* child : visualEditor->getChildren())
-                    if (auto* button = dynamic_cast<juce::TextButton*>(child))
-                        if (button->getButtonText() == "Focus / Presence")
-                        {
-                            button->setToggleState(true, juce::dontSendNotification);
-                            button->onClick();
-                        }
-                auto presenceImage = visualEditor->createComponentSnapshot(visualEditor->getLocalBounds());
-                juce::FileOutputStream presenceStream(imageFile.getSiblingFile("KickPresence.png"));
-                presenceStream.setPosition(0);
-                presenceStream.truncate();
-                require(presenceStream.openedOk() && juce::PNGImageFormat().writeImageToStream(presenceImage, presenceStream),
-                    "Presence view snapshot must encode");
-                for (const auto& page : { juce::String("Filtres"), juce::String("Expander"), juce::String("Compresseur") })
-                {
-                    for (auto* child : visualEditor->getChildren())
-                        if (auto* button = dynamic_cast<juce::TextButton*>(child))
-                            if (button->getButtonText() == page) button->onClick();
-                    juce::FileOutputStream pageStream(imageFile.getSiblingFile("Kick" + page + ".png"));
-                    pageStream.setPosition(0);
-                    pageStream.truncate();
-                    require(pageStream.openedOk() && juce::PNGImageFormat().writeImageToStream(
-                        visualEditor->createComponentSnapshot(visualEditor->getLocalBounds()), pageStream), "Each section screenshot must encode");
-                }
-                for (auto* child : visualEditor->getChildren())
-                    if (auto* toggle = dynamic_cast<juce::ToggleButton*>(child))
-                        if (toggle->getButtonText() == "Multibande")
-                        {
-                            visual.setControl(drum::compressorOn, 1);
-                            toggle->setToggleState(true, juce::dontSendNotification);
-                            toggle->onClick();
-                        }
-                juce::FileOutputStream multibandStream(imageFile.getSiblingFile("KickMultibande.png"));
-                visual.setControl(drum::lowThreshold, -40);
-                visual.setControl(drum::midThreshold, -40);
-                visual.setControl(drum::highThreshold, -40);
-                juce::AudioBuffer<float> multibandAudio(1, 256);
-                for (int block = 0; block < 48; ++block)
-                {
-                    for (int sample = 0; sample < 256; ++sample)
-                    {
-                        const auto time = (block * 256 + sample) / 48000.0;
-                        multibandAudio.setSample(0, sample, static_cast<float>(0.14 * std::sin(juce::MathConstants<double>::twoPi * 80 * time)
-                            + 0.08 * std::sin(juce::MathConstants<double>::twoPi * 600 * time)
-                            + 0.05 * std::sin(juce::MathConstants<double>::twoPi * 3500 * time)));
-                    }
-                    visual.processBlock(multibandAudio, midi);
-                }
-                juce::MessageManager::getInstance()->runDispatchLoopUntil(70);
-                require(visual.getBandMeters()[0] > 1 && visual.getBandMeters()[1] > 1 && visual.getBandMeters()[2] > 1,
-                    "Live multiband UI meters must receive actual reductions from all three bands");
-                multibandStream.setPosition(0);
-                multibandStream.truncate();
-                require(multibandStream.openedOk() && juce::PNGImageFormat().writeImageToStream(
-                    visualEditor->createComponentSnapshot(visualEditor->getLocalBounds()), multibandStream),
-                    "Multiband UI snapshot must encode");
-                visual.setControl(drum::instrument, 9);
-                visual.setControl(drum::compressorOn, 0);
-                visual.setControl(drum::glueOn, 1);
-                visual.setControl(drum::glueThreshold, -30);
-                visual.setControl(drum::ambienceOn, 1);
-                for (auto* child : visualEditor->getChildren())
-                    if (auto* button = dynamic_cast<juce::TextButton*>(child))
-                        if (button->getButtonText() == "Bus") button->onClick();
-                for (int block = 0; block < 48; ++block)
-                {
-                    for (int sample = 0; sample < 256; ++sample)
-                    {
-                        const auto time = (block * 256 + sample) / 48000.0;
-                        multibandAudio.setSample(0, sample, static_cast<float>(0.2 * std::sin(juce::MathConstants<double>::twoPi * 80 * time)
-                            + 0.08 * std::sin(juce::MathConstants<double>::twoPi * 600 * time)
-                            + 0.05 * std::sin(juce::MathConstants<double>::twoPi * 3500 * time)));
-                    }
-                    visual.processBlock(multibandAudio, midi);
-                }
-                juce::MessageManager::getInstance()->runDispatchLoopUntil(70);
-                require(visual.getMeters()[1] > 0.01f && visual.getMeters()[3] > 0.1f,
-                    "Bus capture must show real nonzero output and Glue reduction");
-                juce::FileOutputStream busStream(imageFile.getSiblingFile("DrumMasterBus.png"));
-                busStream.setPosition(0);
-                busStream.truncate();
-                require(busStream.openedOk() && juce::PNGImageFormat().writeImageToStream(
-                    visualEditor->createComponentSnapshot(visualEditor->getLocalBounds()), busStream), "Bus screenshot must encode");
-                visual.setControl(drum::crushOn, 1);
-                visual.setControl(drum::colourOn, 1);
-                visual.setControl(drum::clipOn, 1);
-                visual.setControl(drum::clipCeiling, -12);
-                visual.setControl(drum::clipMix, 50);
-                visual.setControl(drum::dynamicOn, 1);
-                visual.setControl(drum::dynamicLowThreshold, -40);
-                visual.setControl(drum::dynamicHighThreshold, -40);
-                visual.setControl(drum::crushThreshold, -40);
-                for (int block = 0; block < 96; ++block)
-                {
-                    for (int sample = 0; sample < 256; ++sample)
-                    {
-                        const auto time = (block * 256 + sample) / 48000.0;
-                        multibandAudio.setSample(0, sample, static_cast<float>(0.3 * std::sin(juce::MathConstants<double>::twoPi * 350 * time)
-                            + 0.2 * std::sin(juce::MathConstants<double>::twoPi * 7000 * time)));
-                    }
-                    visual.processBlock(multibandAudio, midi);
-                }
-                const auto finishMeters = visual.getFinishMeters();
-                require(finishMeters[0] > 1 && finishMeters[1] > 1 && finishMeters[2] > 1,
-                    "Finishing GUI meters must receive actual Crush and both dynamic EQ reductions");
-                require(finishMeters[6] > 0 && finishMeters[7] > 0 && finishMeters[8] > 0,
-                    "Harmonic and room meters must measure real residual and return signals");
-                juce::MessageManager::getInstance()->runDispatchLoopUntil(70);
-                const auto activeDynamicImage = visualEditor->createComponentSnapshot(visualEditor->getLocalBounds());
-                int activeIndicators = 0;
-                for (auto* child : visualEditor->getChildren())
-                    if (auto* label = dynamic_cast<juce::Label*>(child))
-                        if (label->getText().startsWith("CRUSH ") || label->getText().startsWith("DYN G ")
-                            || label->getText().startsWith("COULEUR ") || label->getText().startsWith("ROOM "))
-                        {
-                            ++activeIndicators;
-                            require(label->getY() >= 300 && label->getBottom() <= 344
-                                && !label->getText().contains("OFF"), "Active finishing indications must stay beside the upper graph");
-                        }
-                require(activeIndicators == 5, "Upper indicators must expose Crush, dynamic EQ, colour, room and room compression states");
-                for (const auto& page : { juce::String("Impact"), juce::String("Precision") })
-                {
-                    for (auto* child : visualEditor->getChildren())
-                        if (auto* button = dynamic_cast<juce::TextButton*>(child))
-                            if (button->getButtonText() == page) button->onClick();
-                    juce::FileOutputStream pageStream(imageFile.getSiblingFile("Drum" + page + ".png"));
-                    pageStream.setPosition(0);
-                    pageStream.truncate();
-                    require(pageStream.openedOk() && juce::PNGImageFormat().writeImageToStream(
-                        visualEditor->createComponentSnapshot(visualEditor->getLocalBounds()), pageStream),
-                        "Finishing screenshots must encode");
-                }
-                visual.setControl(drum::ambienceOn, 0);
-                multibandAudio.clear();
-                for (int block = 0; block < 192; ++block)
-                {
-                    multibandAudio.clear();
-                    visual.processBlock(multibandAudio, midi);
-                }
-                juce::MessageManager::getInstance()->runDispatchLoopUntil(850);
-                const auto quietDynamicImage = visualEditor->createComponentSnapshot(visualEditor->getLocalBounds());
-                int movingCurvePixels = 0;
-                const auto orange = [](juce::Colour colour) { return colour.getRed() > 230
-                    && colour.getGreen() > 140 && colour.getGreen() < 190 && colour.getBlue() < 130; };
-                for (int horizontal = 64; horizontal < 728; ++horizontal)
-                    for (int vertical = 112; vertical < 268; ++vertical)
-                        if (activeDynamicImage.getPixelAt(horizontal, vertical) != quietDynamicImage.getPixelAt(horizontal, vertical)
-                            && (orange(activeDynamicImage.getPixelAt(horizontal, vertical))
-                                || orange(quietDynamicImage.getPixelAt(horizontal, vertical)))) ++movingCurvePixels;
-                require(movingCurvePixels > 120, "Dynamic EQ curve must visibly move with actual audio reductions");
-                for (auto* child : visualEditor->getChildren())
-                    if (auto* label = dynamic_cast<juce::Label*>(child))
-                        if (label->getText().startsWith("DYN G "))
-                            require(label->getText().contains("0.0 dB") && !label->getText().contains("OFF"),
-                                "Stopped processing must decay to zero without confusing silence with module OFF");
-                juce::FileOutputStream quietStream(imageFile.getSiblingFile("DrumDynamicQuiet.png"));
-                quietStream.setPosition(0);
-                quietStream.truncate();
-                require(quietStream.openedOk() && juce::PNGImageFormat().writeImageToStream(quietDynamicImage, quietStream),
-                    "Quiet live curve screenshot must encode");
-                visual.releaseResources();
-            }
-        }
+        testEditor(processor, argumentCount == 2 ? juce::File(juce::String::fromUTF8(arguments[1]))
+            : juce::File::getSpecialLocation(juce::File::currentExecutableFile).getSiblingFile("DrumLive.png"));
         require(processor.getSpectrumMailbox().subscribers.load() == 0, "Closing editor must release the spectrum subscription");
         processor.prepareToPlay(48000.0, 1024);
         juce::AudioBuffer<float> buffer(2, 1024);
@@ -2041,7 +1707,7 @@ void testDrumBus()
             require(proposal.valid, "Every non-Kick profile must analyse a finite percussion performance");
             if (element == 9)
                 require(proposal.settings[drum::glueOn] == 1 && proposal.settings[drum::compressorOn] == 0
-                    && proposal.settings[drum::crushAmount] <= 13
+                    && proposal.settings[drum::crushAmount] <= 18
                     && (proposal.settings[drum::ambienceOn] == 0 || proposal.settings[drum::ambienceAmount] <= 4),
                     "Master Auto must keep Glue as its main compressor and use restrained finishing returns");
             juce::AudioBuffer<float> chunk(1, 256);

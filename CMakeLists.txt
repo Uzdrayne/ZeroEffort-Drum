@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.22)
-project(ZeroEffortDrum VERSION 0.9.0 LANGUAGES C CXX)
+project(ZeroEffortDrum VERSION 0.10.0 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -23,12 +23,12 @@ include(cmake/PatchJuceARABuses.cmake)
 juce_add_plugin(ZeroEffortDrum
     COMPANY_NAME "Robin"
     COMPANY_WEBSITE "https://example.invalid/zeroeffort-drum"
-    VERSION 0.9.0
+    VERSION 0.10.0
     BUNDLE_ID "com.robin.zeroeffortdrum"
     PLUGIN_MANUFACTURER_CODE Rbin
     PLUGIN_CODE Zedr
     PRODUCT_NAME "ZeroEffort Drum"
-    DESCRIPTION "Drum channel strip with instrument Auto presets, bus Glue and ARA playback"
+    DESCRIPTION "Drum channel strip with instrument Auto presets, kit phase alignment, bus Glue and ARA playback"
     FORMATS VST3
     IS_ARA_EFFECT TRUE
     ARA_FACTORY_ID "\"com.robin.zeroeffortdrum.factory.1\""
@@ -38,7 +38,16 @@ juce_add_plugin(ZeroEffortDrum
 target_sources(ZeroEffortDrum PRIVATE
     Source/ARA/ZeroEffortDrumProcessor.cpp
     Source/ARA/ZeroEffortDrumProcessor.h
-    Source/ARA/RegionCache.h)
+    Source/ARA/RegionCache.h
+    Source/Kit/KitTypes.h
+    Source/Kit/KitAnalysis.h
+    Source/Kit/KitAligner.h
+    Source/Kit/KitRegistry.h
+    Source/Kit/KitRegistry.cpp
+    Source/UI/DrumLookAndFeel.h
+    Source/UI/DrumControlNames.h
+    Source/UI/ZeroEffortDrumEditor.h
+    Source/UI/ZeroEffortDrumEditor.cpp)
 target_include_directories(ZeroEffortDrum PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/Source/ARA")
 target_compile_definitions(ZeroEffortDrum PUBLIC
     DRUM_ARA_CUBASE_BUS_WORKAROUND=1
@@ -59,10 +68,11 @@ if(BUILD_TESTING)
     add_test(NAME RegionCacheTests COMMAND RegionCacheTests)
 
     juce_add_console_app(ZeroEffortDrumTests PRODUCT_NAME "ZeroEffort Drum Tests")
-    target_sources(ZeroEffortDrumTests PRIVATE tests/ZeroEffortDrumProcessorTests.cpp
+    target_sources(ZeroEffortDrumTests PRIVATE tests/ZeroEffortDrumProcessorTests.cpp tests/KitTests.cpp tests/EditorTests.cpp tests/Screenshots.cpp
         "${juce_SOURCE_DIR}/modules/juce_audio_plugin_client/juce_audio_plugin_client_ARA.cpp")
     target_include_directories(ZeroEffortDrumTests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/Source")
-    target_compile_definitions(ZeroEffortDrumTests PRIVATE JucePlugin_Build_VST3=1 JUCE_MODAL_LOOPS_PERMITTED=1)
+    target_compile_definitions(ZeroEffortDrumTests PRIVATE JucePlugin_Build_VST3=1 JUCE_MODAL_LOOPS_PERMITTED=1
+        ZED_WAV_DIRECTORY="${CMAKE_CURRENT_SOURCE_DIR}/wav_test_file")
     target_link_libraries(ZeroEffortDrumTests PRIVATE ZeroEffortDrum juce::juce_audio_utils)
     add_test(NAME ZeroEffortDrumTests COMMAND ZeroEffortDrumTests)
 

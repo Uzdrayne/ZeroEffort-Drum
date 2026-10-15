@@ -206,7 +206,9 @@ public:
                 + " dB / renfort crete avant EQ-COMP "
                 + juce::String(juce::Decibels::gainToDecibels(maximumBody, -160.0f), 1) + " dBFS\n";
         else proposal.summary += "Element " + juce::String(instrumentName(instrumentFromValue(settings[instrument])))
-            + " / Focus, nettoyage et renfort synthetique Kick desactives\n";
+            + " / Focus et renfort synthetique Kick desactives"
+            + " / Bleed Clean max " + juce::String(maximumCleanup, 1) + " dB"
+            + (settings[cleanupOn] > 0.5f ? " / detecteur adapte au corps\n" : " / OFF\n");
         proposal.summary += "Pas de separation de sources, limiteur ni garantie de phase avec les autres micros."
             "\n\nREGLAGES FINAUX\n";
         for (size_t index = 0; index < proposal.settings.size(); ++index)
