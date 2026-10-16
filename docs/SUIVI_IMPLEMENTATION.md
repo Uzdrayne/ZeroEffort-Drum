@@ -15,7 +15,7 @@ Légende : ⬜ à faire · 🔄 en cours · ✅ terminé · ⏸ en réserve
 | T1 | Tests A01-A04, A10, E01, E02, E06, E07 (+E08, E09, E10) | ✅ | `79c196e` | CTest 3/3 ; 7 200 propositions ; mutation de E07 détectée |
 | T2 | Rejeu `--replay` / `--compare` / `--export-wav` | ✅ | `79c196e` | CTest 3/3 ; essai sur les 4 WAV du dépôt (Kick, Snare, Tom, OvH) |
 | J2 | Mesures P1 additives (L03, L05, D02, H02, H06, S01, S02, P02) | ✅ | `35a4b32` | CTest 3/3, 0 avertissement ; profils inchangés (équivalence legacy) ; `push()` sans allocation (compteur vérifié) |
-| J3 | Corrections 1 et 2 (désactivées par défaut) | ✅ | (ce commit) | CTest 3/3, 0 avertissement ; test du problème 1 d'abord rouge (bleed/onset 0,307), vert avec le correctif (6e-6) ; équivalence legacy inchangée par défaut ; **aucun cas doré mis à jour** |
+| J3 | Corrections 1 et 2 (désactivées par défaut) | ✅ | `4ce081b` | CTest 3/3, 0 avertissement ; test du problème 1 d'abord rouge (bleed/onset 0,307), vert avec le correctif (6e-6) ; équivalence legacy inchangée par défaut ; **aucun cas doré mis à jour** |
 | Registre de rôles | `RoleDescriptor` | ⏸ | | |
 | T3 | Défauts Kit / Phase | ⏸ | | |
 | Sous-bus SB1-SB7 | | ⏸ | | |
