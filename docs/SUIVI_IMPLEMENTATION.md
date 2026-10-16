@@ -11,7 +11,7 @@ Légende : ⬜ à faire · 🔄 en cours · ✅ terminé · ⏸ en réserve
 |---|---|---|---|---|
 | Phase 0 | Lecture du code, plan, décisions | ✅ | `8e25dd8`, `6736b8c` | Plan validé par l'utilisateur |
 | Build | Compatibilité VS 2019 / VS 2022 | ✅ | `6736b8c` | CTest 3/3, 0 avertissement (VS 2022) |
-| J1 | Snapshot JSON, `analysisVersion`, export développeur, test de boucle | ✅ | (ce commit) | CTest 3/3, 0 avertissement (VS 2022) ; 540 rejeux identiques à 1e-6 ; export réel non testé (pas de Cubase) |
+| J1 | Snapshot JSON, `analysisVersion`, export développeur, test de boucle | ✅ | `20cd588` | CTest 3/3, 0 avertissement (VS 2022) ; 540 rejeux identiques à 1e-6 ; export réel non testé (pas de Cubase) |
 | T1 | Tests A01-A04, A10, E01, E02, E06, E07 | ⬜ | | |
 | T2 | Rejeu `replay` / `compare` | ⬜ | | |
 | J2 | Mesures P1 additives (L03, L05, D02, H02, H06, S01, S02, P02) | ⬜ | | |
