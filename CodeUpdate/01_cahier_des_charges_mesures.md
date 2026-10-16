@@ -77,7 +77,7 @@ Convention de nommage des colonnes de la base : `famille_mesure[_stat]`, avec `_
 | ID | Mesure | Calcul | Décision servie | Prio | État |
 |---|---|---|---|---|---|
 | D01 | `crest_global_db` | L01 − L02 | Garde-fou « signal trop plat » | P1 | Existant (`crestDb`) |
-| D02 | `crest_actif_db` | L01 − L03 | Active ou non le compresseur (aujourd'hui sur le crest global) | P1 | **Fait (J2)** : ctiveCrestDb(), pas encore lu par les profils (J3) |
+| D02 | `crest_actif_db` | L01 − L03 | Active ou non le compresseur (aujourd'hui sur le crest global) | P1 | **Fait (J2)** : `activeCrestDb()` ; lu par `KickProfile` pour l'activation du compresseur derrière `ProposalPolicy::compressorUsesActiveCrest` (J3, **désactivé par défaut**) |
 | D03 | `plage_dyn_db` | P95 − P10 | Active l'expander (contraste ≥ 12 dB aujourd'hui) | P1 | Partiel |
 | D04 | `crest_frappe_` `mean, sd` | pic / RMS sur [−5 ms, +100 ms] autour de chaque frappe | Mesure de la compression déjà présente | P2 | À faire |
 | D05 | `compression_estimee` | dispersion des pics de frappes (écart-type des pics en dB) : faible = déjà comprimé | Réduit la dose de compression automatique | P2 | À faire |

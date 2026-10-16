@@ -1,9 +1,19 @@
 # Suivi de l'implémentation : analyse v1
 
 Mis à jour à chaque étape. Plan et décisions : [PLAN_IMPLEMENTATION.md](PLAN_IMPLEMENTATION.md).
-Spécifications : `CodeUpdate/01` à `08`. Branche : `feature/analyse-v1` (départ : tag `v0.10.0`).
+Spécifications : `CodeUpdate/01` à `08`. Dernière mise à jour : 16 octobre 2026.
 
 Légende : ⬜ à faire · 🔄 en cours · ✅ terminé · ⏸ en réserve
+
+## Branches et version
+
+| Élément | État |
+|---|---|
+| Version du plug-in | **0.10.0** inchangée (`CMakeLists.txt`) : rien d'audible n'a changé par défaut |
+| `main` | vague 1 fusionnée (pull request #1, commit `9f8e9f2`) : phase 0, build VS 2019 / 2022, J1, T1, T2, J2, J3 |
+| `feature/t3-kit-phase` | T3 (`acd4704`, suivi `0a4dabd`), poussée sur GitHub ; **pull request à ouvrir et à fusionner par l'utilisateur** |
+| Tag `v0.10.0` | version de départ, retour arrière possible (`git checkout v0.10.0`) |
+| Comportement audible | **inchangé** : les correctifs J3 sont désactivés par défaut, T3 ne touche pas à `Source/` |
 
 ## Jalons
 
@@ -16,9 +26,13 @@ Légende : ⬜ à faire · 🔄 en cours · ✅ terminé · ⏸ en réserve
 | T2 | Rejeu `--replay` / `--compare` / `--export-wav` | ✅ | `79c196e` | CTest 3/3 ; essai sur les 4 WAV du dépôt (Kick, Snare, Tom, OvH) |
 | J2 | Mesures P1 additives (L03, L05, D02, H02, H06, S01, S02, P02) | ✅ | `35a4b32` | CTest 3/3, 0 avertissement ; profils inchangés (équivalence legacy) ; `push()` sans allocation (compteur vérifié) |
 | J3 | Corrections 1 et 2 (désactivées par défaut) | ✅ | `4ce081b` | CTest 3/3, 0 avertissement ; test du problème 1 d'abord rouge (bleed/onset 0,307), vert avec le correctif (6e-6) ; équivalence legacy inchangée par défaut ; **aucun cas doré mis à jour** |
-| Registre de rôles | `RoleDescriptor` | ⏸ | | |
-| T3 | Défauts Kit / Phase (D01-D10) | ✅ | `acd4704` | CTest 3/3, 0 avertissement ; 4 écarts de Kit / Phase **rapportés, non corrigés** ; mutation fine du retard (+3 %) détectée |
-| Sous-bus SB1-SB7 | | ⏸ | | |
+| T3 | Défauts Kit / Phase (D01-D10, synthétique + 1 kit réel) | ✅ | `acd4704` | CTest 3/3, 0 avertissement ; 4 constats sur Kit / Phase **rapportés, non corrigés** ; mutation fine du retard (+3 %) détectée |
+| T4 | Tests de mesure restants : A05, A06, A07, A11, A12, A13 | ⬜ | | prochain jalon sans écoute |
+| Registre de rôles | `RoleDescriptor` (sorties identiques à 1e-6) | ⏸ | | demande des cas dorés de référence |
+| Corrections Kit / Phase | constats 1 à 3 de T3 (biais du kick, refus hors fenêtre, diaphonie) | ⏸ | | décision de l'utilisateur + écoute dans un hôte |
+| Activation des correctifs J3 | `excludeLeadFramesByDefault`, `compressorUsesActiveCrest` | ⏸ | | écoute dans un hôte (Cubase) |
+| J4 / J4b | détecteurs par rôle (corrige A08), analyse continue Overheads / Room | ⏸ | | change le son ; corpus réel |
+| Sous-bus SB1-SB7 | | ⏸ | | extension préalable du registre Kit (mesures, trims, rôles Kick Sub / Hi-hat Bottom) |
 
 ## Journal
 
@@ -81,7 +95,7 @@ Fichiers : `Source/Drum/DrumAnalysis.h` (politique des trames d'attaque, `phaseP
 Branche `feature/t3-kit-phase`. Fichiers : `tests/KitTests.cpp` (`FaultKit`, `testKitFaults`, surcharge de `check` pour `juce::String`), `tests/MeasureTests.cpp` (D08 côté mesures), doc 02 (section 5.4 : tableau des résultats). **Aucun fichier de `Source/` modifié** (consigne du plan : ne pas toucher à l'algorithme de corrélation, rapporter les écarts).
 
 - Générateur synthétique à physique connue : micro de proximité qui entend le coup en premier, overheads qui l'entendent X ms plus tard, polarité, diaphonie de la caisse claire, bruit, gain, overheads décalés.
-- ✅ D01-D04 (22 cas dont 7 retards de kick de 0,5 à 10 ms, caisse claire 1 à 10 ms, polarité, +7 ms inversé), D05, D06, D07, D08, D09, D10, et D01-D04 sur le kit réel du dépôt (retard +3 ms, polarité inversée, les deux : exacts à 0,001 ms).
+- ✅ D01-D04 en synthétique (15 cas : 7 retards de kick de 0,5 à 10 ms, 4 retards de caisse claire de 1 à 10 ms, 2 polarités, 2 retards inversés dont +7 ms), D05, D06, D07, D08, D09, D10, et D01-D04 sur le kit réel du dépôt (4 cas : overheads retardés de 3 ms sur kick et caisse claire, polarité inversée, les deux : exacts à 0,001 ms).
 - Les tests sont écrits « juste ou refusé » : un refus propre passe, une mauvaise correction silencieuse échoue.
 - Vérification par mutation : retard multiplié par 1,03 dans `KitAnalysis.h` : les tests existants passent, D01 échoue (2,000 → 2,110 ms) ; la mutation a été annulée (`git checkout`).
 - **Quatre constats sur Kit / Phase** (à décider avec l'utilisateur, hors périmètre de T3) :
@@ -97,7 +111,6 @@ Branche `feature/t3-kit-phase`. Fichiers : `tests/KitTests.cpp` (`FaultKit`, `te
 - **Double garde de l'export** : option CMake **et** variable d'environnement (la décision validée ne prévoyait que la variable) ; c'est ce que demande le doc 01 (« jamais dans un build de production »). Pour l'utiliser : configurer avec `-DZED_ANALYSIS_EXPORT=ON`.
 - **Tests d'abord** : le test et le code ont été écrits ensemble (le seul « rouge » constaté est un échec de compilation) ; les rejets sont vérifiés par une garde qui prouve que le texte modifié existe bien.
 - **Mesures exportées** : seulement celles qui existent déjà (L01, L02, L04, L06, D01, H01, trames par phase). Les nouvelles viendront avec J2.
-
 - **T2 sans cible `drumtest`** : les commandes sont des options de `ZeroEffortDrumTests.exe` (décision du plan). Les noms `replay` / `compare` deviennent `--replay` / `--compare` ; `--export-wav` remplace `analyse`. `faults`, `golden`, `perf` non faits.
 - **Rubrique « Cas dorés »** du rapport (doc 02, section 8) absente : il n'existe pas encore de cas validé à l'oreille (T6).
 - **Mesures de proximité** : `bass/total` utilise `bandEnergy(20, 16000)` (le Kick utilise `min(16000, 0,45 × fréquence)` : identique au-dessus de 35,6 kHz d'échantillonnage).
@@ -113,14 +126,18 @@ Branche `feature/t3-kit-phase`. Fichiers : `tests/KitTests.cpp` (`FaultKit`, `te
 - **T3, tolérances** : ± 1 échantillon demandé sur signal pur, non tenu pour le kick (voir constat 1) ; tolérances posées à 0,1 ms (kick) et 0,025 ms (caisse claire), 0,2 ms sur kit réel.
 - **T3, kits réels** : un seul kit réel (kick, caisse claire, OH L/R de `wav_test_file`) au lieu de 3 à 5.
 - **T3, D01** : interprété comme « les overheads entendent le kick X ms après son micro » (le plug-in ne peut que retarder un micro).
+
 ## Questions ouvertes
 
 - L'export réel (session Auto dans Cubase) n'a pas été exercé : à tester sur la machine avec Cubase, avec un build `-DZED_ANALYSIS_EXPORT=ON`.
 - **Seuil de la fenêtre active** (40 dB, 12 dB, plafond P95) : à calibrer sur des prises réelles (courbe crest actif / seuil, plateau à ±0,5 dB pour ±10 dB). Le vrai corpus n'est pas sur cette machine.
-- **Activation par défaut** des deux correctifs J3 : à décider après une écoute dans un hôte (pas possible sur cette machine). Procédure : exporter les prises avec --exclude-lead-frames --active-crest, --replay / --compare, écouter les prises listées.
+- **Activation par défaut** des deux correctifs J3 : à décider après une écoute dans un hôte (pas possible sur cette machine). Procédure : exporter les prises avec `--exclude-lead-frames --active-crest`, `--replay` / `--compare`, écouter les prises listées.
 - **Kit / Phase** : faut-il corriger les constats 1 à 3 de T3 (refus hors fenêtre, diaphonie, biais du kick) ? Ils changent le comportement de l'alignement : à décider, avec écoute dans un hôte.
+- **Corpus** : les WAV de `wav_test_file/` (5 fichiers, 113 Mo) sont toujours suivis par git ; le vrai corpus restera hors du dépôt (décision validée). Le retrait des 5 WAV du dépôt reste à décider (sans réécrire l'historique).
 - Le snapshot enregistre la proposition issue de `propose()` (phase 0), pas la version finale après les étapes de calibration (`refineThreshold`, `finish`) : c'est ce que le rejeu compare.
 
 ## Prochaine action
 
-Vague 1 (J1, T1, T2, J2, J3) fusionnée dans main ; T3 terminé sur eature/t3-kit-phase. Suite possible : T4 (A05-A07, A11-A13), registre de rôles, sous-bus ; ou corriger les constats Kit / Phase après décision.
+1. **Utilisateur** : ouvrir et fusionner la pull request de `feature/t3-kit-phase`, puis faire *Pull* sur `main`.
+2. **Utilisateur** (quand Cubase est disponible) : tester l'export `-DZED_ANALYSIS_EXPORT=ON` et écouter les correctifs J3 ; apporter le vrai corpus.
+3. **Assistant** : T4 (A05-A07, A11-A13), puis registre de rôles ; correctifs Kit / Phase et sous-bus après décision.
