@@ -18,6 +18,7 @@ void testAnalysisProperties();
 void testReplay();
 void testMeasures();
 void testKnownProblems();
+void testSignals();
 int runReplayCommand(const juce::StringArray& arguments);
 void makeScreenshots(const juce::File& directory);
 void testEditor(ZeroEffortDrumProcessor& processor, const juce::File& imageFile);
@@ -1292,6 +1293,7 @@ int main(int argumentCount, char** arguments)
         testReplay();
         testMeasures();
         testKnownProblems();
+        testSignals();
         testKickResponse();
         testDrumBus();
         testKickArchive();

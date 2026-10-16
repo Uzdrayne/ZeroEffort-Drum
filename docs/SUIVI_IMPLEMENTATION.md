@@ -11,7 +11,7 @@ Légende : ⬜ à faire · 🔄 en cours · ✅ terminé · ⏸ en réserve
 |---|---|
 | Version du plug-in | **0.10.0** inchangée (`CMakeLists.txt`) : rien d'audible n'a changé par défaut |
 | `main` | vague 1 fusionnée (pull request #1, commit `9f8e9f2`) : phase 0, build VS 2019 / 2022, J1, T1, T2, J2, J3 |
-| `feature/t3-kit-phase` | T3 (`acd4704`, suivi `0a4dabd`), poussée sur GitHub ; **pull request à ouvrir et à fusionner par l'utilisateur** |
+| `feature/t3-kit-phase` | T3 (`acd4704`) et T4, poussée sur GitHub jusqu'à `71dbf74` ; **pull request à ouvrir et à fusionner par l'utilisateur** |
 | Tag `v0.10.0` | version de départ, retour arrière possible (`git checkout v0.10.0`) |
 | Comportement audible | **inchangé** : les correctifs J3 sont désactivés par défaut, T3 ne touche pas à `Source/` |
 
@@ -27,7 +27,7 @@ Légende : ⬜ à faire · 🔄 en cours · ✅ terminé · ⏸ en réserve
 | J2 | Mesures P1 additives (L03, L05, D02, H02, H06, S01, S02, P02) | ✅ | `35a4b32` | CTest 3/3, 0 avertissement ; profils inchangés (équivalence legacy) ; `push()` sans allocation (compteur vérifié) |
 | J3 | Corrections 1 et 2 (désactivées par défaut) | ✅ | `4ce081b` | CTest 3/3, 0 avertissement ; test du problème 1 d'abord rouge (bleed/onset 0,307), vert avec le correctif (6e-6) ; équivalence legacy inchangée par défaut ; **aucun cas doré mis à jour** |
 | T3 | Défauts Kit / Phase (D01-D10, synthétique + 1 kit réel) | ✅ | `acd4704` | CTest 3/3, 0 avertissement ; 4 constats sur Kit / Phase **rapportés, non corrigés** ; mutation fine du retard (+3 %) détectée |
-| T4 | Tests de mesure restants : A05, A06, A07, A11, A12, A13 | ⬜ | | prochain jalon sans écoute |
+| T4 | Tests de mesure restants : A05, A06, A07, A11 (+ mesure S04) | ✅ | (ce commit) | CTest 3/3, 0 avertissement ; A12 / A13 en attente de O04 / R01 |
 | Registre de rôles | `RoleDescriptor` (sorties identiques à 1e-6) | ⏸ | | demande des cas dorés de référence |
 | Corrections Kit / Phase | constats 1 à 3 de T3 (biais du kick, refus hors fenêtre, diaphonie) | ⏸ | | décision de l'utilisateur + écoute dans un hôte |
 | Activation des correctifs J3 | `excludeLeadFramesByDefault`, `compressorUsesActiveCrest` | ⏸ | | écoute dans un hôte (Cubase) |
@@ -90,6 +90,17 @@ Fichiers : `Source/Drum/DrumAnalysis.h` (politique des trames d'attaque, `phaseP
 - **Snapshots et rejeu** : la politique d'analyse (`analysis.excludeLeadFrames`, `leadFrames`) et la politique de proposition (`meta.policy`) sont enregistrées ; `--export-wav ... --exclude-lead-frames --active-crest` ; `--replay ... --active-crest|--no-active-crest` surcharge la politique enregistrée. Test : surcharge « off » sur un snapshot « on » = 2 réglages modifiés (compresseur et multibande), une prise à écouter.
 - **Effet sur les vrais WAV du dépôt** (analyse seule, rock, intensité 1) : Kick 741 frappes, 2 964 trames mises de côté (bleed : 5 408 → 2 444 trames), rapport aigu du bleed 0,0090 → 0,0012 ; Snare 0,92 contre 1,13 ; Tom 0,61 contre 0,69 ; Overheads 10,94 contre 10,99 ; **aucun réglage ne change** (`airGain` = 0 avant et après, le cut d'aigu du Kick ne démarre qu'au-dessus de 1 ; crest du Kick 25,4 dB / actif 24,5 dB : compresseur ON dans les deux cas). Le rapport de comparaison (`--compare`) indique « Rien à écouter ».
 - **Prises à écouter** : aucune avec ces 5 WAV. L'effet sur l'`airGain` du Kick ne se verra que sur un enregistrement où le bleed aigu est proche du seuil ; à valider sur le vrai corpus.
+### T4 : tests de mesure restants
+
+Branche `feature/t3-kit-phase` (poursuite). Fichiers : `tests/SignalTests.cpp` (nouveau), `Source/Drum/DrumAnalysis.h` (`spectralSlopeDbPerOctave`, S04), `Source/Drum/DrumAnalysisSnapshot.h` (colonne `sp_slope_db_oct`), `CMakeLists.txt`, `tests/ZeroEffortDrumProcessorTests.cpp`, doc 01 et 02. Mesure additive : `analysisVersion` reste 3 (aucun nouvel état d'analyse).
+
+- ✅ **A05** : bruit rose (filtre de Kellet) −3 dB/octave ± 0,5, bruit blanc 0 ± 0,5, à 44,1 / 48 / 96 kHz ; S04 ajoutée (densité de puissance par tiers d'octave, régression de 100 Hz à 10 kHz).
+- ✅ **A06** : bruit limité à chacune des 4 bandes 200-500, 500-2k, 2k-5k, 5k-10k (Butterworth d'ordre 8 de chaque côté) à 48 et 96 kHz : énergie dans la bande à moins de 1 dB du total, autres bandes sous −12 dB, tiers d'octave éloignés à plus de 20 dB.
+- ✅ **A07** : 24 frappes de kick à 60 Hz comptées exactement et corps à 60 Hz ± 6 à 44,1 / 48 / 96 kHz ; corps suivi pour 45, 80 et 120 Hz (± 12 Hz).
+- ✅ **A11** : mêmes 16 frappes à 44,1 / 48 / 96 kHz : frappes, pic, RMS, crest (± 0,3 dB), crest actif (± 0,5 dB), niveaux relatifs des bandes (± 1 dB) cohérents.
+- **Constats** : (a) la puissance S01 absolue dépend de la taille de FFT (+6 dB à 96 kHz pour le même signal) : seules les mesures relatives se comparent d'une fréquence d'échantillonnage à l'autre (documenté, test qui échoue si cela change) ; (b) le détecteur de frappes a un seuil absolu (niveau grave 0,0003, environ −70 dBFS) : un lit de bruit rose à −54 dBFS RMS fait compter 17 et 30 frappes pour 16 jouées (risque R3 du doc 04), non corrigé ; (c) une bande à la limite de deux bandes nommées (kick à 60 Hz) change de bande selon la fréquence d'échantillonnage (cases FFT différentes), le test de cohérence utilise donc 100 Hz.
+- ⏸ **A12** (éclat aigu, mesure O04) et **A13** (T60 de la room, mesure R01) : ces mesures n'existent pas, elles viennent avec J4b (analyse continue Overheads / Room).
+
 ### T3 : défauts artificiels Kit / Phase
 
 Branche `feature/t3-kit-phase`. Fichiers : `tests/KitTests.cpp` (`FaultKit`, `testKitFaults`, surcharge de `check` pour `juce::String`), `tests/MeasureTests.cpp` (D08 côté mesures), doc 02 (section 5.4 : tableau des résultats). **Aucun fichier de `Source/` modifié** (consigne du plan : ne pas toucher à l'algorithme de corrélation, rapporter les écarts).
@@ -138,6 +149,6 @@ Branche `feature/t3-kit-phase`. Fichiers : `tests/KitTests.cpp` (`FaultKit`, `te
 
 ## Prochaine action
 
-1. **Utilisateur** : ouvrir et fusionner la pull request de `feature/t3-kit-phase`, puis faire *Pull* sur `main`.
+1. **Utilisateur** : publier `feature/t3-kit-phase` (T3 et T4), ouvrir et fusionner la pull request, puis *Pull* sur `main`.
 2. **Utilisateur** (quand Cubase est disponible) : tester l'export `-DZED_ANALYSIS_EXPORT=ON` et écouter les correctifs J3 ; apporter le vrai corpus.
-3. **Assistant** : T4 (A05-A07, A11-A13), puis registre de rôles ; correctifs Kit / Phase et sous-bus après décision.
+3. **Assistant** : registre de rôles (demande des cas dorés de référence : sorties identiques à 1e-6), puis correctifs Kit / Phase et sous-bus après décision.

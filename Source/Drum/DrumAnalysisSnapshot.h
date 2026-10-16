@@ -101,6 +101,7 @@ struct DrumAnalysisSnapshot
         object->setProperty("ph_bleed_frames", analysis.bleedFrames);
         object->setProperty("ph_lead_frames", analysis.leadFrames);
         object->setProperty("ph_bleed_treble_ratio", numberOrNull(analysis.bleedTrebleRatio()));
+        object->setProperty("sp_slope_db_oct", numberOrNull(analysis.spectralSlopeDbPerOctave()));
         object->setProperty("ph_attack_body_gap_db", numberOrNull(analysis.attackBodyGapDb(role)));
         for (int band = 0; band < thirdOctaveCount; ++band)
             object->setProperty("sp_third_oct_" + thirdOctaveLabel(band), numberOrNull(analysis.thirdOctaveDb(band)));

@@ -91,7 +91,7 @@ Le programme génère des signaux dont les mesures sont connues par calcul.
 
 A10 est essentiel : une analyse qui dépend de la taille de bloc de l'hôte donnera des résultats différents d'un DAW à l'autre.
 
-**État (T1, 16/10/2026)** : A01, A02, A03, A04 et A10 sont implémentés dans `tests/PropertyTests.cpp` (exécutés par `ZeroEffortDrumTests`). A10 compare le bloc `analysis` du snapshot à l'identique (blocs de 64, 257, 512 et 4096, à 44,1, 48 et 96 kHz) : aucune dépendance à la taille de bloc. A09 est implémenté en J2 (`tests/MeasureTests.cpp`, avec une tolérance de 1,5 dB au lieu de 1 dB : voir doc 01, 5.1) et A08 en J3 (`tests/KnownProblemTests.cpp`) comme **échec attendu** : il passe tant que le détecteur sous-compte les doubles pédales et échoue dès qu'il sera corrigé. A05-A07 et A11-A13 restent à faire.
+**État (T1, 16/10/2026)** : A01, A02, A03, A04 et A10 sont implémentés dans `tests/PropertyTests.cpp` (exécutés par `ZeroEffortDrumTests`). A10 compare le bloc `analysis` du snapshot à l'identique (blocs de 64, 257, 512 et 4096, à 44,1, 48 et 96 kHz) : aucune dépendance à la taille de bloc. A09 est implémenté en J2 (`tests/MeasureTests.cpp`, avec une tolérance de 1,5 dB au lieu de 1 dB : voir doc 01, 5.1) et A08 en J3 (`tests/KnownProblemTests.cpp`) comme **échec attendu** : il passe tant que le détecteur sous-compte les doubles pédales et échoue dès qu'il sera corrigé. A05 (pente −3 dB/octave ± 0,5 sur bruit rose, 0 sur bruit blanc, à 44,1 / 48 / 96 kHz ; la mesure S04 a été ajoutée pour cela), A06 (bruit limité à une bande : énergie dans la bande à moins de 1 dB, autres bandes sous −12 dB), A07 (24 frappes comptées exactement et corps à 60 Hz ± 6 à 44,1 / 48 / 96 kHz) et A11 (mêmes 16 frappes, pic, RMS, crest et niveaux relatifs des bandes cohérents entre les trois fréquences) sont implémentés en T4 (`tests/SignalTests.cpp`). **Constats** : (a) la puissance S01 absolue dépend de la taille de FFT (+6 dB à 96 kHz), seules les mesures relatives se comparent ; (b) le détecteur de frappes a un seuil absolu (niveau grave 0,0003, environ −70 dBFS) : un lit de bruit rose à −54 dBFS RMS ajoute des frappes fantômes (17 et 30 comptées pour 16 jouées), ce qui confirme le risque R3 ; non corrigé. A12 et A13 restent à faire : ils dépendent de mesures qui n'existent pas encore (O04 éclat aigu, R01 décroissance de la room).
 
 ### 5.2 Rejeu de snapshots (`T-B`)
 
@@ -272,7 +272,7 @@ Les résultats alimentent le jeu de cas dorés (5.7) et les cibles du document 0
 | T1 | Squelette `drumtest`, famille A (A01 à A04, A10) et E (E01, E02, E06, E07) | Premiers tests au vert |
 | T2 | Export / rechargement des snapshots, commande `replay`, diff et taux de refus | Premier rapport de comparaison |
 | T3 | Défauts artificiels pour Kit / Phase (D01 à D04) sur 3 à 5 kits réels | Test de non-régression de Kit / Phase | **Fait** (16/10/2026) en synthétique + 1 kit réel ; voir 5.4 |
-| T4 | Signaux de A05 à A09 et A11 ; tests marqués « échec attendu » pour les problèmes connus | Les problèmes 2 et 3 du document 01 deviennent visibles |
+| T4 | Signaux de A05 à A09 et A11 ; tests marqués « échec attendu » pour les problèmes connus | Les problèmes 2 et 3 du document 01 deviennent visibles | **Fait** (16/10/2026) : A05-A09 et A11 ; A12-A13 en attente de O04 et R01 |
 | T5 | Famille J (overheads, room) | Couverture des rôles sans frappe |
 | T6 | Cas dorés, sensibilité aux seuils, performance | Rapport complet |
 

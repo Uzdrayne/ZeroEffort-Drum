@@ -405,6 +405,36 @@ public:
         return sum > 0 ? static_cast<float>(10 * std::log10(sum / frames)) : unavailable();
     }
 
+    // S04: slope of the power density per octave (regression of the third octave density in dB against log2 of the
+    // centre frequency, 100 Hz to 10 kHz). Pink noise reads -3 dB/octave, white noise 0. NaN when fewer than 8 bands fit.
+    float spectralSlopeDbPerOctave() const
+    {
+        const auto frames = spectrumFrames();
+        if (frames < 1) return unavailable();
+        double sumX = 0, sumY = 0, sumXX = 0, sumXY = 0;
+        int count = 0;
+        for (int index = 0; index < thirdOctaveCount; ++index)
+        {
+            const auto centre = thirdOctaveCentre(index);
+            const auto lower = centre * std::pow(2.0, -1.0 / 6), upper = centre * std::pow(2.0, 1.0 / 6);
+            if (centre < 100 || centre > 10000 || upper > rate * MeasureConstants::bandLimitRatio) continue;
+            double sum = 0;
+            int bins = 0;
+            for (size_t bin = 1; bin < static_cast<size_t>(fftSize / 2); ++bin)
+            {
+                const auto hz = static_cast<double>(bin) * rate / fftSize;
+                if (hz >= lower && hz < upper) { sum += spectrum[bin]; ++bins; }
+            }
+            if (bins < 1 || sum <= 0) continue;
+            const auto x = std::log2(centre), y = 10 * std::log10(sum / bins / frames);
+            sumX += x; sumY += y; sumXX += x * x; sumXY += x * y;
+            ++count;
+        }
+        if (count < 8) return unavailable();
+        const auto denominator = count * sumXX - sumX * sumX;
+        return denominator > 0 ? static_cast<float>((count * sumXY - sumX * sumY) / denominator) : unavailable();
+    }
+
     // S02: energy of a band relative to the whole 20 Hz - 20 kHz range, in dB.
     float bandRelativeDb(double lower, double upper) const
     {
