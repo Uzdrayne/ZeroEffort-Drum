@@ -77,7 +77,7 @@ Convention de nommage des colonnes de la base : `famille_mesure[_stat]`, avec `_
 | ID | Mesure | Calcul | Décision servie | Prio | État |
 |---|---|---|---|---|---|
 | D01 | `crest_global_db` | L01 − L02 | Garde-fou « signal trop plat » | P1 | Existant (`crestDb`) |
-| D02 | `crest_actif_db` | L01 − L03 | Active ou non le compresseur (aujourd'hui sur le crest global) | P1 | **Fait (J2)** : ctiveCrestDb(), pas encore lu par les profils (J3) |
+| D02 | `crest_actif_db` | L01 − L03 | Active ou non le compresseur (aujourd'hui sur le crest global) | P1 | **Fait (J2)** : `activeCrestDb()` ; lu par `KickProfile` pour l'activation du compresseur derrière `ProposalPolicy::compressorUsesActiveCrest` (J3, **désactivé par défaut**) |
 | D03 | `plage_dyn_db` | P95 − P10 | Active l'expander (contraste ≥ 12 dB aujourd'hui) | P1 | Partiel |
 | D04 | `crest_frappe_` `mean, sd` | pic / RMS sur [−5 ms, +100 ms] autour de chaque frappe | Mesure de la compression déjà présente | P2 | À faire |
 | D05 | `compression_estimee` | dispersion des pics de frappes (écart-type des pics en dB) : faible = déjà comprimé | Réduit la dose de compression automatique | P2 | À faire |
@@ -105,10 +105,10 @@ Source : spectre de puissance cumulé (`spectrum` = onset + tail + bleed), FFT 4
 
 | ID | Mesure | Calcul | Décision servie | Prio | État |
 |---|---|---|---|---|---|
-| S01 | `sp_third_oct_XXX` | énergie par bande de 1/3 d'octave (31 colonnes, 20 Hz à 20 kHz), normalisée par le nombre de trames | Comparaison à la cible, EQ automatique | P1 | **Fait (J2)** : `thirdOctaveDb(i)`, dB de la puissance FFT non étalonnée par trame ; `null` sous la résolution de la FFT (bande 20 Hz à 48 kHz) et au-dessus de 0,45 × fréquence |
+| S01 | `sp_third_oct_XXX` | énergie par bande de 1/3 d'octave (31 colonnes, 20 Hz à 20 kHz), normalisée par le nombre de trames | Comparaison à la cible, EQ automatique | P1 | **Fait (J2)** : `thirdOctaveDb(i)`, dB de la puissance FFT non étalonnée par trame ; `null` sous la résolution de la FFT (bande 20 Hz à 48 kHz) et au-dessus de 0,45 × fréquence. **Attention (T4, A11)** : la valeur absolue dépend de la taille de FFT (4096 jusqu'à 48 kHz, 8192 au-dessus) : à 1 kHz, 96 kHz lit 6 dB de plus que 48 kHz pour le même signal. Seules les mesures relatives (S02, S04) se comparent entre fréquences d'échantillonnage |
 | S02 | `band_` `sub, grave, basMedium, medium, presence, brillance, air` | énergie en dB relative au total 20 Hz-20 kHz (bandes : 20-60, 60-200, 200-500, 500-2k, 2k-5k, 5k-10k, 10k-20k) | Lecture rapide et règles de texte du Bilan | P1 | **Fait (J2)** : `bandRelativeDb()` ; les 7 bandes sont une partition de 20 Hz à min(20 kHz, 0,45 × fréquence) |
 | S03 | `centroide_hz`, `rolloff85_hz`, `rolloff95_hz` | barycentre ; fréquence contenant 85 % et 95 % de l'énergie | Teinte (sombre / brillant), choix du low-pass | P2 | À faire |
-| S04 | `pente_db_oct` | pente de la régression du spectre en dB / log fréquence, de 100 Hz à 10 kHz | Écart de timbre global | P2 | À faire |
+| S04 | `pente_db_oct` | pente de la régression du spectre en dB / log fréquence, de 100 Hz à 10 kHz | Écart de timbre global | P2 | **Fait (T4)** : `spectralSlopeDbPerOctave()` (colonne `sp_slope_db_oct`), densité de puissance par tiers d'octave (bruit rose −3 dB/oct, bruit blanc 0) ; `null` si moins de 8 bandes |
 | S05 | `platitude` (flatness) | moyenne géométrique / moyenne arithmétique | Distingue tonal et bruité | P3 | À faire |
 | S06 | `coupure_basse_hz`, `coupure_haute_hz` | fréquence où le niveau passe sous −60 dB du maximum | Prise déjà filtrée ; réglage des filtres | P2 | À faire |
 

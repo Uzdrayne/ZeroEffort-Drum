@@ -91,7 +91,7 @@ Le programme génère des signaux dont les mesures sont connues par calcul.
 
 A10 est essentiel : une analyse qui dépend de la taille de bloc de l'hôte donnera des résultats différents d'un DAW à l'autre.
 
-**État (T1, 16/10/2026)** : A01, A02, A03, A04 et A10 sont implémentés dans `tests/PropertyTests.cpp` (exécutés par `ZeroEffortDrumTests`). A10 compare le bloc `analysis` du snapshot à l'identique (blocs de 64, 257, 512 et 4096, à 44,1, 48 et 96 kHz) : aucune dépendance à la taille de bloc. A09 est implémenté en J2 (`tests/MeasureTests.cpp`, avec une tolérance de 1,5 dB au lieu de 1 dB : voir doc 01, 5.1) et A08 en J3 (`tests/KnownProblemTests.cpp`) comme **échec attendu** : il passe tant que le détecteur sous-compte les doubles pédales et échoue dès qu'il sera corrigé. A05-A07 et A11-A13 restent à faire.
+**État (T1, 16/10/2026)** : A01, A02, A03, A04 et A10 sont implémentés dans `tests/PropertyTests.cpp` (exécutés par `ZeroEffortDrumTests`). A10 compare le bloc `analysis` du snapshot à l'identique (blocs de 64, 257, 512 et 4096, à 44,1, 48 et 96 kHz) : aucune dépendance à la taille de bloc. A09 est implémenté en J2 (`tests/MeasureTests.cpp`, avec une tolérance de 1,5 dB au lieu de 1 dB : voir doc 01, 5.1) et A08 en J3 (`tests/KnownProblemTests.cpp`) comme **échec attendu** : il passe tant que le détecteur sous-compte les doubles pédales et échoue dès qu'il sera corrigé. A05 (pente −3 dB/octave ± 0,5 sur bruit rose, 0 sur bruit blanc, à 44,1 / 48 / 96 kHz ; la mesure S04 a été ajoutée pour cela), A06 (bruit limité à une bande : énergie dans la bande à moins de 1 dB, autres bandes sous −12 dB), A07 (24 frappes comptées exactement et corps à 60 Hz ± 6 à 44,1 / 48 / 96 kHz) et A11 (mêmes 16 frappes, pic, RMS, crest et niveaux relatifs des bandes cohérents entre les trois fréquences) sont implémentés en T4 (`tests/SignalTests.cpp`). **Constats** : (a) la puissance S01 absolue dépend de la taille de FFT (+6 dB à 96 kHz), seules les mesures relatives se comparent ; (b) le détecteur de frappes a un seuil absolu (niveau grave 0,0003, environ −70 dBFS) : un lit de bruit rose à −54 dBFS RMS ajoute des frappes fantômes (17 et 30 comptées pour 16 jouées), ce qui confirme le risque R3 ; non corrigé. A12 et A13 restent à faire : ils dépendent de mesures qui n'existent pas encore (O04 éclat aigu, R01 décroissance de la room).
 
 ### 5.2 Rejeu de snapshots (`T-B`)
 
@@ -123,6 +123,25 @@ On prend une bonne prise, on l'abîme d'une façon connue, et on vérifie que l'
 | D09 | Seulement 3 pistes (kick, caisse claire, un overhead) | résultat correct, pas de plantage (public amateur) |
 | D10 | Kick Out seul, sans Kick In | mesuré directement contre les overheads (comportement documenté) |
 
+**État (T3, 16/10/2026)** : D01 à D10 sont implémentés dans `tests/KitTests.cpp` (`testKitFaults`, signaux synthétiques à la physique connue, plus D01-D04 sur le kit réel de `wav_test_file`) et D08 côté mesures dans `tests/MeasureTests.cpp`. L'algorithme de corrélation n'a **pas** été modifié : les écarts sont rapportés, et les tests passent tant que ces écarts restent exactement ceux listés (ils échouent si l'un change, pour rappeler de les transformer en tests normaux).
+
+| Test | Résultat |
+|---|---|
+| D01 kick 0,5 à 10 ms | **Écart de tolérance** : retard retrouvé avec un biais constant de +0,04 à +0,06 ms (2 à 3 échantillons à 48 kHz), alors que le document demande ± 1 échantillon (0,021 ms). Tolérance posée à 0,1 ms. La caisse claire est retrouvée à 0,001 ms près. |
+| D02 caisse claire 1 / 2,5 / 6 / 10 ms | OK à 0,001 ms près |
+| D02 au-delà de 10 ms (11, 14, 18 ms) | **Échec attendu, constat important** : l'outil ne refuse pas, il propose une correction fausse sans l'indiquer (0,1 ms normal ; 2,2 ms inversé ; 6,2 ms inversé, avec r de 0,3 à 0,4). Contraire à « refus clair plutôt qu'une mauvaise valeur ». |
+| Kick entendu avant son micro par les overheads | 2 ms d'avance : OK (aucune correction). 5 ms d'avance : **échec attendu** (2,0 ms inversé proposé). |
+| D03 polarité inversée (retard 0 et 4 ms) | OK |
+| D04 retard + inversion (3 ms, 7 ms) | OK (même biais de 0,05 ms sur le kick) |
+| D05 diaphonie caisse claire dans le micro du kick | **Échec attendu** : retard correct jusqu'à −19 dB (rapport au pic du kick) ; à −16,5, −14,5 et −8,5 dB (soit les niveaux −12 et −6 dB du document) la correction suit la caisse claire (3,5 ms au lieu de 5,0 ms, polarité normale, r ≈ 0,7). `diaphonie_db` (K04) n'existe pas, donc non testé. |
+| D06 bruit de fond −50, −40, −30 dBFS | OK : retard exact (± 0,2 ms) ; −20 et −10 dBFS : jamais de mauvaise valeur (un des deux cas est refusé) |
+| D07 overheads décalés de 0,4 ms | OK : écart retrouvé (0,41 ms), score stéréo 95,7 → 80,7 |
+| D08 prise 20 dB plus faible | OK côté kit (mêmes corrections et scores) et côté mesures (spectres relatifs, crest, frappes, écart attaque/corps inchangés ; niveaux décalés de 20 dB ; seuil du compresseur décalé de 20 dB) |
+| D09 trois pistes (kick, caisse claire, un overhead) | OK, pas de score stéréo |
+| D10 Kick Out seul | OK (3,7 ms, inversé, biais de 0,085 ms) |
+| D01-D04 sur le kit réel (kick +3,03 ms, caisse claire +2,91 ms) | OK à 0,001 ms près : overheads retardés de 3 ms → +3,0 ms ; kick inversé → polarité inversée ; les deux ensemble. Un seul kit réel disponible (pas 3 à 5). |
+
+Interprétation de D01 retenue : le défaut est « les overheads entendent le kick X ms après son micro » ; le retard attendu est X ms (le plug-in ne peut que retarder un micro de proximité).
 ### 5.5 Overheads et room (`T-J`)
 
 | Test | Défaut appliqué | Réponse attendue |
@@ -252,8 +271,8 @@ Les résultats alimentent le jeu de cas dorés (5.7) et les cibles du document 0
 |---|---|---|
 | T1 | Squelette `drumtest`, famille A (A01 à A04, A10) et E (E01, E02, E06, E07) | Premiers tests au vert |
 | T2 | Export / rechargement des snapshots, commande `replay`, diff et taux de refus | Premier rapport de comparaison |
-| T3 | Défauts artificiels pour Kit / Phase (D01 à D04) sur 3 à 5 kits réels | Test de non-régression de Kit / Phase |
-| T4 | Signaux de A05 à A09 et A11 ; tests marqués « échec attendu » pour les problèmes connus | Les problèmes 2 et 3 du document 01 deviennent visibles |
+| T3 | Défauts artificiels pour Kit / Phase (D01 à D04) sur 3 à 5 kits réels | Test de non-régression de Kit / Phase | **Fait** (16/10/2026) en synthétique + 1 kit réel ; voir 5.4 |
+| T4 | Signaux de A05 à A09 et A11 ; tests marqués « échec attendu » pour les problèmes connus | Les problèmes 2 et 3 du document 01 deviennent visibles | **Fait** (16/10/2026) : A05-A09 et A11 ; A12-A13 en attente de O04 et R01 |
 | T5 | Famille J (overheads, room) | Couverture des rôles sans frappe |
 | T6 | Cas dorés, sensibilité aux seuils, performance | Rapport complet |
 
