@@ -245,6 +245,43 @@ void testSnapshotCarriesMeasures()
     std::cout << "PASS: J2 measures in snapshots (31 third-octave columns, null when unavailable, validated restore)" << std::endl;
 }
 
+// D08 (measure side): the same take 20 dB lower. Shape measures stay, level measures move by exactly 20 dB.
+void testLevelDrop()
+{
+    const auto loud = kicks(48000, 6, 0.5, 28, 0.0005, 0.08);
+    auto quiet = loud;
+    for (auto& value : quiet) value *= 0.1f;
+    const auto a = analyse(loud, 48000);
+    const auto b = analyse(quiet, 48000);
+    const auto& high = a->analysis();
+    const auto& low = b->analysis();
+    check(std::abs((high.peakDb() - low.peakDb()) - 20.0f) < 0.05f, "D08 the peak must move by 20 dB");
+    check(std::abs((high.rmsDb() - low.rmsDb()) - 20.0f) < 0.05f, "D08 the RMS must move by 20 dB");
+    check(std::abs((high.activeRmsDb() - low.activeRmsDb()) - 20.0f) < 0.3f, "D08 the active RMS must move by 20 dB");
+    check(std::abs(high.crestDb() - low.crestDb()) < 0.01f && std::abs(high.activeCrestDb() - low.activeCrestDb()) < 0.3f, "D08 the crests do not depend on the level");
+    check(high.hitCount() == low.hitCount() && high.hitCount() >= 10, "D08 the hits do not depend on the level");
+    for (const auto& band : drum::namedBands)
+    {
+        const auto before = high.bandRelativeDb(band.lower, band.upper), after = low.bandRelativeDb(band.lower, band.upper);
+        check(std::isnan(before) == std::isnan(after) && (std::isnan(before) || std::abs(before - after) < 0.1f),
+            juce::String("D08 the band ") + band.id + " relative to the whole range must not change");
+    }
+    for (int band = 0; band < drum::thirdOctaveCount; ++band)
+        if (std::isfinite(high.thirdOctaveDb(band)))
+            check(std::abs((high.thirdOctaveDb(band) - low.thirdOctaveDb(band)) - 20.0f) < 0.05f, "D08 the third octave levels must move by 20 dB, band " + juce::String(band));
+    check(std::abs(high.attackBodyGapDb(drum::DrumInstrument::kick) - low.attackBodyGapDb(drum::DrumInstrument::kick)) < 0.05f,
+        "D08 the attack to body gap is a shape measure");
+    // The proposals follow the level only through the percentile based thresholds (compressor and gate), by 20 dB.
+    const auto original = drum::defaultSettings();
+    const auto proposalHigh = a->propose(original, drum::DrumStyle::rock, 1.0f), proposalLow = b->propose(original, drum::DrumStyle::rock, 1.0f);
+    check(proposalHigh.valid && proposalLow.valid, "D08 both takes must give a proposal");
+    check(proposalHigh.settings[drum::bodyFrequency] == proposalLow.settings[drum::bodyFrequency]
+        && proposalHigh.settings[drum::bodyGain] == proposalLow.settings[drum::bodyGain], "D08 the EQ shape does not depend on the level");
+    check(std::abs((proposalHigh.settings[drum::threshold] - proposalLow.settings[drum::threshold]) - 20.0f) < 1.5f,
+        "D08 the compressor threshold must follow the level");
+    std::cout << "PASS: D08 level drop of 20 dB: shape measures unchanged, level measures shifted by 20 dB" << std::endl;
+}
+
 // H02: nothing may allocate while samples are pushed.
 void testNoAllocation()
 {
@@ -279,5 +316,6 @@ void testMeasures()
     testSpectralMeasures();
     testAttackBodyGap();
     testSnapshotCarriesMeasures();
+    testLevelDrop();
     testNoAllocation();
 }

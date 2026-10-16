@@ -17,7 +17,7 @@ Légende : ⬜ à faire · 🔄 en cours · ✅ terminé · ⏸ en réserve
 | J2 | Mesures P1 additives (L03, L05, D02, H02, H06, S01, S02, P02) | ✅ | `35a4b32` | CTest 3/3, 0 avertissement ; profils inchangés (équivalence legacy) ; `push()` sans allocation (compteur vérifié) |
 | J3 | Corrections 1 et 2 (désactivées par défaut) | ✅ | `4ce081b` | CTest 3/3, 0 avertissement ; test du problème 1 d'abord rouge (bleed/onset 0,307), vert avec le correctif (6e-6) ; équivalence legacy inchangée par défaut ; **aucun cas doré mis à jour** |
 | Registre de rôles | `RoleDescriptor` | ⏸ | | |
-| T3 | Défauts Kit / Phase | ⏸ | | |
+| T3 | Défauts Kit / Phase (D01-D10) | ✅ | (ce commit) | CTest 3/3, 0 avertissement ; 4 écarts de Kit / Phase **rapportés, non corrigés** ; mutation fine du retard (+3 %) détectée |
 | Sous-bus SB1-SB7 | | ⏸ | | |
 
 ## Journal
@@ -76,6 +76,20 @@ Fichiers : `Source/Drum/DrumAnalysis.h` (politique des trames d'attaque, `phaseP
 - **Snapshots et rejeu** : la politique d'analyse (`analysis.excludeLeadFrames`, `leadFrames`) et la politique de proposition (`meta.policy`) sont enregistrées ; `--export-wav ... --exclude-lead-frames --active-crest` ; `--replay ... --active-crest|--no-active-crest` surcharge la politique enregistrée. Test : surcharge « off » sur un snapshot « on » = 2 réglages modifiés (compresseur et multibande), une prise à écouter.
 - **Effet sur les vrais WAV du dépôt** (analyse seule, rock, intensité 1) : Kick 741 frappes, 2 964 trames mises de côté (bleed : 5 408 → 2 444 trames), rapport aigu du bleed 0,0090 → 0,0012 ; Snare 0,92 contre 1,13 ; Tom 0,61 contre 0,69 ; Overheads 10,94 contre 10,99 ; **aucun réglage ne change** (`airGain` = 0 avant et après, le cut d'aigu du Kick ne démarre qu'au-dessus de 1 ; crest du Kick 25,4 dB / actif 24,5 dB : compresseur ON dans les deux cas). Le rapport de comparaison (`--compare`) indique « Rien à écouter ».
 - **Prises à écouter** : aucune avec ces 5 WAV. L'effet sur l'`airGain` du Kick ne se verra que sur un enregistrement où le bleed aigu est proche du seuil ; à valider sur le vrai corpus.
+### T3 : défauts artificiels Kit / Phase
+
+Branche `feature/t3-kit-phase`. Fichiers : `tests/KitTests.cpp` (`FaultKit`, `testKitFaults`, surcharge de `check` pour `juce::String`), `tests/MeasureTests.cpp` (D08 côté mesures), doc 02 (section 5.4 : tableau des résultats). **Aucun fichier de `Source/` modifié** (consigne du plan : ne pas toucher à l'algorithme de corrélation, rapporter les écarts).
+
+- Générateur synthétique à physique connue : micro de proximité qui entend le coup en premier, overheads qui l'entendent X ms plus tard, polarité, diaphonie de la caisse claire, bruit, gain, overheads décalés.
+- ✅ D01-D04 (22 cas dont 7 retards de kick de 0,5 à 10 ms, caisse claire 1 à 10 ms, polarité, +7 ms inversé), D05, D06, D07, D08, D09, D10, et D01-D04 sur le kit réel du dépôt (retard +3 ms, polarité inversée, les deux : exacts à 0,001 ms).
+- Les tests sont écrits « juste ou refusé » : un refus propre passe, une mauvaise correction silencieuse échoue.
+- Vérification par mutation : retard multiplié par 1,03 dans `KitAnalysis.h` : les tests existants passent, D01 échoue (2,000 → 2,110 ms) ; la mutation a été annulée (`git checkout`).
+- **Quatre constats sur Kit / Phase** (à décider avec l'utilisateur, hors périmètre de T3) :
+  1. **Biais de +0,05 ms sur le kick** (2-3 échantillons) contre ± 1 échantillon demandé ; la caisse claire est exacte.
+  2. **Retards au-delà de la fenêtre de recherche** (caisse claire > 10 ms, kick entendu 5 ms avant son micro) : une correction fausse est proposée sans refus. Le plug-in en mode Suggérer l'afficherait comme une mesure normale (confiance r ≈ 0,3-0,4).
+  3. **Diaphonie de la caisse claire à partir de −16 dB dans le micro du kick** : le retard du kick suit la caisse claire. Pistes de correction (non faites) : ne garder que les événements dont le niveau est proche du pic du micro, ou refuser quand les paires de frappes donnent deux retards distincts.
+  4. `diaphonie_db` (K04) n'existe pas.
+- Ces constats sont des tests « échec attendu » (comme A08) : ils échouent dès que le comportement change.
 ## Écarts avec les spécifications
 
 - **Emplacement des fonctions** : `toSnapshot` / `restoreSnapshot` / `measuresToVar` sont des fonctions statiques de `struct DrumAnalysisSnapshot` (ami de `DrumAnalysis`), pas des méthodes de `DrumAnalysis` : la classe de mesure reste inchangée. Le doc 07 disait « dans la classe DrumAnalysis ».
@@ -96,13 +110,17 @@ Fichiers : `Source/Drum/DrumAnalysis.h` (politique des trames d'attaque, `phaseP
 - **J3, mécanisme** : deux réglages à l'exécution (`setExcludeLeadFrames`, `ProposalPolicy`) plutôt que de simples constantes, pour pouvoir tester et comparer les deux comportements ; les constantes nommées fixent les valeurs par défaut, toutes à « désactivé ». Leur activation par défaut reste à décider après écoute.
 - **J3, correctif du problème 1** : « exclure » (et non « classer après coup ») ; les trames écartées restent dans le spectre global pour ne pas modifier les mesures de forme.
 - **J3, analysisVersion = 3** (nouveaux champs d'analyse dans le snapshot).
+- **T3, tolérances** : ± 1 échantillon demandé sur signal pur, non tenu pour le kick (voir constat 1) ; tolérances posées à 0,1 ms (kick) et 0,025 ms (caisse claire), 0,2 ms sur kit réel.
+- **T3, kits réels** : un seul kit réel (kick, caisse claire, OH L/R de `wav_test_file`) au lieu de 3 à 5.
+- **T3, D01** : interprété comme « les overheads entendent le kick X ms après son micro » (le plug-in ne peut que retarder un micro).
 ## Questions ouvertes
 
 - L'export réel (session Auto dans Cubase) n'a pas été exercé : à tester sur la machine avec Cubase, avec un build `-DZED_ANALYSIS_EXPORT=ON`.
 - **Seuil de la fenêtre active** (40 dB, 12 dB, plafond P95) : à calibrer sur des prises réelles (courbe crest actif / seuil, plateau à ±0,5 dB pour ±10 dB). Le vrai corpus n'est pas sur cette machine.
 - **Activation par défaut** des deux correctifs J3 : à décider après une écoute dans un hôte (pas possible sur cette machine). Procédure : exporter les prises avec --exclude-lead-frames --active-crest, --replay / --compare, écouter les prises listées.
+- **Kit / Phase** : faut-il corriger les constats 1 à 3 de T3 (refus hors fenêtre, diaphonie, biais du kick) ? Ils changent le comportement de l'alignement : à décider, avec écoute dans un hôte.
 - Le snapshot enregistre la proposition issue de `propose()` (phase 0), pas la version finale après les étapes de calibration (`refineThreshold`, `finish`) : c'est ce que le rejeu compare.
 
 ## Prochaine action
 
-Vague 1 terminée (J1, T1, T2, J2, J3). Suite possible (en réserve dans le plan) : registre de rôles, T3 (défauts Kit / Phase), sous-bus ; ou activer les correctifs J3 après écoute.
+Vague 1 (J1, T1, T2, J2, J3) fusionnée dans main ; T3 terminé sur eature/t3-kit-phase. Suite possible : T4 (A05-A07, A11-A13), registre de rôles, sous-bus ; ou corriger les constats Kit / Phase après décision.
