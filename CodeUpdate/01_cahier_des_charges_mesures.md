@@ -208,7 +208,9 @@ Les overheads reçoivent aussi les corrections de Kit / Phase (K01 à K03) : ce 
 
 ## 7. Format de sortie
 
-Une analyse = un fichier JSON avec quatre blocs : `meta`, `analysis` (valeurs brutes pour le rejeu), `measures` (valeurs lisibles), `proposal` (réglages produits, par **identifiant de paramètre** et non par indice). Le code de sérialisation est dans `DrumAnalysisSnapshot.h`.
+Une analyse = un fichier JSON avec cinq blocs : `meta`, `input` (réglages de départ, par identifiant de paramètre : ajout du 16/10/2026, nécessaire au rejeu de `propose()`), `analysis` (valeurs brutes pour le rejeu), `measures` (valeurs lisibles), `proposal` (réglages produits, par **identifiant de paramètre** et non par indice). Le code de sérialisation est dans `Source/Drum/DrumAnalysisSnapshot.h` (**implémenté en J1**). Les spectres sont écrits en base64 (doubles little-endian, un rejeu est identique bit à bit) ; un snapshot reste sous 300 Ko, y compris à 96 kHz.
+
+**Export développeur** : désactivé par défaut. Il faut compiler avec `-DZED_ANALYSIS_EXPORT=ON` (option CMake, jamais dans un build de production) **et** définir la variable d'environnement `ZED_ANALYSIS_EXPORT_DIR` ; un fichier `snapshot_<date>_<rôle>.json` est écrit à chaque analyse Auto (thread de l'interface, pas `processBlock`). `ZED_ANALYSIS_EXPORT_LICENCE` renseigne `meta.licence` (défaut `private-dev`).
 
 Champs obligatoires de `meta` : `schema`, `analysisVersion`, `profileVersion`, `role`, `style`, `intensity`, `source`, `licence`.
 Un export CSV (une ligne par piste) est généré à partir de `measures` avec la convention de la section 5. Les listes de longueur variable (`resonances_liste`) restent dans le JSON.
@@ -239,7 +241,7 @@ Un export CSV (une ligne par piste) est généré à partir de `measures` avec l
 
 | Jalon | Contenu | Livrable |
 |---|---|---|
-| J1 | Export `toSnapshot()` et `toMeasures()` à chaque analyse | Premiers JSON réels |
+| J1 | Export `toSnapshot()` et `toMeasures()` à chaque analyse | Premiers JSON réels | **Fait** (16/10/2026) : `DrumAnalysisSnapshot.h`, test de boucle ; export réel à tester sur une machine avec Cubase |
 | J2 | Mesures P1 manquantes : L03, L05, D02, H02, H06, S01, S02, P02 | Colonnes de base remplies sur 20 prises |
 | J3 | Corrections 1 et 2 de la section 8, avec comparaison avant / après sur la base | Rapport de rejeu |
 | J4 | Détecteurs par rôle (H08), corps et résonance de la caisse claire (T01, T03) | Profils Snare et Tom basés sur des mesures |

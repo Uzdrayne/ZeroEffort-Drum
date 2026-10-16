@@ -15,6 +15,7 @@ public:
     void prepare(double sampleRate) { measurements.prepare(sampleRate); }
     void push(const float* audio, int length) { measurements.push(audio, length); }
     const DrumAnalysis& analysis() const { return measurements; }
+    DrumAnalysis& editableAnalysis() { return measurements; }  // snapshot restore only
 
     DrumProposal propose(const Settings& original, DrumStyle style = DrumStyle::natural, float intensity = 1.0f) const
     {

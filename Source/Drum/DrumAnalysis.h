@@ -5,6 +5,12 @@ namespace drum
 {
 inline constexpr std::array<float, 3> kickGateReleases { 160, 100, 80 };
 
+// Bump when a constant that shapes the measurements changes: 10 ms window and hop, FFT 4096 / 8192
+// (switch above 48 kHz), onset 0-70 ms, tail 70-230 ms, 120 ms refractory period, 25-250 Hz hit
+// detector band, the six envelope attack/release times and kickGateReleases. Snapshots recorded
+// with another version are not comparable.
+inline constexpr int analysisVersion = 1;
+
 // Retains the original Kick temporal detectors alongside shared signal measurements.
 // Profiles read this object by const reference; FFT buffers and histograms are never copied.
 class DrumAnalysis
@@ -232,6 +238,7 @@ private:
     friend class ProfileAssembly;
     friend struct MasterBusProfile;
     friend class LegacyProposalReference;
+    friend struct DrumAnalysisSnapshot;
 
     int fftSize = 4096;
     juce::dsp::FFT fft { 12 };

@@ -5,6 +5,7 @@
 #include "CacheValidity.h"
 #include "../Drum/DrumArchive.h"
 #include "../Drum/DrumAutoPreset.h"
+#include "../Drum/DrumAnalysisSnapshot.h"
 #include "../Drum/DrumPresetPreview.h"
 #include <cmath>
 
@@ -678,7 +679,21 @@ void ZeroEffortDrumProcessor::updateAutoPreset()
     if (session.offset == session.total)
     {
         if (session.phase == 0)
+        {
             session.proposal = session.analyser.propose(session.before, session.style, session.intensity);
+#if ZED_ANALYSIS_EXPORT
+            // Development export, never in a production build: runs on the message thread, not in processBlock.
+            drum::SnapshotContext context;
+            context.original = session.before;
+            context.style = session.style;
+            context.intensity = session.intensity;
+            context.source = isBoundToARA() ? "ara-region" : "live-capture";
+            context.licence = juce::SystemStats::getEnvironmentVariable("ZED_ANALYSIS_EXPORT_LICENCE", "private-dev");
+            if (const auto exported = drum::DrumAnalysisSnapshot::exportSnapshot(session.analyser.analysis(), context, session.proposal);
+                exported.failed())
+                juce::Logger::writeToLog("Analysis export failed: " + exported.getErrorMessage());
+#endif
+        }
         else if (session.phase == 1)
             session.preview.refineThreshold(session.proposal);
         else

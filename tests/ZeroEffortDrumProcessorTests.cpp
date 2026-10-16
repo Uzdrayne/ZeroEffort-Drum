@@ -13,6 +13,7 @@
 const ARA::ARAFactory* JUCE_CALLTYPE createARAFactory();
 void testDrumBus();
 void testKit();
+void testSnapshot();
 void makeScreenshots(const juce::File& directory);
 void testEditor(ZeroEffortDrumProcessor& processor, const juce::File& imageFile);
 
@@ -1277,6 +1278,7 @@ int main(int argumentCount, char** arguments)
             return 0;
         }
         testKit();
+        testSnapshot();
         testKickResponse();
         testDrumBus();
         testKickArchive();
