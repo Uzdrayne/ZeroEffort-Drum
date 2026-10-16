@@ -62,22 +62,22 @@ Convention de nommage des colonnes de la base : `famille_mesure[_stat]`, avec `_
 |---|---|---|---|---|---|
 | L01 | `peak_dbfs` | max des valeurs absolues, en dB | Refus si trop faible (< 0,001) ; marge de sortie | P1 | Existant (`peakDb`) |
 | L02 | `rms_global_dbfs` | racine de (énergie / échantillons) | Référence ; crest global | P1 | Existant (`rmsDb`) |
-| L03 | `rms_actif_dbfs` | même calcul, sur les fenêtres actives seulement | Crest stable, seuils de compression | P1 | À faire |
+| L03 | `rms_actif_dbfs` | même calcul, sur les fenêtres actives seulement | Crest stable, seuils de compression | P1 | **Fait (J2)** : `DrumAnalysis::activeRmsDb()` ; NaN / `null` sans fenêtre active |
 | L04 | `env_p10 … env_p99` | percentiles de la distribution des pics de fenêtre | Seuils du compresseur et de l'expander | P1 | Existant (`percentile`, `percentileOf`) |
-| L05 | `noise_floor_dbfs` | P10 de la distribution des pics de fenêtre | Détection du contraste exploitable (expander) | P1 | Partiel |
+| L05 | `noise_floor_dbfs` | P10 de la distribution des pics de fenêtre | Détection du contraste exploitable (expander) | P1 | **Fait (J2)** : `noiseFloorDb()` |
 | L06 | `clipped_ratio` | échantillons écrêtés / échantillons | Refus si > 1 % | P1 | Existant (`clipped`) |
 | L07 | `true_peak_dbtp` | pic après sur-échantillonnage ×4 | Marge de sortie | P2 | À faire |
 | L08 | `lufs_integre`, `lufs_short_max` | pondération K, norme BS.1770 | Normalisation des spectres, comparaison entre pistes | P2 | À faire |
 | L09 | `dc_offset` | moyenne des échantillons | Alerte | P3 | À faire |
 
-**Règle de la fenêtre active (à calibrer, voir question Q1)** : fenêtre de 10 ms dont le pic est supérieur à `P95 − 40 dB`. La valeur 40 dB est une hypothèse de départ.
+**Règle de la fenêtre active (à calibrer, voir question Q1)** : fenêtre de 10 ms dont le pic est supérieur à `max(P95 − 40 dB, plancher de bruit + 12 dB)` (décision 01-Q1 du document 05). Les valeurs 40 et 12 dB sont des hypothèses de départ (`MeasureConstants`). Cas limite ajouté en J2 : le seuil ne dépasse jamais le P95 (un signal sans dynamique garde ses fenêtres les plus fortes) et les fenêtres de silence numérique (≤ −100 dBFS) ne sont jamais actives. Constat synthétique : le seuil relatif au P95 bouge un peu avec la densité du jeu (écart de crest actif ≈ 1,2 dB entre un kick isolé et un kick dense, contre 4,8 dB pour le crest global) : à régler avec la courbe de calibration du document 05.
 
 ### 5.2 Dynamique (`dyn_`)
 
 | ID | Mesure | Calcul | Décision servie | Prio | État |
 |---|---|---|---|---|---|
 | D01 | `crest_global_db` | L01 − L02 | Garde-fou « signal trop plat » | P1 | Existant (`crestDb`) |
-| D02 | `crest_actif_db` | L01 − L03 | Active ou non le compresseur (aujourd'hui sur le crest global) | P1 | À faire |
+| D02 | `crest_actif_db` | L01 − L03 | Active ou non le compresseur (aujourd'hui sur le crest global) | P1 | **Fait (J2)** : ctiveCrestDb(), pas encore lu par les profils (J3) |
 | D03 | `plage_dyn_db` | P95 − P10 | Active l'expander (contraste ≥ 12 dB aujourd'hui) | P1 | Partiel |
 | D04 | `crest_frappe_` `mean, sd` | pic / RMS sur [−5 ms, +100 ms] autour de chaque frappe | Mesure de la compression déjà présente | P2 | À faire |
 | D05 | `compression_estimee` | dispersion des pics de frappes (écart-type des pics en dB) : faible = déjà comprimé | Réduit la dose de compression automatique | P2 | À faire |
@@ -90,11 +90,11 @@ Détecteur actuel (à conserver tel quel pour le kick) : bande 25-250 Hz (diffé
 | ID | Mesure | Calcul | Décision servie | Prio | État |
 |---|---|---|---|---|---|
 | H01 | `hits` | nombre de frappes détectées | Refus si < 3 | P1 | Existant |
-| H02 | `hits_par_s` | `hits` / durée | Qualité de l'échantillon, densité du jeu | P1 | À faire |
+| H02 | `hits_par_s` | `hits` / durée | Qualité de l'échantillon, densité du jeu | P1 | **Fait (J2)** : hitsPerSecond() (détecteur grave, voir problème 4) |
 | H03 | `force_frappe_` `mean, sd, p10, p90` | pic de chaque frappe, en dB | Régularité du jeu ; ghost notes | P2 | À faire |
 | H04 | `ghost_ratio` | frappes < P50 − 12 dB / total | Réglage de l'expander (ne pas couper les ghost notes) | P2 | À faire |
 | H05 | `attaque_10_90_ms` | temps de montée de l'enveloppe de la frappe | Réglage de l'attaque du compresseur | P2 | À faire |
-| H06 | `decay_t20_ms`, `decay_t60_ms` | temps de chute de l'enveloppe | Release de l'expander et du compresseur | P1 | À faire |
+| H06 | `decay_t20_ms`, `decay_t60_ms` | temps de chute de l'enveloppe | Release de l'expander et du compresseur | P1 | **Fait (J2)** : `decayT20Ms()` mesuré (chute de 20 dB de l'enveloppe des pics de 10 ms depuis la détection, médiane, résolution 10 ms, il faut 3 frappes), `decayT60Ms()` extrapolé (× 3) |
 | H07 | `ratio_attaque_sustain_db` | énergie 0-20 ms moins énergie 50-300 ms | Attack/Sustain, dose de transitoire | P2 | À faire |
 | H08 | Détecteur propre à chaque rôle | bande et période réfractaire adaptées (caisse claire : 150-5000 Hz ; toms : 60-400 Hz) | Fiabilité de `hits` hors kick | P1 | À faire |
 | H09 | Détecteur large bande (flux spectral au-dessus de 1 kHz) pour overheads et room | Sert uniquement à segmenter les événements (décroissance, densité) ; son nombre de frappes n'est pas exploité | P2 | À faire |
@@ -105,8 +105,8 @@ Source : spectre de puissance cumulé (`spectrum` = onset + tail + bleed), FFT 4
 
 | ID | Mesure | Calcul | Décision servie | Prio | État |
 |---|---|---|---|---|---|
-| S01 | `sp_third_oct_XXX` | énergie par bande de 1/3 d'octave (31 colonnes, 20 Hz à 20 kHz), normalisée par le nombre de trames | Comparaison à la cible, EQ automatique | P1 | À faire (à partir de `bandEnergy`) |
-| S02 | `band_` `sub, grave, basMedium, medium, presence, brillance, air` | énergie en dB relative au total 20 Hz-20 kHz (bandes : 20-60, 60-200, 200-500, 500-2k, 2k-5k, 5k-10k, 10k-20k) | Lecture rapide et règles de texte du Bilan | P1 | À faire (`toMeasures`) |
+| S01 | `sp_third_oct_XXX` | énergie par bande de 1/3 d'octave (31 colonnes, 20 Hz à 20 kHz), normalisée par le nombre de trames | Comparaison à la cible, EQ automatique | P1 | **Fait (J2)** : `thirdOctaveDb(i)`, dB de la puissance FFT non étalonnée par trame ; `null` sous la résolution de la FFT (bande 20 Hz à 48 kHz) et au-dessus de 0,45 × fréquence |
+| S02 | `band_` `sub, grave, basMedium, medium, presence, brillance, air` | énergie en dB relative au total 20 Hz-20 kHz (bandes : 20-60, 60-200, 200-500, 500-2k, 2k-5k, 5k-10k, 10k-20k) | Lecture rapide et règles de texte du Bilan | P1 | **Fait (J2)** : `bandRelativeDb()` ; les 7 bandes sont une partition de 20 Hz à min(20 kHz, 0,45 × fréquence) |
 | S03 | `centroide_hz`, `rolloff85_hz`, `rolloff95_hz` | barycentre ; fréquence contenant 85 % et 95 % de l'énergie | Teinte (sombre / brillant), choix du low-pass | P2 | À faire |
 | S04 | `pente_db_oct` | pente de la régression du spectre en dB / log fréquence, de 100 Hz à 10 kHz | Écart de timbre global | P2 | À faire |
 | S05 | `platitude` (flatness) | moyenne géométrique / moyenne arithmétique | Distingue tonal et bruité | P3 | À faire |
@@ -117,7 +117,7 @@ Source : spectre de puissance cumulé (`spectrum` = onset + tail + bleed), FFT 4
 | ID | Mesure | Calcul | Décision servie | Prio | État |
 |---|---|---|---|---|---|
 | P01 | `onset_spectrum`, `tail_spectrum`, `bleed_spectrum` | spectres cumulés par phase, plus le nombre de trames de chacune | Base de toutes les mesures ci-dessous ; rejeu des profils | P1 | Existant |
-| P02 | `ecart_attaque_corps_db` | énergie onset dans la bande de clic moins énergie onset dans la bande de corps | « Manque de claque » ou « trop mou » | P1 | À faire |
+| P02 | `ecart_attaque_corps_db` | énergie onset dans la bande de clic moins énergie onset dans la bande de corps | « Manque de claque » ou « trop mou » | P1 | **Fait (J2)** : `attackBodyGapDb(rôle)` pour Kick, Snare et Toms (bandes de la section 5.5) |
 | P03 | `bleed_aigu_vs_onset_grave` | énergie 6-12 kHz du bleed / énergie 35-150 Hz de l'onset | Réduction de l'aigu du kick (`airGain`) | P1 | Existant (dans `KickProfile`) |
 | P04 | `contraste_tail_bleed_db` | tail − bleed, par bande | Fiabilité des corrections de résonance | P2 | À faire |
 
@@ -242,7 +242,7 @@ Un export CSV (une ligne par piste) est généré à partir de `measures` avec l
 | Jalon | Contenu | Livrable |
 |---|---|---|
 | J1 | Export `toSnapshot()` et `toMeasures()` à chaque analyse | Premiers JSON réels | **Fait** (16/10/2026) : `DrumAnalysisSnapshot.h`, test de boucle ; export réel à tester sur une machine avec Cubase |
-| J2 | Mesures P1 manquantes : L03, L05, D02, H02, H06, S01, S02, P02 | Colonnes de base remplies sur 20 prises |
+| J2 | Mesures P1 manquantes : L03, L05, D02, H02, H06, S01, S02, P02 | Colonnes de base remplies sur 20 prises | **Fait** (16/10/2026) : synthétique seulement, 20 prises réelles à faire |
 | J3 | Corrections 1 et 2 de la section 8, avec comparaison avant / après sur la base | Rapport de rejeu |
 | J4 | Détecteurs par rôle (H08), corps et résonance de la caisse claire (T01, T03) | Profils Snare et Tom basés sur des mesures |
 | J4b | Analyse continue pour overheads et room (5.10, mesures P1) et extension stéréo de `push()` | Profils Overheads et Room basés sur des mesures |

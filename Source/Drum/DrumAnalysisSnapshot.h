@@ -68,22 +68,51 @@ struct DrumAnalysisSnapshot
         return juce::Result::ok();
     }
 
-    static juce::var measuresToVar(const DrumAnalysis& analysis)
+    static juce::var numberOrNull(double value)
+    {
+        return std::isfinite(value) ? juce::var(value) : juce::var();
+    }
+
+    static juce::var measuresToVar(const DrumAnalysis& analysis, DrumInstrument role = DrumInstrument::kick)
     {
         auto* object = new juce::DynamicObject();
         const auto samples = static_cast<double>(analysis.samples);
         object->setProperty("lvl_peak_dbfs", analysis.peakDb());
         object->setProperty("lvl_rms_global_dbfs", analysis.rmsDb());
+        object->setProperty("lvl_rms_active_dbfs", numberOrNull(analysis.activeRmsDb()));
+        object->setProperty("lvl_noise_floor_dbfs", numberOrNull(analysis.noiseFloorDb()));
+        object->setProperty("lvl_active_threshold_dbfs", numberOrNull(analysis.windows > 0 ? analysis.activeThresholdDb() : DrumAnalysis::unavailable()));
+        object->setProperty("lvl_active_windows", analysis.activeWindowCount());
         object->setProperty("lvl_clipped_ratio", analysis.samples > 0 ? static_cast<double>(analysis.clipped) / samples : 0.0);
         for (const auto fraction : { 0.10f, 0.25f, 0.50f, 0.75f, 0.90f, 0.95f, 0.99f })
             object->setProperty("lvl_env_p" + juce::String(juce::roundToInt(fraction * 100)), analysis.percentile(fraction));
         object->setProperty("dyn_crest_global_db", analysis.crestDb());
+        object->setProperty("dyn_crest_active_db", numberOrNull(analysis.activeCrestDb()));
         object->setProperty("hit_hits", analysis.hits);
+        object->setProperty("hit_hits_per_s", numberOrNull(analysis.hitsPerSecond()));
+        object->setProperty("hit_decay_t20_ms", numberOrNull(analysis.decayT20Ms()));
+        object->setProperty("hit_decay_t60_ms", numberOrNull(analysis.decayT60Ms()));
+        object->setProperty("hit_decay_observed", analysis.decayObservedHits());
+        object->setProperty("hit_decay_censored", analysis.decayCensoredHits());
         object->setProperty("duration_s", analysis.rate > 0 ? samples / analysis.rate : 0.0);
         object->setProperty("ph_onset_frames", analysis.onsetFrames);
         object->setProperty("ph_tail_frames", analysis.tailFrames);
         object->setProperty("ph_bleed_frames", analysis.bleedFrames);
+        object->setProperty("ph_attack_body_gap_db", numberOrNull(analysis.attackBodyGapDb(role)));
+        for (int band = 0; band < thirdOctaveCount; ++band)
+            object->setProperty("sp_third_oct_" + thirdOctaveLabel(band), numberOrNull(analysis.thirdOctaveDb(band)));
+        for (const auto& band : namedBands)
+            object->setProperty(juce::String("band_") + band.id, numberOrNull(analysis.bandRelativeDb(band.lower, band.upper)));
         return juce::var(object);
+    }
+
+    // Nominal centre frequencies, as written in the column names.
+    static juce::String thirdOctaveLabel(int index)
+    {
+        static const char* const labels[thirdOctaveCount] { "20", "25", "31.5", "40", "50", "63", "80", "100", "125", "160",
+            "200", "250", "315", "400", "500", "630", "800", "1000", "1250", "1600", "2000", "2500", "3150", "4000", "5000",
+            "6300", "8000", "10000", "12500", "16000", "20000" };
+        return labels[juce::jlimit(0, thirdOctaveCount - 1, index)];
     }
 
     static juce::var analysisToVar(const DrumAnalysis& analysis)
@@ -110,6 +139,9 @@ struct DrumAnalysisSnapshot
         object->setProperty("onsetSpectrum", encode(analysis.onsetSpectrum, bins));
         object->setProperty("tailSpectrum", encode(analysis.tailSpectrum, bins));
         object->setProperty("bleedSpectrum", encode(analysis.bleedSpectrum, bins));
+        object->setProperty("windowEnergyByPeak", encode(analysis.windowEnergyByPeak, analysis.windowEnergyByPeak.size()));
+        object->setProperty("decayHistogram", counts(analysis.decayHistogram));
+        object->setProperty("decayCensored", analysis.decayCensored);
         return juce::var(object);
     }
 
@@ -149,16 +181,27 @@ struct DrumAnalysisSnapshot
             if (!readCounts((*envelopeArray)[static_cast<int>(index)], envelopes[index]))
                 return juce::Result::fail("invalid envelope histogram");
 
+        std::array<int, 101> decayHistogram {};
+        juce::int64 decayCensored = 0;
+        if (!readCounts(object->getProperty("decayHistogram"), decayHistogram))
+            return juce::Result::fail("invalid decay histogram");
+        if (!readInteger(*object, "decayCensored", decayCensored) || decayCensored < 0
+            || decayCensored > std::numeric_limits<int>::max())
+            return juce::Result::fail("invalid decay counter");
+
         analysis.prepare(rate);
         const auto bins = static_cast<size_t>(analysis.fftSize / 2);
         if (!decode(object->getProperty("spectrum").toString(), analysis.spectrum, bins)
             || !decode(object->getProperty("onsetSpectrum").toString(), analysis.onsetSpectrum, bins)
             || !decode(object->getProperty("tailSpectrum").toString(), analysis.tailSpectrum, bins)
-            || !decode(object->getProperty("bleedSpectrum").toString(), analysis.bleedSpectrum, bins))
+            || !decode(object->getProperty("bleedSpectrum").toString(), analysis.bleedSpectrum, bins)
+            || !decode(object->getProperty("windowEnergyByPeak").toString(), analysis.windowEnergyByPeak, analysis.windowEnergyByPeak.size()))
         {
             analysis.prepare(rate);
             return juce::Result::fail("invalid spectrum");
         }
+        analysis.decayHistogram = decayHistogram;
+        analysis.decayCensored = static_cast<int>(decayCensored);
         analysis.samples = samples;
         analysis.clipped = clipped;
         analysis.energy = energy;
@@ -203,7 +246,7 @@ struct DrumAnalysisSnapshot
         root->setProperty("meta", juce::var(meta));
         root->setProperty("input", juce::var(input));
         root->setProperty("analysis", analysisToVar(analysis));
-        root->setProperty("measures", measuresToVar(analysis));
+        root->setProperty("measures", measuresToVar(analysis, instrumentFromValue(context.original[instrument])));
         root->setProperty("proposal", juce::var(recorded));
         return juce::var(root);
     }

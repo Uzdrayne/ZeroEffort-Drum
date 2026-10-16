@@ -1,5 +1,6 @@
 #pragma once
 #include "DrumProposal.h"
+#include <limits>
 
 namespace drum
 {
@@ -7,9 +8,36 @@ inline constexpr std::array<float, 3> kickGateReleases { 160, 100, 80 };
 
 // Bump when a constant that shapes the measurements changes: 10 ms window and hop, FFT 4096 / 8192
 // (switch above 48 kHz), onset 0-70 ms, tail 70-230 ms, 120 ms refractory period, 25-250 Hz hit
-// detector band, the six envelope attack/release times and kickGateReleases. Snapshots recorded
-// with another version are not comparable.
-inline constexpr int analysisVersion = 1;
+// detector band, the six envelope attack/release times, kickGateReleases and MeasureConstants.
+// Also bump when the snapshot gains analysis fields. Snapshots recorded with another version are not
+// comparable. Version 2: active-window energy and hit decay added (J2).
+inline constexpr int analysisVersion = 2;
+
+// H: starting points to calibrate on a corpus (document 05, 01-Q1 and 01-Q5).
+struct MeasureConstants
+{
+    static constexpr float activeBelowP95Db = 40;     // a window is active above P95 minus this...
+    static constexpr float activeAboveFloorDb = 12;   // ...and above the noise floor plus this
+    static constexpr int decayReferenceWindows = 3;   // windows after a hit used to find its peak level
+    static constexpr float decayDropDb = 20;          // the decay time is the time to fall this far
+    static constexpr int decayMaxWindows = 100;       // give up after 1 s
+    static constexpr int minimumDecayHits = 3;        // hits needed before a median decay is reported
+    static constexpr float t60Factor = 3;             // T60 is extrapolated from the 20 dB drop
+    static constexpr double bandLimitRatio = 0.45;    // bands above this fraction of the rate are ignored (01-Q4)
+};
+
+inline constexpr int thirdOctaveCount = 31;           // 20 Hz to 20 kHz, nominal centres 1000 * 10^(n/10), n = -17..13
+inline double thirdOctaveCentre(int index) noexcept { return 1000.0 * std::pow(10.0, (index - 17) / 10.0); }
+
+struct NamedBand
+{
+    const char* id;
+    double lower, upper;
+};
+
+inline constexpr std::array<NamedBand, 7> namedBands {{
+    { "sub", 20, 60 }, { "grave", 60, 200 }, { "basMedium", 200, 500 }, { "medium", 500, 2000 },
+    { "presence", 2000, 5000 }, { "brillance", 5000, 10000 }, { "air", 10000, 20000 } }};
 
 // Retains the original Kick temporal detectors alongside shared signal measurements.
 // Profiles read this object by const reference; FFT buffers and histograms are never copied.
@@ -49,6 +77,12 @@ public:
         slowCoefficient = 1.0 - std::exp(-juce::MathConstants<double>::twoPi * 25 / rate);
         lastHitSample = -1000000000;
         lastHit = -1000;
+        windowEnergy = 0;
+        windowEnergyByPeak.fill(0);
+        decayHistogram.fill(0);
+        decayCensored = trackAge = 0;
+        trackActive = false;
+        trackReference = -100;
     }
 
     void push(const float* audio, int length)
@@ -68,16 +102,36 @@ public:
             lowSlow += slowCoefficient * (value - lowSlow);
             const auto bassValue = lowFast - lowSlow;
             bassEnergy += bassValue * bassValue;
+            windowEnergy += static_cast<double>(value) * value;
             windowPeak = juce::jmax(windowPeak, magnitude);
             if (++windowSamples >= juce::jmax(1, static_cast<int>(rate * 0.01)))
             {
                 const auto decibels = juce::Decibels::gainToDecibels(windowPeak, -100.0f);
-                ++histogram[static_cast<size_t>(juce::jlimit(0, 100, static_cast<int>(decibels + 100)))];
+                const auto peakBucket = static_cast<size_t>(juce::jlimit(0, 100, static_cast<int>(decibels + 100)));
+                ++histogram[peakBucket];
+                windowEnergyByPeak[peakBucket] += windowEnergy;
+                windowEnergy = 0;
                 for (size_t detector = 0; detector < envelopes.size(); ++detector)
                 {
                     const auto level = juce::Decibels::gainToDecibels(envelopePeaks[detector], -100.0f);
                     ++envelopeHistograms[detector][static_cast<size_t>(juce::jlimit(0, 100, static_cast<int>(level + 100)))];
                     envelopePeaks[detector] = 0;
+                }
+                if (trackActive)
+                {
+                    ++trackAge;
+                    if (trackAge <= MeasureConstants::decayReferenceWindows)
+                        trackReference = juce::jmax(trackReference, decibels);
+                    else if (decibels <= trackReference - MeasureConstants::decayDropDb)
+                    {
+                        ++decayHistogram[static_cast<size_t>(juce::jmin(trackAge, MeasureConstants::decayMaxWindows))];
+                        trackActive = false;
+                    }
+                    else if (trackAge >= MeasureConstants::decayMaxWindows)
+                    {
+                        ++decayCensored;
+                        trackActive = false;
+                    }
                 }
                 const auto bassLevel = std::sqrt(bassEnergy / windowSamples);
                 if (bassLevel > 0.0003 && bassLevel > previousBass * 1.8
@@ -86,6 +140,10 @@ public:
                     ++hits;
                     lastHit = windows;
                     lastHitSample = samples - windowSamples;
+                    if (trackActive) ++decayCensored;
+                    trackActive = true;
+                    trackAge = 0;
+                    trackReference = decibels;
                 }
                 previousBass = bassLevel;
                 bassEnergy = 0;
@@ -221,6 +279,142 @@ public:
     }
     float crestDb() const { return peakDb() - rmsDb(); }
 
+    // J2 measures: additive, read by nothing in the profiles yet. Unavailable values are NaN.
+    static float unavailable() noexcept { return std::numeric_limits<float>::quiet_NaN(); }
+
+    int hitCount() const noexcept { return hits; }
+    int analysedWindows() const noexcept { return windows; }
+    double durationSeconds() const noexcept { return rate > 0 ? static_cast<double>(samples) / rate : 0.0; }
+
+    // L05: P10 of the window peak distribution.
+    float noiseFloorDb() const { return windows > 0 ? percentile(0.10f) : unavailable(); }
+
+    // Active windows: peak above max(P95 - 40 dB, noise floor + 12 dB) (decision 01-Q1), never above P95 itself so that
+    // a signal without dynamics (steady tone, constant noise) keeps its loudest windows instead of none.
+    float activeThresholdDb() const
+    {
+        const auto p95 = percentile(0.95f);
+        return juce::jmin(p95, juce::jmax(p95 - MeasureConstants::activeBelowP95Db,
+            noiseFloorDb() + MeasureConstants::activeAboveFloorDb));
+    }
+
+    int activeWindowCount() const
+    {
+        if (windows < 1) return 0;
+        const auto threshold = activeThresholdDb();
+        int count = 0;
+        // bucket 0 holds the windows at or below -100 dBFS (digital silence): never active
+        for (size_t index = 1; index < histogram.size(); ++index)
+            if (static_cast<float>(index) - 100 >= threshold) count += histogram[index];
+        return count;
+    }
+
+    // L03: RMS over the active windows only.
+    float activeRmsDb() const
+    {
+        const auto count = activeWindowCount();
+        if (count < 1) return unavailable();
+        const auto threshold = activeThresholdDb();
+        double active = 0;
+        for (size_t index = 1; index < histogram.size(); ++index)
+            if (static_cast<float>(index) - 100 >= threshold) active += windowEnergyByPeak[index];
+        const auto length = static_cast<double>(juce::jmax(1, static_cast<int>(rate * 0.01)));
+        return juce::Decibels::gainToDecibels(static_cast<float>(std::sqrt(active / (count * length))), -100.0f);
+    }
+
+    // D02: global peak minus the active RMS.
+    float activeCrestDb() const
+    {
+        const auto level = activeRmsDb();
+        return std::isfinite(level) ? peakDb() - level : unavailable();
+    }
+
+    // H02
+    float hitsPerSecond() const
+    {
+        const auto duration = durationSeconds();
+        return duration > 0 ? static_cast<float>(hits / duration) : unavailable();
+    }
+
+    // H06: time from the hit detection to a 20 dB fall of the 10 ms peak envelope (median over the hits that got
+    // there before the next hit, 10 ms resolution). T60 is that time extrapolated, not measured.
+    int decayObservedHits() const noexcept
+    {
+        int count = 0;
+        for (const auto value : decayHistogram) count += value;
+        return count;
+    }
+    int decayCensoredHits() const noexcept { return decayCensored; }
+
+    float decayT20Ms() const
+    {
+        const auto total = decayObservedHits();
+        if (total < MeasureConstants::minimumDecayHits) return unavailable();
+        int count = 0;
+        for (size_t index = 0; index < decayHistogram.size(); ++index)
+        {
+            count += decayHistogram[index];
+            if (count * 2 >= total) return static_cast<float>(index) * 10.0f;
+        }
+        return unavailable();
+    }
+    float decayT60Ms() const
+    {
+        const auto t20 = decayT20Ms();
+        return std::isfinite(t20) ? t20 * MeasureConstants::t60Factor : unavailable();
+    }
+
+    int spectrumFrames() const noexcept { return onsetFrames + tailFrames + bleedFrames; }
+
+    // S01: power of one third-octave band per analysed frame, in dB of the unscaled FFT power.
+    float thirdOctaveDb(int index) const
+    {
+        const auto frames = spectrumFrames();
+        if (index < 0 || index >= thirdOctaveCount || frames < 1) return unavailable();
+        const auto centre = thirdOctaveCentre(index);
+        const auto lower = centre * std::pow(2.0, -1.0 / 6), upper = centre * std::pow(2.0, 1.0 / 6);
+        if (upper > rate * MeasureConstants::bandLimitRatio) return unavailable();
+        double sum = 0;
+        for (size_t bin = 1; bin < static_cast<size_t>(fftSize / 2); ++bin)
+        {
+            const auto hz = static_cast<double>(bin) * rate / fftSize;
+            if (hz >= lower && hz < upper) sum += spectrum[bin];
+        }
+        return sum > 0 ? static_cast<float>(10 * std::log10(sum / frames)) : unavailable();
+    }
+
+    // S02: energy of a band relative to the whole 20 Hz - 20 kHz range, in dB.
+    float bandRelativeDb(double lower, double upper) const
+    {
+        const auto limit = juce::jmin(20000.0, rate * MeasureConstants::bandLimitRatio);
+        const auto total = bandEnergy(20, limit);
+        if (lower >= limit || total <= 0) return unavailable();
+        const auto band = bandEnergy(lower, juce::jmin(upper, limit));
+        return band > 0 ? static_cast<float>(10 * std::log10(band / total)) : unavailable();
+    }
+
+    // P02: onset energy in the click band minus onset energy in the body band, in dB.
+    float attackBodyGapDb(double bodyLower, double bodyUpper, double clickLower, double clickUpper) const
+    {
+        if (onsetFrames < 3 || clickUpper > rate * MeasureConstants::bandLimitRatio) return unavailable();
+        const auto body = phaseEnergy(onsetSpectrum, bodyLower, bodyUpper);
+        const auto click = phaseEnergy(onsetSpectrum, clickLower, clickUpper);
+        return body > 0 && click > 0 ? static_cast<float>(10 * std::log10(click / body)) : unavailable();
+    }
+
+    // Reference bands of document 01, section 5.5; other roles have none.
+    float attackBodyGapDb(DrumInstrument role) const
+    {
+        switch (role)
+        {
+            case DrumInstrument::kick: return attackBodyGapDb(35, 150, 2000, 5000);
+            case DrumInstrument::snare: return attackBodyGapDb(120, 250, 3000, 6000);
+            case DrumInstrument::tom1: case DrumInstrument::tom2: case DrumInstrument::tom3: case DrumInstrument::floorTom:
+                return attackBodyGapDb(60, 250, 2000, 5000);
+            default: return unavailable();
+        }
+    }
+
     // Spread between the loud (P90) and quiet (P20) levels of one envelope detector; the expander gate looks at it.
     float envelopeContrastDb(size_t detector) const
     {
@@ -268,5 +462,11 @@ private:
     juce::int64 lastHitSample = -1000000000;
     double lowFast = 0, lowSlow = 0, previousBass = 0, bassEnergy = 0;
     double fastCoefficient = 0, slowCoefficient = 0;
+    double windowEnergy = 0;
+    std::array<double, 101> windowEnergyByPeak {};   // energy of the windows, bucketed like histogram
+    std::array<int, 101> decayHistogram {};           // hits by number of 10 ms windows to fall decayDropDb
+    int decayCensored = 0, trackAge = 0;
+    float trackReference = -100;
+    bool trackActive = false;
 };
 }

@@ -12,9 +12,9 @@ Légende : ⬜ à faire · 🔄 en cours · ✅ terminé · ⏸ en réserve
 | Phase 0 | Lecture du code, plan, décisions | ✅ | `8e25dd8`, `6736b8c` | Plan validé par l'utilisateur |
 | Build | Compatibilité VS 2019 / VS 2022 | ✅ | `6736b8c` | CTest 3/3, 0 avertissement (VS 2022) |
 | J1 | Snapshot JSON, `analysisVersion`, export développeur, test de boucle | ✅ | `20cd588` | CTest 3/3, 0 avertissement (VS 2022) ; 540 rejeux identiques à 1e-6 ; export réel non testé (pas de Cubase) |
-| T1 | Tests A01-A04, A10, E01, E02, E06, E07 (+E08, E09, E10) | ✅ | voir ci-dessous | CTest 3/3 ; 7 200 propositions ; mutation de E07 détectée |
-| T2 | Rejeu `--replay` / `--compare` / `--export-wav` | ✅ | voir ci-dessous | CTest 3/3 ; essai sur les 4 WAV du dépôt (Kick, Snare, Tom, OvH) |
-| J2 | Mesures P1 additives (L03, L05, D02, H02, H06, S01, S02, P02) | ⬜ | | |
+| T1 | Tests A01-A04, A10, E01, E02, E06, E07 (+E08, E09, E10) | ✅ | `79c196e` | CTest 3/3 ; 7 200 propositions ; mutation de E07 détectée |
+| T2 | Rejeu `--replay` / `--compare` / `--export-wav` | ✅ | `79c196e` | CTest 3/3 ; essai sur les 4 WAV du dépôt (Kick, Snare, Tom, OvH) |
+| J2 | Mesures P1 additives (L03, L05, D02, H02, H06, S01, S02, P02) | ✅ | (ce commit) | CTest 3/3, 0 avertissement ; profils inchangés (équivalence legacy) ; `push()` sans allocation (compteur vérifié) |
 | J3 | Corrections 1 et 2 (désactivées par défaut) | ⬜ | | |
 | Registre de rôles | `RoleDescriptor` | ⏸ | | |
 | T3 | Défauts Kit / Phase | ⏸ | | |
@@ -54,6 +54,18 @@ Fichiers : `Source/Drum/DrumReplay.h` (nouveau), `Source/Drum/DrumAnalysis.h` (`
 - ✅ Tests : dossier de 5 snapshots + 2 fichiers invalides, rapport sans différence, différences simulées (gain de 3 dB, fréquence de 2 % sous le seuil, bascule refus/valide), entrées présentes d'un seul côté, aller-retour JSON, codes de sortie des commandes, WAV synthétique exporté puis rejoué.
 - Essai réel (analyse seule, aucune lecture audio) sur `wav_test_file` : 4 snapshots de 104 Ko, tous valides, rejeu déterministe, aucune différence.
 - Commandes : voir le doc 02, section 3 (état).
+### J2 : mesures P1 additives
+
+Fichiers : `Source/Drum/DrumAnalysis.h` (état + accesseurs const + `MeasureConstants`), `Source/Drum/DrumAnalysisSnapshot.h` (état et mesures exportés), `tests/MeasureTests.cpp` (nouveau), `CMakeLists.txt`, `tests/ZeroEffortDrumProcessorTests.cpp`, doc 01.
+
+- ✅ **L03 / D02** : énergie de chaque fenêtre de 10 ms rangée dans le même histogramme de pics (`windowEnergyByPeak`, 101 cases) ; le seuil actif est calculé à la lecture (le P95 n'est connu qu'à la fin). `activeRmsDb()`, `activeCrestDb()`, `activeThresholdDb()`, `activeWindowCount()`.
+- ✅ **L05** : `noiseFloorDb()` (P10). **H02** : `hitsPerSecond()`, `hitCount()`.
+- ✅ **H06** : suivi des chutes après chaque frappe sans allocation (référence = pic des 4 premières fenêtres, chute de 20 dB, au plus 1 s) ; histogramme des durées, médiane à 10 ms près, il faut 3 frappes ; frappes interrompues par la suivante comptées à part (`decayCensoredHits()`). T60 = 3 × T20 (extrapolé, documenté comme tel).
+- ✅ **S01** : `thirdOctaveDb(0..30)` (31 colonnes `sp_third_oct_<fréquence nominale>`). **S02** : `bandRelativeDb()` et 7 colonnes `band_*` (partition de 20 Hz à min(20 kHz, 0,45 × fréquence)). **P02** : `attackBodyGapDb(rôle)`.
+- ✅ Valeurs indisponibles = NaN dans le code, `null` dans le JSON (jamais 0 inventé).
+- ✅ `analysisVersion` passe à **2** (le snapshot contient de nouveaux champs d'analyse, obligatoires à la lecture).
+- ✅ Tests : L03/D02 (sinusoïde −9,03 dBFS / 3,01 dB), L05 (lit un lit de bruit à −50,5 dBFS), A09 (kick isolé contre dense), silence = indisponible, H02, H06 à 44,1/48/96 kHz (T20 attendu 82 et 164 ms, tolérance ±30 ms), S01 (sinusoïde 1 kHz dans la bonne bande, voisines à > 25 dB, bruit blanc +10 dB par décade à 1 dB près), S02 (partition = 1 à 3 %), limite 0,45 × fréquence, P02 (+6 dB pour un clic doublé), snapshot (colonnes, restauration identique, champs endommagés refusés), H02 de la section performance : aucune allocation dans `push()` (compteur d'allocations du thread, auto-vérifié).
+- Les profils ne lisent aucune de ces mesures : `testProposalEquivalence` (référence figée) passe sans modification.
 ## Écarts avec les spécifications
 
 - **Emplacement des fonctions** : `toSnapshot` / `restoreSnapshot` / `measuresToVar` sont des fonctions statiques de `struct DrumAnalysisSnapshot` (ami de `DrumAnalysis`), pas des méthodes de `DrumAnalysis` : la classe de mesure reste inchangée. Le doc 07 disait « dans la classe DrumAnalysis ».
@@ -66,11 +78,16 @@ Fichiers : `Source/Drum/DrumReplay.h` (nouveau), `Source/Drum/DrumAnalysis.h` (`
 - **Rubrique « Cas dorés »** du rapport (doc 02, section 8) absente : il n'existe pas encore de cas validé à l'oreille (T6).
 - **Mesures de proximité** : `bass/total` utilise `bandEnergy(20, 16000)` (le Kick utilise `min(16000, 0,45 × fréquence)` : identique au-dessus de 35,6 kHz d'échantillonnage).
 - **Tests d'abord (T1)** : les tests A et E ont été écrits après lecture du code, mais ils passent tous sans modification des profils ; leur capacité à échouer est prouvée par la mutation de E07, pas par un état rouge initial.
+- **J2, règle de la fenêtre active** : le seuil est plafonné au P95 et le silence numérique (≤ −100 dBFS) n'est jamais actif ; sans cela un signal sans dynamique (sinusoïde, bruit constant) n'avait aucune fenêtre active, et le silence donnait −100 dB au lieu de « indisponible ». Ajouts au doc 01.
+- **J2, A09** : le doc 02 attend un crest actif identique à ±1 dB ; la mesure synthétique donne 1,18 dB (global : 4,76 dB). Le test exige < 1,5 dB et 3 × plus stable que le global. Cause : le seuil relatif au P95 baisse quand le jeu est épars. À régler par la courbe de calibration de 01-Q1 (nécessite des prises réelles) : voir questions ouvertes.
+- **J2, H06** : T20 est un temps de passage direct à −20 dB (pas une régression −5/−25 dB) à 10 ms de résolution, mesuré depuis la détection de la frappe ; T60 = 3 × T20. Détecteur de frappes réglé pour le grave (problème 4 du doc 01) : H06 n'est fiable que pour Kick et Toms.
+- **J2, S01** : valeurs en dB de la puissance FFT non étalonnée (pas de forme relative) ; la bande 20 Hz est indisponible à 48 kHz (aucune case FFT dans 17,8-22,4 Hz).
 ## Questions ouvertes
 
 - L'export réel (session Auto dans Cubase) n'a pas été exercé : à tester sur la machine avec Cubase, avec un build `-DZED_ANALYSIS_EXPORT=ON`.
+- **Seuil de la fenêtre active** (40 dB, 12 dB, plafond P95) : à calibrer sur des prises réelles (courbe crest actif / seuil, plateau à ±0,5 dB pour ±10 dB). Le vrai corpus n'est pas sur cette machine.
 - Le snapshot enregistre la proposition issue de `propose()` (phase 0), pas la version finale après les étapes de calibration (`refineThreshold`, `finish`) : c'est ce que le rejeu compare.
 
 ## Prochaine action
 
-J2 : mesures P1 additives (L03, L05, D02, H02, H06, S01, S02, P02), sans modifier les profils.
+J3 : corrections 1 et 2 du doc 01 (désactivées par défaut) : tests d'abord (problème 1, A08 en échec attendu), puis correctif derrière une constante nommée.
