@@ -15,6 +15,7 @@ struct SnapshotContext
     Settings original = defaultSettings();
     DrumStyle style = DrumStyle::natural;
     float intensity = 1;
+    ProposalPolicy policy;
     juce::String source { "unknown" }, licence { "private-dev" };
 };
 
@@ -98,6 +99,8 @@ struct DrumAnalysisSnapshot
         object->setProperty("ph_onset_frames", analysis.onsetFrames);
         object->setProperty("ph_tail_frames", analysis.tailFrames);
         object->setProperty("ph_bleed_frames", analysis.bleedFrames);
+        object->setProperty("ph_lead_frames", analysis.leadFrames);
+        object->setProperty("ph_bleed_treble_ratio", numberOrNull(analysis.bleedTrebleRatio()));
         object->setProperty("ph_attack_body_gap_db", numberOrNull(analysis.attackBodyGapDb(role)));
         for (int band = 0; band < thirdOctaveCount; ++band)
             object->setProperty("sp_third_oct_" + thirdOctaveLabel(band), numberOrNull(analysis.thirdOctaveDb(band)));
@@ -130,6 +133,8 @@ struct DrumAnalysisSnapshot
         object->setProperty("onsetFrames", analysis.onsetFrames);
         object->setProperty("tailFrames", analysis.tailFrames);
         object->setProperty("bleedFrames", analysis.bleedFrames);
+        object->setProperty("leadFrames", analysis.leadFrames);
+        object->setProperty("excludeLeadFrames", analysis.excludeLeadFrames);
         object->setProperty("histogram", counts(analysis.histogram));
         juce::Array<juce::var> envelopes;
         for (const auto& values : analysis.envelopeHistograms) envelopes.add(counts(values));
@@ -169,6 +174,11 @@ struct DrumAnalysisSnapshot
             return juce::Result::fail("counter out of range");
         const auto& invalid = object->getProperty("invalid");
         if (!invalid.isBool()) return juce::Result::fail("invalid flag missing");
+        juce::int64 leadFrames = 0;
+        const auto& excludeLead = object->getProperty("excludeLeadFrames");
+        if (!excludeLead.isBool() || !readInteger(*object, "leadFrames", leadFrames) || leadFrames < 0
+            || leadFrames > std::numeric_limits<int>::max())
+            return juce::Result::fail("invalid lead frame policy");
 
         std::array<int, 101> histogram {};
         std::array<std::array<int, 101>, 6> envelopes {};
@@ -200,6 +210,8 @@ struct DrumAnalysisSnapshot
             analysis.prepare(rate);
             return juce::Result::fail("invalid spectrum");
         }
+        analysis.excludeLeadFrames = static_cast<bool>(excludeLead);
+        analysis.leadFrames = static_cast<int>(leadFrames);
         analysis.decayHistogram = decayHistogram;
         analysis.decayCensored = static_cast<int>(decayCensored);
         analysis.samples = samples;
@@ -228,6 +240,9 @@ struct DrumAnalysisSnapshot
         meta->setProperty("intensity", static_cast<double>(context.intensity));
         meta->setProperty("source", context.source);
         meta->setProperty("licence", context.licence);
+        auto* policy = new juce::DynamicObject();
+        policy->setProperty("compressorUsesActiveCrest", context.policy.compressorUsesActiveCrest);
+        meta->setProperty("policy", juce::var(policy));
 
         auto* input = new juce::DynamicObject();
         input->setProperty("settings", settingsToVar(context.original));
@@ -271,6 +286,11 @@ struct DrumAnalysisSnapshot
             || !readNumber(*meta, "intensity", intensity) || !std::isfinite(intensity) || intensity < 0 || intensity > 1)
             return juce::Result::fail("invalid style or intensity");
         context.intensity = static_cast<float>(intensity);
+        if (auto* policy = meta->getProperty("policy").getDynamicObject())
+        {
+            const auto& active = policy->getProperty("compressorUsesActiveCrest");
+            if (active.isBool()) context.policy.compressorUsesActiveCrest = static_cast<bool>(active);
+        }
         context.source = meta->getProperty("source").toString();
         context.licence = meta->getProperty("licence").toString();
 

@@ -186,8 +186,20 @@ void testReplayCommands()
 }
 }
 
-int runReplayCommand(const juce::StringArray& arguments)
+int runReplayCommand(const juce::StringArray& commandLine)
 {
+    // Policy flags may appear anywhere: --exclude-lead-frames (analysis, --export-wav), --active-crest and
+    // --no-active-crest (proposal, --export-wav records it, --replay overrides the recorded one).
+    juce::StringArray arguments;
+    bool excludeLeadFrames = false;
+    std::optional<bool> activeCrest;
+    for (const auto& item : commandLine)
+    {
+        if (item == "--exclude-lead-frames") excludeLeadFrames = true;
+        else if (item == "--active-crest") activeCrest = true;
+        else if (item == "--no-active-crest") activeCrest = false;
+        else arguments.add(item);
+    }
     if (arguments.isEmpty()) return -1;
     const auto fail = [](const juce::String& message) { std::cerr << "ERROR: " << message << std::endl; return 1; };
     const auto writeOutputs = [&](const juce::String& prefix, const juce::var& json, const juce::String& markdown)
@@ -199,10 +211,10 @@ int runReplayCommand(const juce::StringArray& arguments)
     const auto command = arguments[0];
     if (command == "--replay")
     {
-        if (arguments.size() < 2 || arguments.size() > 3) return fail("usage: --replay <snapshot folder> [output prefix]");
+        if (arguments.size() < 2 || arguments.size() > 3) return fail("usage: --replay <snapshot folder> [output prefix] [--active-crest|--no-active-crest]");
         const juce::File folder(arguments[1]);
         if (!folder.isDirectory()) return fail("not a folder: " + folder.getFullPathName());
-        const auto result = drum::DrumReplay::replayFolder(folder);
+        const auto result = drum::DrumReplay::replayFolder(folder, activeCrest);
         auto markdown = drum::DrumReplay::toMarkdown(drum::DrumReplay::compare(result.recorded, result.current));
         if (!result.current.skipped.empty())
         {
@@ -236,7 +248,7 @@ int runReplayCommand(const juce::StringArray& arguments)
     if (command == "--export-wav")
     {
         if (arguments.size() < 4 || arguments.size() > 6)
-            return fail("usage: --export-wav <wav> <snapshot folder> <role 0-9> [natural|rock|metal] [intensity 0-1]");
+            return fail("usage: --export-wav <wav> <snapshot folder> <role 0-9> [natural|rock|metal] [intensity 0-1] [--exclude-lead-frames] [--active-crest]");
         const juce::File wav(arguments[1]), folder(arguments[2]);
         if (!arguments[3].containsOnly("0123456789") || arguments[3].isEmpty() || arguments[3].getIntValue() > 9)
             return fail("role must be an integer from 0 to 9");
@@ -258,6 +270,7 @@ int runReplayCommand(const juce::StringArray& arguments)
             || reader->lengthInSamples <= 0 || reader->lengthInSamples > reader->sampleRate * 3600)
             return fail("supported: mono or stereo, 8-192 kHz, at most one hour");
         drum::DrumAnalyser analyser;
+        analyser.setExcludeLeadFrames(excludeLeadFrames);
         analyser.prepare(reader->sampleRate);
         juce::AudioBuffer<float> audio(static_cast<int>(reader->numChannels), 32768);
         std::array<float, 32768> mono {};
@@ -276,6 +289,8 @@ int runReplayCommand(const juce::StringArray& arguments)
             offset += count;
         }
         context.source = wav.getFileName();
+        if (activeCrest.has_value()) context.policy.compressorUsesActiveCrest = *activeCrest;
+        analyser.setPolicy(context.policy);
         const auto proposal = analyser.propose(context.original, context.style, context.intensity);
         if (!folder.createDirectory()) return fail("cannot create " + folder.getFullPathName());
         const auto name = juce::File::createLegalFileName(wav.getFileNameWithoutExtension() + "_"

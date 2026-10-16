@@ -10,8 +10,8 @@ inline constexpr std::array<float, 3> kickGateReleases { 160, 100, 80 };
 // (switch above 48 kHz), onset 0-70 ms, tail 70-230 ms, 120 ms refractory period, 25-250 Hz hit
 // detector band, the six envelope attack/release times, kickGateReleases and MeasureConstants.
 // Also bump when the snapshot gains analysis fields. Snapshots recorded with another version are not
-// comparable. Version 2: active-window energy and hit decay added (J2).
-inline constexpr int analysisVersion = 2;
+// comparable. Version 2: active-window energy and hit decay added (J2). Version 3: lead frame policy (J3).
+inline constexpr int analysisVersion = 3;
 
 // H: starting points to calibrate on a corpus (document 05, 01-Q1 and 01-Q5).
 struct MeasureConstants
@@ -24,6 +24,8 @@ struct MeasureConstants
     static constexpr int minimumDecayHits = 3;        // hits needed before a median decay is reported
     static constexpr float t60Factor = 3;             // T60 is extrapolated from the 20 dB drop
     static constexpr double bandLimitRatio = 0.45;    // bands above this fraction of the rate are ignored (01-Q4)
+    // J3, problem 1. Off until listened to in a host: it changes the bleed spectrum, hence the Kick air correction.
+    static constexpr bool excludeLeadFramesByDefault = false;
 };
 
 inline constexpr int thirdOctaveCount = 31;           // 20 Hz to 20 kHz, nominal centres 1000 * 10^(n/10), n = -17..13
@@ -71,7 +73,7 @@ public:
         }
         frame.fill(0);
         position = windowSamples = hits = windows = 0;
-        onsetFrames = tailFrames = bleedFrames = 0;
+        onsetFrames = tailFrames = bleedFrames = leadFrames = 0;
         lowFast = lowSlow = previousBass = bassEnergy = 0;
         fastCoefficient = 1.0 - std::exp(-juce::MathConstants<double>::twoPi * 250 / rate);
         slowCoefficient = 1.0 - std::exp(-juce::MathConstants<double>::twoPi * 25 / rate);
@@ -170,16 +172,20 @@ public:
                     largeFFT.performFrequencyOnlyForwardTransform(work.data());
                 }
                 const auto age = (samples - fftSize / 2 - lastHitSample) / rate;
-                auto* phase = age >= 0 && age < 0.07 ? &onsetSpectrum
+                // Problem 1: a frame whose centre precedes the hit by less than half its length already holds the attack.
+                const auto lead = excludeLeadFrames && age < 0 && age >= -(fftSize / 2) / rate;
+                auto* phase = lead ? nullptr
+                    : age >= 0 && age < 0.07 ? &onsetSpectrum
                     : age >= 0.07 && age < 0.23 ? &tailSpectrum : &bleedSpectrum;
-                if (phase == &onsetSpectrum) ++onsetFrames;
+                if (phase == nullptr) ++leadFrames;
+                else if (phase == &onsetSpectrum) ++onsetFrames;
                 else if (phase == &tailSpectrum) ++tailFrames;
                 else ++bleedFrames;
                 for (size_t bin = 1; bin < static_cast<size_t>(fftSize / 2); ++bin)
                 {
                     const auto power = static_cast<double>(work[bin]) * work[bin];
                     spectrum[bin] += power;
-                    (*phase)[bin] += power;
+                    if (phase != nullptr) (*phase)[bin] += power;
                 }
             }
         }
@@ -364,7 +370,23 @@ public:
         return std::isfinite(t20) ? t20 * MeasureConstants::t60Factor : unavailable();
     }
 
-    int spectrumFrames() const noexcept { return onsetFrames + tailFrames + bleedFrames; }
+    int spectrumFrames() const noexcept { return onsetFrames + tailFrames + bleedFrames + leadFrames; }
+
+    // J3, problem 1: leave the frames that already hold an attack out of the bleed spectrum (they are still in
+    // the overall spectrum). Set before prepare(); the default is MeasureConstants::excludeLeadFramesByDefault.
+    void setExcludeLeadFrames(bool exclude) noexcept { excludeLeadFrames = exclude; }
+    bool excludesLeadFrames() const noexcept { return excludeLeadFrames; }
+    int leadFrameCount() const noexcept { return leadFrames; }
+
+    // Average FFT power per frame of one phase in a band (onset, tail or bleed spectra); NaN without frames.
+    enum class Phase { onset, tail, bleed };
+    double phasePower(Phase phase, double lower, double upper) const
+    {
+        const auto frames = phase == Phase::onset ? onsetFrames : phase == Phase::tail ? tailFrames : bleedFrames;
+        if (frames < 1) return std::numeric_limits<double>::quiet_NaN();
+        return phaseEnergy(phase == Phase::onset ? onsetSpectrum : phase == Phase::tail ? tailSpectrum : bleedSpectrum,
+            lower, upper) / frames;
+    }
 
     // S01: power of one third-octave band per analysed frame, in dB of the unscaled FFT power.
     float thirdOctaveDb(int index) const
@@ -400,6 +422,16 @@ public:
         const auto body = phaseEnergy(onsetSpectrum, bodyLower, bodyUpper);
         const auto click = phaseEnergy(onsetSpectrum, clickLower, clickUpper);
         return body > 0 && click > 0 ? static_cast<float>(10 * std::log10(click / body)) : unavailable();
+    }
+
+    // P03: bleed treble (6-12 kHz) relative to 2 % of the onset bass (35-150 Hz), per frame. The Kick air cut starts
+    // above 1 and grows with its log2.
+    float bleedTrebleRatio() const
+    {
+        if (bleedFrames < 1 || onsetFrames < 1) return unavailable();
+        const auto treble = phasePower(Phase::bleed, 6000, 12000);
+        const auto bass = phasePower(Phase::onset, 35, 150);
+        return bass > 0 && treble > 0 ? static_cast<float>(treble / (bass * 0.02)) : unavailable();
     }
 
     // Reference bands of document 01, section 5.5; other roles have none.
@@ -458,7 +490,8 @@ private:
     int position = 0, windowSamples = 0, windows = 0, hits = 0, lastHit = -1000;
     float peak = 0, windowPeak = 0, previousPeak = 0;
     bool invalid = false;
-    int onsetFrames = 0, tailFrames = 0, bleedFrames = 0;
+    int onsetFrames = 0, tailFrames = 0, bleedFrames = 0, leadFrames = 0;
+    bool excludeLeadFrames = MeasureConstants::excludeLeadFramesByDefault;
     juce::int64 lastHitSample = -1000000000;
     double lowFast = 0, lowSlow = 0, previousBass = 0, bassEnergy = 0;
     double fastCoefficient = 0, slowCoefficient = 0;

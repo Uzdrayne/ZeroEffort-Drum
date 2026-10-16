@@ -91,7 +91,7 @@ Le programme génère des signaux dont les mesures sont connues par calcul.
 
 A10 est essentiel : une analyse qui dépend de la taille de bloc de l'hôte donnera des résultats différents d'un DAW à l'autre.
 
-**État (T1, 16/10/2026)** : A01, A02, A03, A04 et A10 sont implémentés dans `tests/PropertyTests.cpp` (exécutés par `ZeroEffortDrumTests`). A10 compare le bloc `analysis` du snapshot à l'identique (blocs de 64, 257, 512 et 4096, à 44,1, 48 et 96 kHz) : aucune dépendance à la taille de bloc. A05-A09 et A11-A13 restent à faire (A08 : échec attendu).
+**État (T1, 16/10/2026)** : A01, A02, A03, A04 et A10 sont implémentés dans `tests/PropertyTests.cpp` (exécutés par `ZeroEffortDrumTests`). A10 compare le bloc `analysis` du snapshot à l'identique (blocs de 64, 257, 512 et 4096, à 44,1, 48 et 96 kHz) : aucune dépendance à la taille de bloc. A09 est implémenté en J2 (`tests/MeasureTests.cpp`, avec une tolérance de 1,5 dB au lieu de 1 dB : voir doc 01, 5.1) et A08 en J3 (`tests/KnownProblemTests.cpp`) comme **échec attendu** : il passe tant que le détecteur sous-compte les doubles pédales et échoue dès qu'il sera corrigé. A05-A07 et A11-A13 restent à faire.
 
 ### 5.2 Rejeu de snapshots (`T-B`)
 

@@ -16,6 +16,9 @@ public:
     void push(const float* audio, int length) { measurements.push(audio, length); }
     const DrumAnalysis& analysis() const { return measurements; }
     DrumAnalysis& editableAnalysis() { return measurements; }  // snapshot restore only
+    void setExcludeLeadFrames(bool exclude) noexcept { measurements.setExcludeLeadFrames(exclude); }
+    void setPolicy(const ProposalPolicy& newPolicy) noexcept { policy = newPolicy; }
+    const ProposalPolicy& getPolicy() const noexcept { return policy; }
 
     DrumProposal propose(const Settings& original, DrumStyle style = DrumStyle::natural, float intensity = 1.0f) const
     {
@@ -173,11 +176,12 @@ private:
             case DrumInstrument::overheads: return OverheadsProfile::propose(measurements, original, style, intensity);
             case DrumInstrument::room: return RoomProfile::propose(measurements, original, style, intensity);
             case DrumInstrument::master: return MasterBusProfile::propose(measurements, original, style, intensity);
-            case DrumInstrument::kick: return KickProfile::propose(measurements, original, style, intensity);
+            case DrumInstrument::kick: return KickProfile::propose(measurements, original, style, intensity, policy);
         }
-        return KickProfile::propose(measurements, original, style, intensity);
+        return KickProfile::propose(measurements, original, style, intensity, policy);
     }
 
     DrumAnalysis measurements;
+    ProposalPolicy policy;
 };
 }

@@ -2,6 +2,7 @@
 #include "DrumAnalysisSnapshot.h"
 #include <algorithm>
 #include <map>
+#include <optional>
 #include <tuple>
 
 namespace drum
@@ -26,6 +27,7 @@ struct ReplayEntry
     bool valid = false, deterministic = true;
     Settings settings = defaultSettings();
     double crest = 0, bassRatio = 0, contrast = 0;
+    double activeCrest = std::numeric_limits<double>::quiet_NaN();
 };
 
 struct ReplayReport
@@ -88,6 +90,7 @@ struct DrumReplay
         entry.settings = proposal.settings;
         entry.deterministic = deterministic;
         entry.crest = analysis.crestDb();
+        entry.activeCrest = analysis.activeCrestDb();
         const auto total = analysis.bandEnergy(20, 16000);
         entry.bassRatio = total > 0 ? analysis.bandEnergy(35, 150) / total : 0.0;
         const auto detector = entry.role == static_cast<int>(DrumInstrument::kick)
@@ -96,8 +99,9 @@ struct DrumReplay
         return entry;
     }
 
-    // Replays every snapshot of a folder (recursively) through the current profiles.
-    static ReplayResult replayFolder(const juce::File& folder)
+    // Replays every snapshot of a folder (recursively) through the current profiles, with the proposal policy
+    // recorded in each snapshot unless an override is given.
+    static ReplayResult replayFolder(const juce::File& folder, std::optional<bool> compressorUsesActiveCrest = std::nullopt)
     {
         ReplayResult result;
         result.recorded.label = "enregistre (" + folder.getFileName() + ")";
@@ -120,6 +124,9 @@ struct DrumReplay
                 continue;
             }
             const auto& context = restored.context;
+            auto policy = context.policy;
+            if (compressorUsesActiveCrest.has_value()) policy.compressorUsesActiveCrest = *compressorUsesActiveCrest;
+            analyser->setPolicy(policy);
             const auto proposal = analyser->propose(context.original, context.style, context.intensity);
             const auto again = analyser->propose(context.original, context.style, context.intensity);
             const auto deterministic = proposal.valid == again.valid && proposal.settings == again.settings;
@@ -149,6 +156,7 @@ struct DrumReplay
             object->setProperty("summary", entry.summary);
             object->setProperty("hits", entry.hits);
             object->setProperty("crest", entry.crest);
+            object->setProperty("activeCrest", DrumAnalysisSnapshot::numberOrNull(entry.activeCrest));
             object->setProperty("bassRatio", entry.bassRatio);
             object->setProperty("contrast", entry.contrast);
             object->setProperty("settings", DrumAnalysisSnapshot::settingsToVar(entry.settings));
@@ -193,6 +201,8 @@ struct DrumReplay
             entry.summary = object->getProperty("summary").toString();
             entry.hits = static_cast<int>(object->getProperty("hits"));
             entry.crest = static_cast<double>(object->getProperty("crest"));
+            const auto& activeCrest = object->getProperty("activeCrest");
+            if (!activeCrest.isVoid()) entry.activeCrest = static_cast<double>(activeCrest);
             entry.bassRatio = static_cast<double>(object->getProperty("bassRatio"));
             entry.contrast = static_cast<double>(object->getProperty("contrast"));
             if (entry.file.isEmpty()) return juce::Result::fail("entry without file");

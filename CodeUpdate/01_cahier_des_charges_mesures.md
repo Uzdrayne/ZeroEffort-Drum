@@ -118,7 +118,7 @@ Source : spectre de puissance cumulé (`spectrum` = onset + tail + bleed), FFT 4
 |---|---|---|---|---|---|
 | P01 | `onset_spectrum`, `tail_spectrum`, `bleed_spectrum` | spectres cumulés par phase, plus le nombre de trames de chacune | Base de toutes les mesures ci-dessous ; rejeu des profils | P1 | Existant |
 | P02 | `ecart_attaque_corps_db` | énergie onset dans la bande de clic moins énergie onset dans la bande de corps | « Manque de claque » ou « trop mou » | P1 | **Fait (J2)** : `attackBodyGapDb(rôle)` pour Kick, Snare et Toms (bandes de la section 5.5) |
-| P03 | `bleed_aigu_vs_onset_grave` | énergie 6-12 kHz du bleed / énergie 35-150 Hz de l'onset | Réduction de l'aigu du kick (`airGain`) | P1 | Existant (dans `KickProfile`) |
+| P03 | `bleed_aigu_vs_onset_grave` | énergie 6-12 kHz du bleed / énergie 35-150 Hz de l'onset | Réduction de l'aigu du kick (`airGain`) | P1 | Existant (dans `KickProfile`) ; exposé en J3 : `bleedTrebleRatio()` (colonne `ph_bleed_treble_ratio`, le cut démarre au-dessus de 1) |
 | P04 | `contraste_tail_bleed_db` | tail − bleed, par bande | Fiabilité des corrections de résonance | P2 | À faire |
 
 Bandes de référence : **kick** corps 35-150 Hz, clic 2-5 kHz ; **caisse claire** corps 120-250 Hz, claque 3-6 kHz ; **toms** corps 60-250 Hz, attaque 2-5 kHz. À confirmer par la base.
@@ -229,6 +229,13 @@ Un export CSV (une ligne par piste) est généré à partir de `measures` avec l
 | 4 | Détecteur réglé pour le kick, fenêtres onset / tail identiques pour tous les rôles | Mesures peu fiables sur caisse claire, toms, cymbales | Détecteur et fenêtres par rôle (H08) |
 | 5 | Résolution de 11,7 Hz sur le corps du kick | Fréquence en escalier | Interpolation parabolique (T02) |
 | 6 | Sur les overheads et la room, le détecteur grave compte les fuites du kick ; onset / tail / bleed y sont sans signification | Chiffres de frappes et spectres par phase trompeurs pour ces rôles | Ne pas les utiliser pour ces rôles ; analyse continue (5.10) |
+
+**État (J3, 16/10/2026)** : les problèmes 1 et 2 ont un correctif **désactivé par défaut** (comportement audible inchangé tant que vous ne l'avez pas écouté dans un hôte) :
+
+- **Problème 1** : `DrumAnalysis::setExcludeLeadFrames(true)` met de côté les trames dont le centre précède la frappe de moins d'une demi-FFT (environ 4 par frappe, comptées dans `leadFrameCount()`, colonne `ph_lead_frames`) ; elles restent dans le spectre global. Constante : `MeasureConstants::excludeLeadFramesByDefault`. Synthétique : la puissance du bleed à 6-12 kHz passe de 31 % de celle de l'attaque à 0,0006 %. Sur `wav_test_file` (Kick, rock) : 741 frappes, 2 964 trames mises de côté, rapport aigu du bleed 0,0090 → 0,0012, aucun réglage ne change (le cut d'aigu ne démarre qu'au-dessus de 1).
+- **Problème 2** : `ProposalPolicy::compressorUsesActiveCrest` fait lire `activeCrestDb()` par `KickProfile` pour la seule décision d'activation du compresseur (et du multibande). Constante : `ProposalDefaults::compressorUsesActiveCrest`. Le seuil de 10 dB n'est pas recalibré (hypothèse H). Synthétique : un kick en salves de 0,15 s par seconde a un crest global de 11,3 dB et actif de 3,0 dB : compresseur ON par défaut, OFF avec la politique. Sur le Kick réel du dépôt : crest 25,4 dB, actif 24,5 dB, même décision.
+- **Problème 3** : toujours présent, test A08 marqué « échec attendu » (24 frappes comptées sur 48 jouées) ; il échouera quand le détecteur sera corrigé, pour rappeler de le transformer en test normal.
+- Les deux réglages sont enregistrés dans les snapshots (`analysis.excludeLeadFrames`, `meta.policy`) ; `--export-wav ... --exclude-lead-frames --active-crest` les active, `--replay ... --active-crest|--no-active-crest` surcharge la politique enregistrée.
 
 ## 9. Contraintes techniques
 

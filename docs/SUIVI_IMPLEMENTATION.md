@@ -14,8 +14,8 @@ Légende : ⬜ à faire · 🔄 en cours · ✅ terminé · ⏸ en réserve
 | J1 | Snapshot JSON, `analysisVersion`, export développeur, test de boucle | ✅ | `20cd588` | CTest 3/3, 0 avertissement (VS 2022) ; 540 rejeux identiques à 1e-6 ; export réel non testé (pas de Cubase) |
 | T1 | Tests A01-A04, A10, E01, E02, E06, E07 (+E08, E09, E10) | ✅ | `79c196e` | CTest 3/3 ; 7 200 propositions ; mutation de E07 détectée |
 | T2 | Rejeu `--replay` / `--compare` / `--export-wav` | ✅ | `79c196e` | CTest 3/3 ; essai sur les 4 WAV du dépôt (Kick, Snare, Tom, OvH) |
-| J2 | Mesures P1 additives (L03, L05, D02, H02, H06, S01, S02, P02) | ✅ | (ce commit) | CTest 3/3, 0 avertissement ; profils inchangés (équivalence legacy) ; `push()` sans allocation (compteur vérifié) |
-| J3 | Corrections 1 et 2 (désactivées par défaut) | ⬜ | | |
+| J2 | Mesures P1 additives (L03, L05, D02, H02, H06, S01, S02, P02) | ✅ | `35a4b32` | CTest 3/3, 0 avertissement ; profils inchangés (équivalence legacy) ; `push()` sans allocation (compteur vérifié) |
+| J3 | Corrections 1 et 2 (désactivées par défaut) | ✅ | (ce commit) | CTest 3/3, 0 avertissement ; test du problème 1 d'abord rouge (bleed/onset 0,307), vert avec le correctif (6e-6) ; équivalence legacy inchangée par défaut ; **aucun cas doré mis à jour** |
 | Registre de rôles | `RoleDescriptor` | ⏸ | | |
 | T3 | Défauts Kit / Phase | ⏸ | | |
 | Sous-bus SB1-SB7 | | ⏸ | | |
@@ -66,6 +66,16 @@ Fichiers : `Source/Drum/DrumAnalysis.h` (état + accesseurs const + `MeasureCons
 - ✅ `analysisVersion` passe à **2** (le snapshot contient de nouveaux champs d'analyse, obligatoires à la lecture).
 - ✅ Tests : L03/D02 (sinusoïde −9,03 dBFS / 3,01 dB), L05 (lit un lit de bruit à −50,5 dBFS), A09 (kick isolé contre dense), silence = indisponible, H02, H06 à 44,1/48/96 kHz (T20 attendu 82 et 164 ms, tolérance ±30 ms), S01 (sinusoïde 1 kHz dans la bonne bande, voisines à > 25 dB, bruit blanc +10 dB par décade à 1 dB près), S02 (partition = 1 à 3 %), limite 0,45 × fréquence, P02 (+6 dB pour un clic doublé), snapshot (colonnes, restauration identique, champs endommagés refusés), H02 de la section performance : aucune allocation dans `push()` (compteur d'allocations du thread, auto-vérifié).
 - Les profils ne lisent aucune de ces mesures : `testProposalEquivalence` (référence figée) passe sans modification.
+### J3 : corrections des problèmes 1 et 2 (désactivées par défaut)
+
+Fichiers : `Source/Drum/DrumAnalysis.h` (politique des trames d'attaque, `phasePower`, `bleedTrebleRatio`, `analysisVersion` = 3), `Source/Drum/DrumProposal.h` (`ProposalPolicy`, `ProposalDefaults`), `Source/Drum/Profiles/KickProfile.h`, `Source/Drum/DrumAutoPreset.h`, `Source/Drum/DrumAnalysisSnapshot.h`, `Source/Drum/DrumReplay.h`, `tests/KnownProblemTests.cpp` (nouveau), `tests/ReplayTests.cpp` (options), doc 01 et 02.
+
+- **Étape A (tests d'abord)** : le test du problème 1 (bande 6-12 kHz, clic d'attaque sur un plancher de bruit très faible) a été écrit contre l'accesseur en lecture seule `phasePower` et a **échoué** sur le code existant : `bleed / onset = 0,307` (le bleed contient 31 % de la puissance du clic). A08 (doubles pédales à 180 bpm) est écrit en « échec attendu » : 24 frappes comptées sur 48.
+- **Étape B** : `excludeLeadFrames` (désactivé par défaut, constante `MeasureConstants::excludeLeadFramesByDefault`) : les trames dont le centre précède la frappe de moins d'une demi-FFT (≈ 4 par frappe) ne vont plus dans le bleed ; elles restent dans le spectre global (`spectrumFrames()` les compte, `leadFrameCount()`). Résultat : `bleed / onset = 6,4e-6`. Le comportement par défaut est vérifié (0,307, aucune trame écartée) et l'équivalence avec la référence figée passe toujours.
+- **Étape C** : `ProposalPolicy::compressorUsesActiveCrest` (désactivé par défaut, `ProposalDefaults`) : `KickProfile` lit `activeCrestDb()` pour la seule décision d'activation du compresseur (et du multibande qui la suit) ; seuil de 10 dB non recalibré. Test synthétique (salves de 0,15 s par seconde : crest global 11,3 dB / actif 3,0 dB) : ON par défaut, OFF avec la politique, aucun autre réglage ne change, les autres rôles ne sont pas concernés.
+- **Snapshots et rejeu** : la politique d'analyse (`analysis.excludeLeadFrames`, `leadFrames`) et la politique de proposition (`meta.policy`) sont enregistrées ; `--export-wav ... --exclude-lead-frames --active-crest` ; `--replay ... --active-crest|--no-active-crest` surcharge la politique enregistrée. Test : surcharge « off » sur un snapshot « on » = 2 réglages modifiés (compresseur et multibande), une prise à écouter.
+- **Effet sur les vrais WAV du dépôt** (analyse seule, rock, intensité 1) : Kick 741 frappes, 2 964 trames mises de côté (bleed : 5 408 → 2 444 trames), rapport aigu du bleed 0,0090 → 0,0012 ; Snare 0,92 contre 1,13 ; Tom 0,61 contre 0,69 ; Overheads 10,94 contre 10,99 ; **aucun réglage ne change** (`airGain` = 0 avant et après, le cut d'aigu du Kick ne démarre qu'au-dessus de 1 ; crest du Kick 25,4 dB / actif 24,5 dB : compresseur ON dans les deux cas). Le rapport de comparaison (`--compare`) indique « Rien à écouter ».
+- **Prises à écouter** : aucune avec ces 5 WAV. L'effet sur l'`airGain` du Kick ne se verra que sur un enregistrement où le bleed aigu est proche du seuil ; à valider sur le vrai corpus.
 ## Écarts avec les spécifications
 
 - **Emplacement des fonctions** : `toSnapshot` / `restoreSnapshot` / `measuresToVar` sont des fonctions statiques de `struct DrumAnalysisSnapshot` (ami de `DrumAnalysis`), pas des méthodes de `DrumAnalysis` : la classe de mesure reste inchangée. Le doc 07 disait « dans la classe DrumAnalysis ».
@@ -82,12 +92,17 @@ Fichiers : `Source/Drum/DrumAnalysis.h` (état + accesseurs const + `MeasureCons
 - **J2, A09** : le doc 02 attend un crest actif identique à ±1 dB ; la mesure synthétique donne 1,18 dB (global : 4,76 dB). Le test exige < 1,5 dB et 3 × plus stable que le global. Cause : le seuil relatif au P95 baisse quand le jeu est épars. À régler par la courbe de calibration de 01-Q1 (nécessite des prises réelles) : voir questions ouvertes.
 - **J2, H06** : T20 est un temps de passage direct à −20 dB (pas une régression −5/−25 dB) à 10 ms de résolution, mesuré depuis la détection de la frappe ; T60 = 3 × T20. Détecteur de frappes réglé pour le grave (problème 4 du doc 01) : H06 n'est fiable que pour Kick et Toms.
 - **J2, S01** : valeurs en dB de la puissance FFT non étalonnée (pas de forme relative) ; la bande 20 Hz est indisponible à 48 kHz (aucune case FFT dans 17,8-22,4 Hz).
+- **J3, périmètre du problème 2** : le crest actif n'est lu que pour l'activation du compresseur du Kick (étape C du prompt). Le refus `crest < 6`, `ProfileAssembly` (`crestMinimum`) et `DrumAutoPreset::configureFinishing` lisent toujours le crest global.
+- **J3, mécanisme** : deux réglages à l'exécution (`setExcludeLeadFrames`, `ProposalPolicy`) plutôt que de simples constantes, pour pouvoir tester et comparer les deux comportements ; les constantes nommées fixent les valeurs par défaut, toutes à « désactivé ». Leur activation par défaut reste à décider après écoute.
+- **J3, correctif du problème 1** : « exclure » (et non « classer après coup ») ; les trames écartées restent dans le spectre global pour ne pas modifier les mesures de forme.
+- **J3, analysisVersion = 3** (nouveaux champs d'analyse dans le snapshot).
 ## Questions ouvertes
 
 - L'export réel (session Auto dans Cubase) n'a pas été exercé : à tester sur la machine avec Cubase, avec un build `-DZED_ANALYSIS_EXPORT=ON`.
 - **Seuil de la fenêtre active** (40 dB, 12 dB, plafond P95) : à calibrer sur des prises réelles (courbe crest actif / seuil, plateau à ±0,5 dB pour ±10 dB). Le vrai corpus n'est pas sur cette machine.
+- **Activation par défaut** des deux correctifs J3 : à décider après une écoute dans un hôte (pas possible sur cette machine). Procédure : exporter les prises avec --exclude-lead-frames --active-crest, --replay / --compare, écouter les prises listées.
 - Le snapshot enregistre la proposition issue de `propose()` (phase 0), pas la version finale après les étapes de calibration (`refineThreshold`, `finish`) : c'est ce que le rejeu compare.
 
 ## Prochaine action
 
-J3 : corrections 1 et 2 du doc 01 (désactivées par défaut) : tests d'abord (problème 1, A08 en échec attendu), puis correctif derrière une constante nommée.
+Vague 1 terminée (J1, T1, T2, J2, J3). Suite possible (en réserve dans le plan) : registre de rôles, T3 (défauts Kit / Phase), sous-bus ; ou activer les correctifs J3 après écoute.
