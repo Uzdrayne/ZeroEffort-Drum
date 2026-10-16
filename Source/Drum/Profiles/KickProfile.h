@@ -5,7 +5,8 @@ namespace drum
 {
 struct KickProfile
 {
-    static DrumProposal propose(const DrumAnalysis& analysis, const Settings& original, DrumStyle style, float intensity)
+    static DrumProposal propose(const DrumAnalysis& analysis, const Settings& original, DrumStyle style, float intensity,
+        const ProposalPolicy& policy = {})
     {
         DrumProposal result;
         result.settings = original;
@@ -71,7 +72,10 @@ struct KickProfile
         settings[gateRatio] = 1 + (style == DrumStyle::metal ? 1.5f : style == DrumStyle::rock ? 1.0f : 0.5f) * intensity;
         settings[gateRange] = (style == DrumStyle::metal ? 12.0f : style == DrumStyle::rock ? 8.0f : 6.0f) * intensity;
         settings[gateRelease] = kickGateReleases[styleIndex];
-        settings[compressorOn] = crest > 10 && intensity > 0 ? 1.0f : 0.0f;
+        // Problem 2: the global crest grows with the silence between hits; the active crest does not.
+        const auto compressorCrest = policy.compressorUsesActiveCrest && std::isfinite(analysis.activeCrestDb())
+            ? static_cast<double>(analysis.activeCrestDb()) : crest;
+        settings[compressorOn] = compressorCrest > 10 && intensity > 0 ? 1.0f : 0.0f;
         settings[ratio] = style == DrumStyle::metal ? 4.0f : style == DrumStyle::rock ? 3.0f : 2.0f;
         settings[attack] = style == DrumStyle::metal ? 4.0f : style == DrumStyle::rock ? 8.0f : 25.0f;
         settings[release] = style == DrumStyle::metal ? 80.0f : style == DrumStyle::rock ? 100.0f : 140.0f;

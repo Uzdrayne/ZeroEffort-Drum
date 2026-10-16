@@ -11,7 +11,8 @@ Source/Kit (the audio thread only writes its own Member and runs KitAligner).
 Use JUCE's audio, parameter and GUI APIs. Keep realtime processing free of
 allocations, locks, file access and logging. Run the processor tests after audio
 changes. Build VST3 with the windows-vs2019 preset using the existing
-Build and Test Release task; three CTest suites cover cache, Drum and ARA
+Build and Test Release task (scripts/Build.ps1 picks windows-vs2022, build dir
+build-vs2022, when Visual Studio 2019 is not installed); three CTest suites cover cache, Drum and ARA
 discovery. F5 runs the Debug tests, not an audio application. Preserve
 parameter IDs and plugin codes unless intentionally breaking host compatibility.
 Do not copy bundles to protected system directories automatically.

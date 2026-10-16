@@ -9,14 +9,26 @@
       "architecture": "x64",
       "binaryDir": "${sourceDir}/build",
       "cacheVariables": { "BUILD_TESTING": "ON" }
+    },
+    {
+      "name": "windows-vs2022",
+      "displayName": "Windows x64 / Visual Studio 2022",
+      "generator": "Visual Studio 17 2022",
+      "architecture": "x64",
+      "binaryDir": "${sourceDir}/build-vs2022",
+      "cacheVariables": { "BUILD_TESTING": "ON" }
     }
   ],
   "buildPresets": [
     { "name": "release", "configurePreset": "windows-vs2019", "configuration": "Release" },
-    { "name": "debug", "configurePreset": "windows-vs2019", "configuration": "Debug" }
+    { "name": "debug", "configurePreset": "windows-vs2019", "configuration": "Debug" },
+    { "name": "release-vs2022", "configurePreset": "windows-vs2022", "configuration": "Release" },
+    { "name": "debug-vs2022", "configurePreset": "windows-vs2022", "configuration": "Debug" }
   ],
   "testPresets": [
     { "name": "release", "configurePreset": "windows-vs2019", "configuration": "Release", "output": { "outputOnFailure": true } },
-    { "name": "debug", "configurePreset": "windows-vs2019", "configuration": "Debug", "output": { "outputOnFailure": true } }
+    { "name": "debug", "configurePreset": "windows-vs2019", "configuration": "Debug", "output": { "outputOnFailure": true } },
+    { "name": "release-vs2022", "configurePreset": "windows-vs2022", "configuration": "Release", "output": { "outputOnFailure": true } },
+    { "name": "debug-vs2022", "configurePreset": "windows-vs2022", "configuration": "Debug", "output": { "outputOnFailure": true } }
   ]
 }
