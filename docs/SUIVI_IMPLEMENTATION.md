@@ -10,8 +10,9 @@ Légende : ⬜ à faire · 🔄 en cours · ✅ terminé · ⏸ en réserve
 | Élément | État |
 |---|---|
 | Version du plug-in | **0.10.0** inchangée (`CMakeLists.txt`) : rien d'audible n'a changé par défaut |
-| `main` | vague 1 fusionnée (pull request #1, commit `9f8e9f2`) : phase 0, build VS 2019 / 2022, J1, T1, T2, J2, J3 |
-| `feature/t3-kit-phase` | T3 (`acd4704`) et T4, poussée sur GitHub jusqu'à `71dbf74` ; **pull request à ouvrir et à fusionner par l'utilisateur** |
+| `main` | vagues 1 et 2 fusionnées (pull requests #1 et #2, commit `b1dbabd`) : phase 0, build VS 2019 / 2022, J1, T1, T2, J2, J3, T3, T4 |
+| Branches de travail | aucune ouverte (`feature/t3-kit-phase` fusionnée) |
+| Passation | [REPRISE_PROCHAINE_SESSION.md](REPRISE_PROCHAINE_SESSION.md) : prompt à coller, état, décisions, menu des prochaines étapes, pièges |
 | Tag `v0.10.0` | version de départ, retour arrière possible (`git checkout v0.10.0`) |
 | Comportement audible | **inchangé** : les correctifs J3 sont désactivés par défaut, T3 ne touche pas à `Source/` |
 
@@ -149,6 +150,8 @@ Branche `feature/t3-kit-phase`. Fichiers : `tests/KitTests.cpp` (`FaultKit`, `te
 
 ## Prochaine action
 
-1. **Utilisateur** : publier `feature/t3-kit-phase` (T3 et T4), ouvrir et fusionner la pull request, puis *Pull* sur `main`.
-2. **Utilisateur** (quand Cubase est disponible) : tester l'export `-DZED_ANALYSIS_EXPORT=ON` et écouter les correctifs J3 ; apporter le vrai corpus.
-3. **Assistant** : registre de rôles (demande des cas dorés de référence : sorties identiques à 1e-6), puis correctifs Kit / Phase et sous-bus après décision.
+Voir la passation : [REPRISE_PROCHAINE_SESSION.md](REPRISE_PROCHAINE_SESSION.md), section 5 (menu selon que Cubase et le vrai corpus sont disponibles ou non).
+
+1. **Utilisateur** (quand Cubase est disponible) : tester l'export `-DZED_ANALYSIS_EXPORT=ON` et écouter les correctifs J3 ; apporter le vrai corpus (hors dépôt).
+2. **Utilisateur** : décider du sort des constats Kit / Phase et du retrait des 5 WAV de git.
+3. **Assistant** : registre de rôles (cas de référence d'abord), puis correctifs Kit / Phase et sous-bus après décision.
