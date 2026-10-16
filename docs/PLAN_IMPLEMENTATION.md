@@ -7,8 +7,8 @@ Sources : `CodeUpdate/01` à `08`, code de `Source/`, `tests/`, `CMakeLists.txt`
 
 | Sujet | Constat |
 |---|---|
-| Build | CMake, preset `windows-vs2019` (générateur Visual Studio 16 2019), C++17, JUCE 8.0.6. Script : `scripts/Build.ps1` (`Verify` = configure + build Release + CTest). |
-| Machine actuelle | Seul Visual Studio **2022** est installé : `Build.ps1 -Action Verify` échoue à la configuration. **Aucune base de référence n'a pu être mesurée** (voir question Q1). |
+| Build | CMake, C++17, JUCE 8.0.6. Presets `windows-vs2019` (défaut, dossier `build/`) et `windows-vs2022` (dossier `build-vs2022/`). `scripts/Build.ps1` choisit automatiquement la 2019 si elle est installée, sinon la 2022 (option `-Toolchain Auto|VS2019|VS2022`). `Verify` = configure + build Release + CTest. |
+| Machine actuelle | Visual Studio 2022 seulement : le script bascule sur `windows-vs2022`. Cubase n'est pas installé : aucun test d'écoute ni d'hôte possible sur ce PC. **Base de référence (VS 2022, Release, v0.10.0 + presets)** : build complet sans avertissement ; CTest 3/3 : `RegionCacheTests` 1,3 s, `ZeroEffortDrumTests` 88,6 s, `ARADiscoveryTests` 1,3 s. |
 | Tests | 3 exécutables console CTest : `RegionCacheTests`, `ZeroEffortDrumTests` (`ZeroEffortDrumProcessorTests.cpp`, `KitTests.cpp`, `EditorTests.cpp`, `Screenshots.cpp`), `ARADiscoveryTests`. Pas de cadre de test externe : fonctions `require(...)` maison. |
 | Filet existant | `tests/LegacyDrumProposalReference.h` (généré par `scripts/FreezeProposalReference.ps1`) : copie figée de l'ancien code de proposition. `ZeroEffortDrumProcessorTests.cpp` (autour des lignes 445-464) vérifie que `propose()` donne **exactement** la même chose. Tout changement de comportement (J3) cassera ce test : voir Q3. |
 | Analyse | Dans un thread de session du processeur (`ZeroEffortDrumProcessor.cpp`, autour des lignes 585-681), **pas** dans `processBlock`. Elle lit le canal 0 seulement (`push(getReadPointer(0), …)`). Le calcul lourd est donc déjà hors du chemin audio. |
@@ -80,13 +80,15 @@ Première vague : **J1, T1, T2, J2, J3**. Le reste est en réserve.
 | Sous-bus SB1-SB3 | `Source/Kit/*`, UI | S01-S08 | registre sans mesures ni trims ; rôles manquants | doc 08 section 12 résolu **avant** de coder |
 | J4/J4b, J5, SB4-SB7 | | | dépendent de la calibration (corpus) | en réserve |
 
-## 5. Questions bloquantes
+## 5. Décisions validées (16 octobre 2026)
 
-1. **Q1 Build** : VS 2019 est absent de cette machine (seulement VS 2022). Faut-il (a) installer VS 2019, (b) ajouter un preset `windows-vs2022` à `CMakePresets.json` et un paramètre à `Build.ps1`, ou (c) un `CMakeUserPresets.json` local (ignoré par git) ? Je recommande (c) : aucun fichier du projet ne change.
-2. **Q2 Option développeur** : comment activer l'export JSON ? Proposition : variable d'environnement `ZED_ANALYSIS_EXPORT_DIR` lue dans le thread d'analyse, désactivée par défaut, aucun contrôle dans l'interface.
-3. **Q3 `LegacyProposalReference`** : J3 change volontairement l'audio. Proposition : le correctif est derrière une constante nommée (activée par défaut après ton écoute) et le test legacy reste vrai tant qu'elle est désactivée ; on fige ensuite une nouvelle référence.
-4. **Q4 Intensité** : conserver la « dose » 1,75× à 100 % (comportement actuel, à documenter) ou l'aligner sur le doc 04 ? Je recommande de **ne pas toucher** dans cette vague.
-5. **Q5 WAV dans git** : 113 Mo suivis alors que le doc 03 (03-Q5) les veut hors dépôt. Les laisser (usage actuel des tests) ou les sortir (Git LFS / dossier externe) ?
+1. **Build** : compatible VS 2019 et VS 2022 (presets + détection automatique dans `Build.ps1`). Fait.
+2. **Export JSON** : variable d'environnement `ZED_ANALYSIS_EXPORT_DIR`, lue dans le thread d'analyse, désactivée par défaut, aucun contrôle dans l'interface.
+3. **`LegacyProposalReference`** : le correctif de J3 sera derrière une constante nommée, **désactivée par défaut** (comportement actuel conservé, test legacy vrai). Elle ne sera activée qu'après une écoute dans Cubase par l'utilisateur ; on figera alors une nouvelle référence.
+4. **Intensité** : la « dose » 1,75× à 100 % n'est pas modifiée dans cette vague.
+5. **WAV** : les vrais corpus restent **hors du dépôt** et ne sont pas disponibles sur ce PC. Les 5 WAV de `wav_test_file/` (suivis par git, usage du test précédent) servent aux tests actuels sans être le corpus définitif. Les outils de rejeu prendront un dossier en paramètre (pas de chemin en dur). Le retrait de ces fichiers de git sera décidé plus tard (sans réécrire l'historique).
+
+Contrainte de session : **aucun test d'écoute ni d'hôte** (Cubase absent). Tout est validé par tests automatiques et signaux synthétiques ; les jalons qui changent le son restent désactivés par défaut.
 
 ## 6. Points hors périmètre signalés
 
