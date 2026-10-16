@@ -41,6 +41,16 @@ drumtest perf                      coût CPU et mémoire
 
 Les noms de commandes sont une proposition.
 
+**État (T1 + T2, 16/10/2026)** : pas de cible `drumtest` séparée (décision du plan) ; les commandes sont des options de `ZeroEffortDrumTests.exe` (dans `build*/ZeroEffortDrumTests_artefacts/<Config>/`) :
+
+```
+ZeroEffortDrumTests.exe --export-wav <wav> <dossier snapshots> <role 0-9> [natural|rock|metal] [intensite 0-1]
+ZeroEffortDrumTests.exe --replay  <dossier snapshots> [prefixe de sortie]   # rejoue, compare a l'enregistre
+ZeroEffortDrumTests.exe --compare <rapport A.json> <rapport B.json> [prefixe de sortie]
+```
+
+`--replay` rejoue tous les snapshots (récursivement) dans les profils actuels, compare avec la proposition enregistrée dans le snapshot, imprime le rapport Markdown et, avec un préfixe, écrit `<préfixe>.json` (rapport de la version courante) et `<préfixe>.md`. Workflow entre deux versions du code : `--replay` avec la version A, `--replay` avec la version B, puis `--compare A.json B.json`. Les rôles sont numérotés comme la liste `DrumInstrument` (0 Kick, 1 Snare, 2-4 Toms, 5 Tom basse, 6 Hi-hat, 7 Overheads, 8 Room, 9 Bus). Sans option, l'exécutable lance la suite de tests complète. `faults`, `golden` et `perf` restent à faire.
+
 ## 4. Corpus de test
 
 ```
@@ -80,6 +90,8 @@ Le programme génère des signaux dont les mesures sont connues par calcul.
 | A13 | Queue exponentielle de bruit avec T60 connu (0,4 s, 0,8 s, 1,5 s) | `decay_t60` à ± 15 % | R01 |
 
 A10 est essentiel : une analyse qui dépend de la taille de bloc de l'hôte donnera des résultats différents d'un DAW à l'autre.
+
+**État (T1, 16/10/2026)** : A01, A02, A03, A04 et A10 sont implémentés dans `tests/PropertyTests.cpp` (exécutés par `ZeroEffortDrumTests`). A10 compare le bloc `analysis` du snapshot à l'identique (blocs de 64, 257, 512 et 4096, à 44,1, 48 et 96 kHz) : aucune dépendance à la taille de bloc. A05-A09 et A11-A13 restent à faire (A08 : échec attendu).
 
 ### 5.2 Rejeu de snapshots (`T-B`)
 
@@ -139,6 +151,8 @@ Vérifications qui doivent être vraies pour **toute** analyse valide, quel que 
 | E08 | Déterminisme : mêmes entrées, mêmes réglages |
 | E09 | Refus explicite : une analyse refusée renvoie `valid = false` et un message, jamais des réglages partiels |
 | E10 | Une analyse insuffisante ne modifie pas les réglages d'origine |
+
+**État (T1, 16/10/2026)** : E01, E02, E06, E07, E08, E09 et E10 sont implémentés (`tests/PropertyTests.cpp`) sur 7 200 propositions issues de 48 signaux générés (3 fréquences d'échantillonnage, 10 rôles, 3 styles, 5 intensités, réglages d'origine aléatoires). E03, E04 et E05 restent à faire.
 
 ### 5.7 Cas dorés (`T-F`)
 
@@ -217,6 +231,8 @@ Analyses proches d'un seuil (± 5 %) :
 ```
 
 La dernière rubrique est le point clé : le programme désigne **quelles prises écouter**, vous n'écoutez que celles-là.
+
+**État (T2)** : implémenté dans `Source/Drum/DrumReplay.h`. Rubriques produites : refus (total, par rôle, par style, alerte au-delà de 5 points), propriétés (déterminisme E08), changements d'état valide / refus, réglages modifiés (moyenne, maximum, fichier), analyses proches d'un seuil (± 5 % : crest 6 et 10, bass/total 0,15, contraste d'enveloppe 12 et 18), prises à écouter (10 au plus, triées ; seuils d'écoute : 1 dB, 5 % en fréquence, 10 % autrement, constantes `ReplayThresholds`, hypothèses H). La rubrique « Cas dorés » n'existe pas encore (T6). Le rapport est écrit en Markdown et en JSON.
 
 ## 9. Tests humains (hors programme)
 

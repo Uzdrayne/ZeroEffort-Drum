@@ -12,8 +12,8 @@ Légende : ⬜ à faire · 🔄 en cours · ✅ terminé · ⏸ en réserve
 | Phase 0 | Lecture du code, plan, décisions | ✅ | `8e25dd8`, `6736b8c` | Plan validé par l'utilisateur |
 | Build | Compatibilité VS 2019 / VS 2022 | ✅ | `6736b8c` | CTest 3/3, 0 avertissement (VS 2022) |
 | J1 | Snapshot JSON, `analysisVersion`, export développeur, test de boucle | ✅ | `20cd588` | CTest 3/3, 0 avertissement (VS 2022) ; 540 rejeux identiques à 1e-6 ; export réel non testé (pas de Cubase) |
-| T1 | Tests A01-A04, A10, E01, E02, E06, E07 | ⬜ | | |
-| T2 | Rejeu `replay` / `compare` | ⬜ | | |
+| T1 | Tests A01-A04, A10, E01, E02, E06, E07 (+E08, E09, E10) | ✅ | voir ci-dessous | CTest 3/3 ; 7 200 propositions ; mutation de E07 détectée |
+| T2 | Rejeu `--replay` / `--compare` / `--export-wav` | ✅ | voir ci-dessous | CTest 3/3 ; essai sur les 4 WAV du dépôt (Kick, Snare, Tom, OvH) |
 | J2 | Mesures P1 additives (L03, L05, D02, H02, H06, S01, S02, P02) | ⬜ | | |
 | J3 | Corrections 1 et 2 (désactivées par défaut) | ⬜ | | |
 | Registre de rôles | `RoleDescriptor` | ⏸ | | |
@@ -34,6 +34,26 @@ Fichiers : `Source/Drum/DrumAnalysisSnapshot.h` (nouveau), `DrumAnalysis.h` (`an
 
 Commandes : `powershell -File scripts\Build.ps1 -Action Verify` (ou la tâche VS Code « Build and Test Release »). Les messages `PASS: snapshot …` apparaissent en lançant directement `build-vs2022\ZeroEffortDrumTests_artefacts\Release\ZeroEffortDrumTests.exe`.
 
+### T1 : tests de mesures et propriétés
+
+Fichier : `tests/PropertyTests.cpp` (nouveau, appelé depuis `main` des tests).
+
+- ✅ A01 (pic -6,02, RMS -9,03, crest 3,01 dB à ±0,05), A02 (silence refusé avec message, 10 rôles), A03 (sinusoïde écrêtée : ratio > 1 %, refus « sature » sur Snare, Tom, Hi-hat, Bus), A04 (NaN : refus sur 10 rôles).
+- ✅ A10 : analyses identiques bit à bit (bloc `analysis` du snapshot) avec des blocs de 64, 257, 512 et 4096, à 44,1, 48 et 96 kHz.
+- ✅ E01, E02, E06, E07, plus E08 (déterminisme), E09 (refus avec message) et E10 (refus = réglages d'origine inchangés) : 7 200 propositions (48 signaux générés, 10 rôles, 3 styles, 5 intensités, `output`/`input`/`bypass` d'origine aléatoires) ; 4 560 valides et 2 640 refusées.
+- Vérification par mutation : avec E07 durci à -4 dB, le test échoue (message « E07 output above -3 dB »), puis le fichier a été restauré.
+- Aucune anomalie du code existant révélée : A10 et E01-E10 passent sans modification des profils.
+
+### T2 : rejeu et comparaison
+
+Fichiers : `Source/Drum/DrumReplay.h` (nouveau), `Source/Drum/DrumAnalysis.h` (`envelopeContrastDb`, accesseur const), `tests/ReplayTests.cpp` (nouveau, tests et commandes), `tests/ZeroEffortDrumProcessorTests.cpp` (aiguillage des options), `CMakeLists.txt`.
+
+- ✅ `--replay <dossier> [préfixe]` : rejoue tous les snapshots, compare à la proposition enregistrée, rapport Markdown + JSON ; les snapshots illisibles ou d'une autre `analysisVersion` sont listés comme ignorés avec la raison.
+- ✅ `--compare <A.json> <B.json> [préfixe]` : refus par rôle et par style (alerte > 5 points), changements valide/refus, réglages modifiés (moyenne, max, fichier), proximité des seuils du code (± 5 %), liste « à écouter » (10 prises au plus).
+- ✅ `--export-wav <wav> <dossier> <rôle> [style] [intensité]` : fabrique un snapshot depuis un WAV (T-C, utile dès que le vrai corpus sera sur une machine) ; même repli de canaux que l'analyse ARA.
+- ✅ Tests : dossier de 5 snapshots + 2 fichiers invalides, rapport sans différence, différences simulées (gain de 3 dB, fréquence de 2 % sous le seuil, bascule refus/valide), entrées présentes d'un seul côté, aller-retour JSON, codes de sortie des commandes, WAV synthétique exporté puis rejoué.
+- Essai réel (analyse seule, aucune lecture audio) sur `wav_test_file` : 4 snapshots de 104 Ko, tous valides, rejeu déterministe, aucune différence.
+- Commandes : voir le doc 02, section 3 (état).
 ## Écarts avec les spécifications
 
 - **Emplacement des fonctions** : `toSnapshot` / `restoreSnapshot` / `measuresToVar` sont des fonctions statiques de `struct DrumAnalysisSnapshot` (ami de `DrumAnalysis`), pas des méthodes de `DrumAnalysis` : la classe de mesure reste inchangée. Le doc 07 disait « dans la classe DrumAnalysis ».
@@ -42,6 +62,10 @@ Commandes : `powershell -File scripts\Build.ps1 -Action Verify` (ou la tâche VS
 - **Tests d'abord** : le test et le code ont été écrits ensemble (le seul « rouge » constaté est un échec de compilation) ; les rejets sont vérifiés par une garde qui prouve que le texte modifié existe bien.
 - **Mesures exportées** : seulement celles qui existent déjà (L01, L02, L04, L06, D01, H01, trames par phase). Les nouvelles viendront avec J2.
 
+- **T2 sans cible `drumtest`** : les commandes sont des options de `ZeroEffortDrumTests.exe` (décision du plan). Les noms `replay` / `compare` deviennent `--replay` / `--compare` ; `--export-wav` remplace `analyse`. `faults`, `golden`, `perf` non faits.
+- **Rubrique « Cas dorés »** du rapport (doc 02, section 8) absente : il n'existe pas encore de cas validé à l'oreille (T6).
+- **Mesures de proximité** : `bass/total` utilise `bandEnergy(20, 16000)` (le Kick utilise `min(16000, 0,45 × fréquence)` : identique au-dessus de 35,6 kHz d'échantillonnage).
+- **Tests d'abord (T1)** : les tests A et E ont été écrits après lecture du code, mais ils passent tous sans modification des profils ; leur capacité à échouer est prouvée par la mutation de E07, pas par un état rouge initial.
 ## Questions ouvertes
 
 - L'export réel (session Auto dans Cubase) n'a pas été exercé : à tester sur la machine avec Cubase, avec un build `-DZED_ANALYSIS_EXPORT=ON`.
@@ -49,4 +73,4 @@ Commandes : `powershell -File scripts\Build.ps1 -Action Verify` (ou la tâche VS
 
 ## Prochaine action
 
-T1 : tests A01-A04, A10, E01, E02, E06, E07 (document 02).
+J2 : mesures P1 additives (L03, L05, D02, H02, H06, S01, S02, P02), sans modifier les profils.

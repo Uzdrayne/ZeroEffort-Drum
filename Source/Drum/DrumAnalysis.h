@@ -221,6 +221,12 @@ public:
     }
     float crestDb() const { return peakDb() - rmsDb(); }
 
+    // Spread between the loud (P90) and quiet (P20) levels of one envelope detector; the expander gate looks at it.
+    float envelopeContrastDb(size_t detector) const
+    {
+        return percentileOf(envelopeHistograms[detector], 0.9f) - percentileOf(envelopeHistograms[detector], 0.2f);
+    }
+
     float percentileOf(const std::array<int, 101>& values, float fraction) const
     {
         const auto target = juce::jmax(1, static_cast<int>(windows * fraction));
