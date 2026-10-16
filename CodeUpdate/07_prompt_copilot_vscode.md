@@ -10,7 +10,7 @@ Constats vérifiés sur le dépôt (v0.10.0) qui modifient la préparation :
 
 - Système de build : **CMake** (pas de Projucer), C++17, JUCE 8.0.6. Tests existants dans `tests/` : à **étendre** (ne pas créer une cible `drumtest` en double, voir J-T1).
 - `DrumAnalysisSnapshot.h` (cité par J1) **n'existe pas** dans le dépôt : J1 l'écrit à partir de zéro, d'après la section 7 du document 01.
-- `analysisVersion` et `toSnapshot()` **n'existent pas** : J1 les introduit. Toute évolution de l'analyse doit aussi invalider les caches ARA (`Source/ARA/CacheValidity.h`, `RegionCache.h`) : à vérifier en phase 0.
+- `analysisVersion` et `toSnapshot()` **n'existent pas** : J1 les introduit. L'analyse n'est jamais persistée (seuls les réglages `Settings` le sont, via `DrumArchive.h`) : `analysisVersion` ne concerne donc que les snapshots JSON et les rapports, pas les caches ARA (`CacheValidity.h` ne gère que l'invalidation d'objets ARA).
 - `Kit::Role` ne connaît que Kick In/Out, Snare Top/Bottom, Tom, Tom basse, Hi-hat, Overheads, Room. Kick Sub, Hi-hat Bottom et les sous-bus du document 08 demandent une extension préalable de Kit / Phase.
 - Le corpus (`wav_test_file/`, 5 WAV) est trop petit pour **calibrer** les valeurs H du document 05 : jusqu'à constitution d'un corpus, les jalons restent sur des signaux synthétiques.
 
@@ -122,8 +122,8 @@ Jalon J1. Objectif : sérialiser et recharger une analyse, sans modifier aucune 
 
 1. Écris DrumAnalysisSnapshot.h (il n'existe pas encore) d'après la section 7 du document 01
    et intègre-le à la classe DrumAnalysis : toSnapshot(), restoreSnapshot(), toMeasures().
-   Introduis analysisVersion et fais-le entrer dans la validité des caches ARA
-   (Source/ARA/CacheValidity.h) : propose le changement avant de le faire si le format de cache évolue.
+   Introduis analysisVersion    et fais-le entrer uniquement dans les snapshots JSON (l'analyse n'est pas persistée : voir
+   docs/PLAN_IMPLEMENTATION.md, section 2).
 2. Ajoute un hook d'export : à la fin de chaque analyse, si une option "dossier de developpement"
    est activée (désactivée par défaut, jamais dans un build de production), écrire un JSON
    { meta, analysis, measures, proposal } comme décrit en section 7 du document 01.
@@ -265,7 +265,7 @@ Les jalons suivants (J4 détecteurs par rôle, T5 overheads et room, calcul des 
 ## 6. Points restant à confirmer en phase 0
 
 - Si `ProfileAssembly.h` compense l'effet de l'EQ sur les seuils du compresseur (risque R1, document 04).
-- Si le format de cache ARA (`RegionCache.h`) doit changer avec `analysisVersion`.
+- Si le format de cache ARA (`RegionCache.h`) doit changer avec `analysisVersion` : **réglé en phase 0, non** (voir `docs/PLAN_IMPLEMENTATION.md`).
 - Si le registre Kit (`KitRegistry`) peut publier des mesures et relayer des trims (document 08, section 12).
 - Constitution d'un corpus de WAV (10 kits minimum) pour sortir du synthétique et calibrer les valeurs H.
 
