@@ -17,7 +17,7 @@ Légende : ⬜ à faire · 🔄 en cours · ✅ terminé · ⏸ en réserve
 | J2 | Mesures P1 additives (L03, L05, D02, H02, H06, S01, S02, P02) | ✅ | `35a4b32` | CTest 3/3, 0 avertissement ; profils inchangés (équivalence legacy) ; `push()` sans allocation (compteur vérifié) |
 | J3 | Corrections 1 et 2 (désactivées par défaut) | ✅ | `4ce081b` | CTest 3/3, 0 avertissement ; test du problème 1 d'abord rouge (bleed/onset 0,307), vert avec le correctif (6e-6) ; équivalence legacy inchangée par défaut ; **aucun cas doré mis à jour** |
 | Registre de rôles | `RoleDescriptor` | ⏸ | | |
-| T3 | Défauts Kit / Phase (D01-D10) | ✅ | (ce commit) | CTest 3/3, 0 avertissement ; 4 écarts de Kit / Phase **rapportés, non corrigés** ; mutation fine du retard (+3 %) détectée |
+| T3 | Défauts Kit / Phase (D01-D10) | ✅ | `acd4704` | CTest 3/3, 0 avertissement ; 4 écarts de Kit / Phase **rapportés, non corrigés** ; mutation fine du retard (+3 %) détectée |
 | Sous-bus SB1-SB7 | | ⏸ | | |
 
 ## Journal
