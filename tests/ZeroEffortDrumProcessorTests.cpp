@@ -18,6 +18,7 @@ void testAnalysisProperties();
 void testReplay();
 void testMeasures();
 void testKnownProblems();
+void testRoleReference();
 void testSignals();
 int runReplayCommand(const juce::StringArray& arguments);
 int runKitCommand(const juce::StringArray& arguments);
@@ -1296,6 +1297,7 @@ int main(int argumentCount, char** arguments)
         testReplay();
         testMeasures();
         testKnownProblems();
+        testRoleReference();
         testSignals();
         testKickResponse();
         testDrumBus();
