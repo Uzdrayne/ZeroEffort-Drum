@@ -461,6 +461,27 @@ public:
         return band > 0 ? static_cast<float>(10 * std::log10(band / total)) : unavailable();
     }
 
+    double sampleRate() const noexcept { return rate; }
+
+    // S02 after a frequency response: the same band level, every bin weighted by `powerGain(frequency)` (power, not amplitude).
+    // With a gain of 1 it equals bandRelativeDb. Used to show what a proposal aims at (Auto radar), never by a profile.
+    template <typename PowerGain>
+    float shapedBandRelativeDb(double lower, double upper, PowerGain&& powerGain) const
+    {
+        const auto limit = juce::jmin(20000.0, rate * MeasureConstants::bandLimitRatio);
+        double total = 0, band = 0;
+        for (size_t bin = 1; bin < spectrum.size(); ++bin)
+        {
+            const auto frequency = static_cast<double>(bin) * rate / fftSize;
+            if (frequency < 20 || frequency > limit) continue;
+            const auto power = spectrum[bin] * powerGain(frequency);
+            total += power;
+            if (frequency >= lower && frequency <= juce::jmin(upper, limit)) band += power;
+        }
+        if (lower >= limit || total <= 0 || !(band > 0)) return unavailable();
+        return static_cast<float>(10 * std::log10(band / total));
+    }
+
     // P02: onset energy in the click band minus onset energy in the body band, in dB.
     float attackBodyGapDb(double bodyLower, double bodyUpper, double clickLower, double clickUpper) const
     {

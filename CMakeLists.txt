@@ -72,7 +72,7 @@ if(BUILD_TESTING)
     add_test(NAME RegionCacheTests COMMAND RegionCacheTests)
 
     juce_add_console_app(ZeroEffortDrumTests PRODUCT_NAME "ZeroEffort Drum Tests")
-    target_sources(ZeroEffortDrumTests PRIVATE tests/ZeroEffortDrumProcessorTests.cpp tests/KitTests.cpp tests/SnapshotTests.cpp tests/PropertyTests.cpp tests/ReplayTests.cpp tests/MeasureTests.cpp tests/KnownProblemTests.cpp tests/RoleReferenceTests.cpp tests/PairTests.cpp tests/SignalTests.cpp tests/EditorTests.cpp tests/Screenshots.cpp
+    target_sources(ZeroEffortDrumTests PRIVATE tests/ZeroEffortDrumProcessorTests.cpp tests/KitTests.cpp tests/SnapshotTests.cpp tests/PropertyTests.cpp tests/ReplayTests.cpp tests/MeasureTests.cpp tests/KnownProblemTests.cpp tests/RoleReferenceTests.cpp tests/PairTests.cpp tests/AutoRadarTests.cpp tests/SignalTests.cpp tests/EditorTests.cpp tests/Screenshots.cpp
         "${juce_SOURCE_DIR}/modules/juce_audio_plugin_client/juce_audio_plugin_client_ARA.cpp")
     target_include_directories(ZeroEffortDrumTests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/Source")
     target_compile_definitions(ZeroEffortDrumTests PRIVATE JucePlugin_Build_VST3=1 JUCE_MODAL_LOOPS_PERMITTED=1)

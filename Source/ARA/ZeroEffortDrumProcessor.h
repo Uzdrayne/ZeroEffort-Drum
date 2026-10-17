@@ -5,6 +5,7 @@
 #include "../Drum/DrumEngine.h"
 #include "../Drum/DrumAutoCapture.h"
 #include "../Drum/DrumAutoPreset.h"
+#include "../Drum/DrumAutoRadar.h"
 #include "../Drum/DrumSpectrum.h"
 #include "../Kit/KitRegistry.h"
 
@@ -47,6 +48,12 @@ public:
     void updateAutoPreset();
     void cancelAutoPreset();
     bool applyAutoPreset();
+    // Auto radar (see DrumAutoRadar.h). With setAutoApplyWhenReady(false) a finished proposal waits for applyAutoPreset() or
+    // discardAutoPreset() instead of being applied at once; the editor asks for it, headless use keeps the former behaviour.
+    drum::AutoRadarView getAutoRadar() const;
+    std::vector<drum::Change> getAutoChanges() const;
+    void setAutoApplyWhenReady(bool apply) noexcept;
+    bool discardAutoPreset();
     bool revertAutoPreset();
     bool autoPresetBusy() const;
     bool canApplyAutoPreset() const;

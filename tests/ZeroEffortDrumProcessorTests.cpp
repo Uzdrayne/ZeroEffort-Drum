@@ -25,8 +25,10 @@ int runKitCommand(const juce::StringArray& arguments);
 int runPairCommand(const juce::StringArray& arguments);
 int runBusCommand(const juce::StringArray& arguments);
 void testPair();
+void testAutoRadar();
 void makeScreenshots(const juce::File& directory);
 void testEditor(ZeroEffortDrumProcessor& processor, const juce::File& imageFile);
+void testAutoRadarFlow(const juce::File& imageFile);
 
 namespace
 {
@@ -1306,6 +1308,7 @@ int main(int argumentCount, char** arguments)
         testKnownProblems();
         testRoleReference();
         testPair();
+        testAutoRadar();
         testSignals();
         testKickResponse();
         testDrumBus();
@@ -1458,6 +1461,8 @@ int main(int argumentCount, char** arguments)
         require(processor.setBusesLayout(stereoLayout), "Host must still be able to negotiate stereo");
         require(processor.getTotalNumOutputChannels() == 2, "Stereo negotiation must update the output bus");
         testEditor(processor, argumentCount == 2 ? juce::File(juce::String::fromUTF8(arguments[1]))
+            : juce::File::getSpecialLocation(juce::File::currentExecutableFile).getSiblingFile("DrumLive.png"));
+        testAutoRadarFlow(argumentCount == 2 ? juce::File(juce::String::fromUTF8(arguments[1]))
             : juce::File::getSpecialLocation(juce::File::currentExecutableFile).getSiblingFile("DrumLive.png"));
         require(processor.getSpectrumMailbox().subscribers.load() == 0, "Closing editor must release the spectrum subscription");
         processor.prepareToPlay(48000.0, 1024);

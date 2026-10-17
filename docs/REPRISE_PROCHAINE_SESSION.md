@@ -46,6 +46,7 @@ Ce que je veux faire : [à compléter, ou « propose-moi »]
 | Registre de rôles | Étape 1 faite : `Source/Drum/DrumRole.h` (table de 10 descripteurs), filet `tests/RoleReferenceTests.cpp` (270 propositions gelées). |
 | J4a | Détection des doubles frappes (`setDoubleHitDetection`, `--no-double-hits` pour l'ancien comportement), **activée par défaut** (17/10/2026). |
 | Corpus | 5 WAV retirés de git ; kits 1 à 4 exportés, K04 mesuré sur 3 kits. `scripts/RunCorpus.ps1` + `corpus.json` (manifeste hors dépôt) lancent toute la chaîne ; voir `docs/Corpus.md`. |
+| Radar Auto | `Source/Drum/DrumAutoRadar.h` (12 axes, courbes source / visé / obtenu, liste des changements), `Source/UI/AutoRadarPanel.h` (panneau animé dans l'éditeur), `owner.setAutoApplyWhenReady(false)` : la proposition attend **Appliquer / Ignorer**. Captures de test : `AutoRadar_*.png` à côté de `ZeroEffortDrumTests.exe`. Voir le suivi. |
 | Brut / mixé (doc 03) | `--pair` (paire à un filtre : alignement, courbe d'égalisation équivalente, cohérence, indices) et `--bus` (bus = somme filtrée de ses micros, régression multi-entrées) : `Source/Drum/DrumPairAnalysis.h`, `tests/PairTests.cpp`. Réel : Kick Bus expliqué à 0,90 par In + Out + Sub, Snare Bus à 0,82 avec son sample. Spec 03 corrigée (3.1 bis, 4, 5.1, 7.1, 12, 13). |
 
 État des tests : build VS 2019 sans avertissement, CTest 3/3 (`RegionCacheTests`, `ZeroEffortDrumTests` ≈ 70-100 s, `ARADiscoveryTests`).
@@ -86,6 +87,7 @@ Ce que je veux faire : [à compléter, ou « propose-moi »]
 Choisir selon ce qui est disponible.
 
 ### Avec Cubase (écoute)
+0. **Essayer le radar Auto** : Analyser sur une piste, regarder les 3 temps, comparer « visé » et « obtenu », Appliquer / Ignorer. Idées déjà notées : A/B à l'écoute (réglages d'origine contre proposition), vue spectre avant / après pour l'EQ, raisons au survol de chaque réglage.
 1. **Écouter J4a** (déjà activé) : le Kick Out du kit 1 est la seule prise du corpus dont un réglage change (< 9 Hz) ; retour arrière possible via `doubleHitsByDefault`.
 2. **Garde-fous Kit / Phase** : décider si on les active et les relier à l'interface (aujourd'hui seulement `KitPolicy` dans `KitSession`).
 

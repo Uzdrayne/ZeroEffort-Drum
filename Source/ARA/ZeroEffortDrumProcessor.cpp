@@ -7,6 +7,7 @@
 #include "../Drum/DrumAutoPreset.h"
 #include "../Drum/DrumAnalysisSnapshot.h"
 #include "../Drum/DrumPresetPreview.h"
+#include "../Drum/DrumAutoRadar.h"
 #include <cmath>
 
 namespace
@@ -388,7 +389,8 @@ struct ZeroEffortDrumProcessor::AutoSession
     double rate = 0;
     juce::int64 offset = 0, total = 0;
     unsigned int generation = 0;
-    bool busy = false, ready = false, changed = false;
+    bool busy = false, ready = false, changed = false, applyWhenReady = true;
+    drum::AutoRadarView radar;
 };
 
 ZeroEffortDrumProcessor::~ZeroEffortDrumProcessor()
@@ -561,6 +563,10 @@ void ZeroEffortDrumProcessor::startAutoPreset()
     session.intensity = getAutoIntensity();
     session.offset = 0;
     session.phase = 0;
+    session.radar = drum::AutoRadarView();
+    session.radar.role = static_cast<int>(drum::instrumentFromValue(session.before[drum::instrument]));
+    session.radar.title = juce::String(drum::instrumentName(drum::instrumentFromValue(session.before[drum::instrument]))) + " / "
+        + drum::drumStyleName(session.style) + " " + juce::String(juce::roundToInt(session.intensity * 100)) + " %";
     if (session.key.isEmpty())
     {
         session.text = "Auto / Selectionner un seul evenement audio";
@@ -600,6 +606,7 @@ void ZeroEffortDrumProcessor::cancelAutoPreset()
     autoCapture.cancel();
     if (autoSession->busy) autoSession->text = "Auto / Annule";
     autoSession->busy = false;
+    autoSession->radar.refused = false;
 }
 
 void ZeroEffortDrumProcessor::updateAutoPreset()
@@ -656,6 +663,7 @@ void ZeroEffortDrumProcessor::updateAutoPreset()
         if (!autoCapture.ready(session.generation))
         {
             session.text = "Auto / Lecture : capture " + juce::String(autoCapture.progress() * 100, 0) + " %";
+            session.radar.progress = autoCapture.progress();
             return;
         }
         if (session.total == 0)
@@ -676,6 +684,11 @@ void ZeroEffortDrumProcessor::updateAutoPreset()
     }
     session.text = juce::String("Auto / ") + (session.phase == 0 ? "Analyse " : session.phase == 1 ? "Calibration " : "Verification ")
         + juce::String(session.total > 0 ? 100.0 * session.offset / session.total : 0.0, 0) + " %";
+    session.radar.progress = session.total > 0 ? static_cast<float>(session.offset) / static_cast<float>(session.total) : 0.0f;
+    if (session.phase == 0)
+        session.radar.source = drum::DrumAutoRadar::measure(session.analyser.analysis());
+    else if (session.phase == 2)
+        if (const auto* output = session.preview.outputAnalysis()) session.radar.result = drum::DrumAutoRadar::measure(*output);
     if (session.offset == session.total)
     {
         if (session.phase == 0)
@@ -708,13 +721,58 @@ void ZeroEffortDrumProcessor::updateAutoPreset()
             auto settings = session.proposal;
             settings.settings[drum::bypass] = 0;
             session.preview.prepare(sampleRate, channels, settings);
+            session.radar.phase = static_cast<drum::AutoRadarView::Phase>(session.phase);
+            session.radar.progress = 0;
+            if (session.phase == 1)
+            {
+                session.radar.target = drum::DrumAutoRadar::intention(session.analyser.analysis(), session.proposal);
+                session.radar.hasTarget = true;
+            }
+            else
+            {
+                session.preview.enableOutputAnalysis(sampleRate);
+                session.radar.hasResult = true;
+            }
             return;
         }
         session.ready = session.proposal.valid;
         session.busy = false;
         session.text = "Auto / " + session.proposal.summary;
-        if (session.ready) applyAutoPreset();
+        session.radar.phase = drum::AutoRadarView::finished;
+        session.radar.progress = 1;
+        session.radar.refused = !session.ready;
+        if (!session.ready) session.radar.message = session.proposal.summary;
+        if (session.ready && session.applyWhenReady) applyAutoPreset();
     }
+}
+
+drum::AutoRadarView ZeroEffortDrumProcessor::getAutoRadar() const
+{
+    auto view = autoSession->radar;
+    view.busy = autoSession->busy;
+    view.ready = autoSession->ready;
+    view.active = view.busy || view.ready || view.refused;
+    return view;
+}
+
+std::vector<drum::Change> ZeroEffortDrumProcessor::getAutoChanges() const
+{
+    const auto& session = *autoSession;
+    if (!(session.ready || session.busy) || session.radar.phase == drum::AutoRadarView::analysis || !session.proposal.valid) return {};
+    return drum::DrumAutoRadar::significantChanges(session.before, session.proposal.settings);
+}
+
+void ZeroEffortDrumProcessor::setAutoApplyWhenReady(bool apply) noexcept { autoSession->applyWhenReady = apply; }
+
+bool ZeroEffortDrumProcessor::discardAutoPreset()
+{
+    auto& session = *autoSession;
+    if (!session.ready && !session.radar.refused) return false;
+    const bool wasReady = session.ready;
+    session.ready = false;
+    session.radar.refused = false;
+    if (wasReady) session.text = "Auto / Proposition ignoree : reglages inchanges";
+    return true;
 }
 
 bool ZeroEffortDrumProcessor::autoPresetBusy() const { return autoSession->busy; }

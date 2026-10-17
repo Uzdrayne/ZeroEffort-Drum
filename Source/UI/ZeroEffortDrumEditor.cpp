@@ -1,6 +1,7 @@
 #include "ZeroEffortDrumEditor.h"
 #include "DrumControlNames.h"
 #include "DrumLookAndFeel.h"
+#include "AutoRadarPanel.h"
 #include "../ARA/ZeroEffortDrumProcessor.h"
 #include "../Drum/DrumFilterResponse.h"
 
@@ -235,6 +236,7 @@ private:
     juce::TextButton diagnostic, analyse, apply, revert, details;
     juce::TextButton kitAnalyse, kitApply, kitReport, kitDelayDown, kitDelayUp;
     KitPreview preview;
+    AutoRadarPanel radarPanel;
     std::array<juce::TextButton, 3> kitModes, styles;
     std::array<juce::TextButton, pageCount> tabs;
     juce::Slider intensity, kitStrength, kitDelay;
@@ -554,6 +556,12 @@ DrumEditor::DrumEditor(ZeroEffortDrumProcessor& processor)
     for (auto& slider : sliders) slider.updateText();
     kitStrength.updateText();
     kitDelay.updateText();
+    radarPanel.onApply = [this] { owner.applyAutoPreset(); timerCallback(); };
+    radarPanel.onIgnore = [this] { owner.discardAutoPreset(); timerCallback(); };
+    radarPanel.onCancel = [this] { owner.cancelAutoPreset(); timerCallback(); };
+    radarPanel.onDetails = [this] { showText("Auto / Bilan", owner.getAutoPresetText()); };
+    addChildComponent(radarPanel);
+    owner.setAutoApplyWhenReady(false);   // the proposal waits for Appliquer in the radar panel
     setSize(editorWidth, editorHeight);
     refreshNames();
     selectPage(eqPage);
@@ -565,6 +573,7 @@ DrumEditor::~DrumEditor()
 {
     if (spectrumSwitch.getToggleState()) owner.getSpectrumMailbox().subscribers.fetch_sub(1);
     owner.cancelAutoPreset();
+    owner.setAutoApplyWhenReady(true);
     setLookAndFeel(nullptr);
 }
 
@@ -723,6 +732,8 @@ void DrumEditor::resized()
     status.setBounds(pageArea.getUnion(levelArea));
     status.setVisible(diagnosing);
     if (diagnosing) status.toFront(false);
+    radarPanel.setBounds(getLocalBounds());
+    if (radarPanel.isVisible()) radarPanel.toFront(false);
 }
 
 void DrumEditor::layoutPage(std::array<bool, drum::controlCount>& shown)
@@ -1448,6 +1459,14 @@ void DrumEditor::timerCallback()
 {
     if (spectrumSwitch.getToggleState()) spectrumDisplay.update(owner.getSpectrumMailbox());
     owner.updateAutoPreset();
+    const auto radar = owner.getAutoRadar();
+    if (radar.active)
+    {
+        if (!radarPanel.isVisible()) radarPanel.open();
+        radarPanel.update(radar, owner.getAutoChanges());
+    }
+    else if (radarPanel.isVisible())
+        radarPanel.close();
     const auto settings = owner.getSettings();
     const auto role = static_cast<int>(drum::instrumentFromValue(settings[drum::instrument]));
     const auto focusVisible = pageVisible(focusPage);

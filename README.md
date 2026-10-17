@@ -77,8 +77,12 @@ Style/intensite Auto sont sauvegardes en insert et dans les reglages ARA.
 Les anciens reglages restent compatibles ; rien ne s'active au chargement.
 
 Choisir role/style/Intensite puis **Analyser** : apres analyse, calibration et
-verification, Auto active les finitions utiles et applique les reglages.
-**Revenir** restaure l'etat precedent. A zero, les nouvelles finitions sont OFF.
+verification, Auto active les finitions utiles ; **la proposition attend votre choix**.
+Un panneau polaire se construit pendant l'analyse (mesures de la source), le calcul
+(valeurs visees, source en transparence) et la verification (valeurs obtenues sur le son
+traite) ; **Appliquer** applique les reglages, **Ignorer** ne change rien. Les modules
+actives et les reglages principaux changes sont listes a droite ; survoler un axe donne
+ses valeurs. **Revenir** restaure l'etat precedent. A zero, les nouvelles finitions sont OFF.
 Crush, couleur, impact, EQ dynamique, clip et ambiance suivent le role, le crest,
 les niveaux et le spectre ; les cymbales ne recoivent pas de distorsion/Crush/room.
 Les presets affines utilisent davantage ces outils : Crush/couleur/impact doses

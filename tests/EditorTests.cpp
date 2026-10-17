@@ -1,4 +1,5 @@
 #include "ARA/ZeroEffortDrumProcessor.h"
+#include "UI/AutoRadarPanel.h"
 #include "Drum/DrumEngine.h"
 #include <iostream>
 #include <stdexcept>
@@ -102,6 +103,120 @@ void processTone(ZeroEffortDrumProcessor& processor, int blocks, const std::vect
 }
 }
 
+
+// The Auto radar overlay: opens with the analysis, builds its three curves, waits for Appliquer or Ignorer.
+void testAutoRadarFlow(const juce::File& imageFile)
+{
+    ZeroEffortDrumProcessor processor;
+    processor.setRateAndBufferSizeDetails(48000, 256);
+    processor.prepareToPlay(48000, 256);
+    processor.setAutoStyle(drum::DrumStyle::rock, 0.8f);
+    std::unique_ptr<juce::AudioProcessorEditor> editorOwner(processor.createEditor());
+    auto& editor = *editorOwner;
+    auto* panel = child<juce::Component>(editor, "autoRadarPanel");
+    require(panel != nullptr && !panel->isVisible(), "The radar panel must exist and stay hidden until Auto starts");
+
+    const auto runAuto = [&](const std::function<void(int)>& onTick) {
+        child<juce::TextButton>(editor, "autoAnalyse")->onClick();
+        require(panel->isVisible(), "Starting Auto must open the radar panel");
+        juce::AudioBuffer<float> audio(1, 256);
+        juce::MidiBuffer midi;
+        for (int block = 0; block < 1500; ++block)
+        {
+            for (int sample = 0; sample < 256; ++sample)
+            {
+                const auto time = static_cast<double>(block * 256 + sample) / 48000.0;
+                const auto age = std::fmod(time, 0.5);
+                audio.setSample(0, sample, static_cast<float>(0.6 * std::exp(-age * 24) * std::sin(juce::MathConstants<double>::twoPi * 62 * time)
+                    + 0.25 * std::exp(-std::fmod(time + 0.25, 0.5) * 20) * std::sin(juce::MathConstants<double>::twoPi * 3100 * time)));
+            }
+            processor.processBlock(audio, midi);
+            if (block % 50 == 0) processor.updateAutoPreset();
+        }
+        for (int step = 0; step < 200 && processor.autoPresetBusy(); ++step)
+        {
+            processor.updateAutoPreset();
+            juce::MessageManager::getInstance()->runDispatchLoopUntil(55);
+            onTick(step);
+        }
+    };
+
+    const auto before = processor.getSettings();
+    std::vector<int> phases;
+    juce::StringArray written;
+    const auto snapshot = [&](const juce::String& name) {
+        auto* radarPanel = dynamic_cast<drum::ui::AutoRadarPanel*>(panel);
+        require(radarPanel != nullptr, "The radar panel must be an AutoRadarPanel");
+        radarPanel->settleForTest();
+        writeSnapshot(editor, imageFile.getSiblingFile("AutoRadar_" + name + ".png"));
+        written.add(name);
+    };
+    runAuto([&](int) {
+        const auto radar = processor.getAutoRadar();
+        if (phases.empty() || phases.back() != static_cast<int>(radar.phase)) phases.push_back(static_cast<int>(radar.phase));
+        const auto name = juce::String("phase") + juce::String(static_cast<int>(radar.phase));
+        if (radar.progress > 0.6f && !written.contains(name) && radar.phase != drum::AutoRadarView::finished) snapshot(name);
+    });
+    require(phases.size() >= 3 && phases.front() == 0 && phases[1] == 1 && phases[2] == 2, "The radar must go through analysis, calculation and verification");
+    const auto radar = processor.getAutoRadar();
+    require(radar.ready && radar.phase == drum::AutoRadarView::finished && radar.hasTarget && radar.hasResult
+        && radar.source.any() && radar.target.any() && radar.result.any(), "A finished Auto must publish the three curves");
+    require(std::abs(radar.result.raw[4] - radar.source.raw[4]) > 0.05f || std::abs(radar.result.raw[7] - radar.source.raw[7]) > 0.05f,
+        "The obtained curve must differ from the source: the proposal does something");
+    snapshot("done");
+    require(panel->isVisible() && processor.getSettings() == before && processor.canApplyAutoPreset(),
+        "The proposal must wait: panel open, settings untouched, Apply available");
+    auto* apply = child<juce::TextButton>(*panel, "autoRadarApply");
+    auto* ignore = child<juce::TextButton>(*panel, "autoRadarIgnore");
+    require(apply != nullptr && ignore != nullptr && apply->isVisible() && apply->isEnabled() && ignore->isEnabled(),
+        "Appliquer and Ignorer must be available once the proposal is ready");
+    require(!processor.getAutoChanges().empty(), "The list of changes must not be empty for a real proposal");
+
+    ignore->onClick();
+    juce::MessageManager::getInstance()->runDispatchLoopUntil(80);
+    require(!panel->isVisible() && processor.getSettings() == before && !processor.canApplyAutoPreset(),
+        "Ignorer must close the panel and leave every setting untouched");
+
+    runAuto([](int) {});
+    require(panel->isVisible() && processor.getSettings() == before, "A second run must wait as well");
+    apply->onClick();
+    juce::MessageManager::getInstance()->runDispatchLoopUntil(80);
+    require(!panel->isVisible() && processor.getSettings() != before && processor.canRevertAutoPreset(),
+        "Appliquer must apply the proposal, close the panel and offer Revenir");
+
+    // A refused analysis (silence) explains itself and closes with Fermer, without touching the settings
+    processor.revertAutoPreset();
+    const auto untouched = processor.getSettings();
+    child<juce::TextButton>(editor, "autoAnalyse")->onClick();
+    {
+        juce::AudioBuffer<float> silence(1, 256);
+        silence.clear();
+        juce::MidiBuffer midi;
+        for (int block = 0; block < 1500; ++block)
+        {
+            processor.processBlock(silence, midi);
+            if (block % 50 == 0) processor.updateAutoPreset();
+        }
+        for (int step = 0; step < 200 && processor.autoPresetBusy(); ++step) processor.updateAutoPreset();
+    }
+    juce::MessageManager::getInstance()->runDispatchLoopUntil(80);
+    require(panel->isVisible() && processor.getAutoRadar().refused && !processor.getAutoRadar().ready,
+        "A refused analysis must keep the panel open to say why");
+    require(!child<juce::TextButton>(*panel, "autoRadarIgnore")->getButtonText().compare("Fermer"), "A refusal is closed with Fermer");
+    require(!child<juce::TextButton>(*panel, "autoRadarApply")->isVisible(), "A refusal has nothing to apply");
+    writeSnapshot(editor, imageFile.getSiblingFile("AutoRadar_refused.png"));
+    child<juce::TextButton>(*panel, "autoRadarIgnore")->onClick();
+    juce::MessageManager::getInstance()->runDispatchLoopUntil(80);
+    require(!panel->isVisible() && processor.getSettings() == untouched, "Fermer must close the panel and change nothing");
+
+    // Cancelling while it runs closes the panel without applying anything
+    processor.revertAutoPreset();
+    child<juce::TextButton>(editor, "autoAnalyse")->onClick();
+    child<juce::TextButton>(editor, "autoAnalyse")->onClick();     // the same button reads "Annuler" while Auto runs
+    juce::MessageManager::getInstance()->runDispatchLoopUntil(80);
+    require(!panel->isVisible() && !processor.autoPresetBusy(), "Cancelling must close the panel");
+    std::cout << "PASS: Auto radar panel (3 phases, proposal waits, Ignorer / Appliquer / cancel)" << std::endl;
+}
 void testEditor(ZeroEffortDrumProcessor& processor, const juce::File& imageFile)
 {
     {

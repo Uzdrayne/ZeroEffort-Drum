@@ -16,6 +16,7 @@ public:
         settings = proposal.settings;
         engine.prepare(sampleRate, 256, channels);
         scratch.setSize(channels, 256);
+        analyseOutput = false;
         dryEnergy = wetEnergy = 0;
         wetPeak = maximumReduction = 0;
         samples = 0;
@@ -32,6 +33,17 @@ public:
         maximumCleanup = maximumBody = 0;
         renderedHits = 0;
     }
+
+    // The processed signal can be measured with the same analysis as the source (the Auto radar shows what was obtained).
+    // Call after prepare(); it costs one more analysis of the rendered audio, so it is only asked for in the verification pass.
+    void enableOutputAnalysis(double sampleRate)
+    {
+        if (outputAnalyser == nullptr) outputAnalyser = std::make_unique<DrumAnalyser>();
+        outputAnalyser->prepare(sampleRate);
+        outputMono.assign(256, 0.0f);
+        analyseOutput = true;
+    }
+    const DrumAnalysis* outputAnalysis() const { return outputAnalyser != nullptr ? &outputAnalyser->analysis() : nullptr; }
 
     void push(const juce::AudioBuffer<float>& audio, int count)
     {
@@ -51,6 +63,18 @@ public:
             }
             juce::AudioBuffer<float> block(scratch.getArrayOfWritePointers(), scratch.getNumChannels(), length);
             engine.process(block, settings);
+            if (analyseOutput)
+            {
+                // same channel fold as the source analysis: the loudest channel of every sample
+                for (int sample = 0; sample < length; ++sample)
+                {
+                    float value = block.getSample(0, sample);
+                    for (int channel = 1; channel < block.getNumChannels(); ++channel)
+                        if (std::abs(block.getSample(channel, sample)) > std::abs(value)) value = block.getSample(channel, sample);
+                    outputMono[static_cast<size_t>(sample)] = value;
+                }
+                outputAnalyser->push(outputMono.data(), length);
+            }
             for (size_t band = 0; band < 3; ++band)
             {
                 const auto peak = engine.bandPeakMeters[band].load();
@@ -246,6 +270,9 @@ private:
     }
 
     DrumEngine engine;
+    std::unique_ptr<DrumAnalyser> outputAnalyser;
+    std::vector<float> outputMono;
+    bool analyseOutput = false;
     Settings settings {};
     juce::AudioBuffer<float> scratch;
     int blocks = 0;
