@@ -7,12 +7,13 @@ namespace drum
 enum class DrumStyle { natural, rock, metal };
 
 // Bump when a rule that shapes the proposals changes (profiles, style tables).
-inline constexpr int profileVersion = 1;
+// Version 2: the Kick compressor reads the active crest by default (J3 activated).
+inline constexpr int profileVersion = 2;
 
-// J3, problem 2. Off until listened to in a host: it changes when the Kick compressor switches on.
+// J3, problem 2. Activated on 17 October 2026 (validated by the user): it changes when the Kick compressor switches on.
 struct ProposalDefaults
 {
-    static constexpr bool compressorUsesActiveCrest = false;
+    static constexpr bool compressorUsesActiveCrest = true;
 };
 
 // Choices that change a proposal without changing the analysis. Recorded in the snapshots.

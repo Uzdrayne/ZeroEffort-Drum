@@ -77,7 +77,7 @@ Convention de nommage des colonnes de la base : `famille_mesure[_stat]`, avec `_
 | ID | Mesure | Calcul | Décision servie | Prio | État |
 |---|---|---|---|---|---|
 | D01 | `crest_global_db` | L01 − L02 | Garde-fou « signal trop plat » | P1 | Existant (`crestDb`) |
-| D02 | `crest_actif_db` | L01 − L03 | Active ou non le compresseur (aujourd'hui sur le crest global) | P1 | **Fait (J2)** : `activeCrestDb()` ; lu par `KickProfile` pour l'activation du compresseur derrière `ProposalPolicy::compressorUsesActiveCrest` (J3, **désactivé par défaut**) |
+| D02 | `crest_actif_db` | L01 − L03 | Active ou non le compresseur (aujourd'hui sur le crest global) | P1 | **Fait (J2)** : `activeCrestDb()` ; lu par `KickProfile` pour l'activation du compresseur derrière `ProposalPolicy::compressorUsesActiveCrest` (J3, **activé par défaut depuis le 17/10/2026**) |
 | D03 | `plage_dyn_db` | P95 − P10 | Active l'expander (contraste ≥ 12 dB aujourd'hui) | P1 | Partiel |
 | D04 | `crest_frappe_` `mean, sd` | pic / RMS sur [−5 ms, +100 ms] autour de chaque frappe | Mesure de la compression déjà présente | P2 | À faire |
 | D05 | `compression_estimee` | dispersion des pics de frappes (écart-type des pics en dB) : faible = déjà comprimé | Réduit la dose de compression automatique | P2 | À faire |
@@ -230,7 +230,7 @@ Un export CSV (une ligne par piste) est généré à partir de `measures` avec l
 | 5 | Résolution de 11,7 Hz sur le corps du kick | Fréquence en escalier | Interpolation parabolique (T02) |
 | 6 | Sur les overheads et la room, le détecteur grave compte les fuites du kick ; onset / tail / bleed y sont sans signification | Chiffres de frappes et spectres par phase trompeurs pour ces rôles | Ne pas les utiliser pour ces rôles ; analyse continue (5.10) |
 
-**État (J3, 16/10/2026)** : les problèmes 1 et 2 ont un correctif **désactivé par défaut** (comportement audible inchangé tant que vous ne l'avez pas écouté dans un hôte) :
+**État (J3, 16/10/2026, activé le 17/10/2026)** : les problèmes 1 et 2 ont un correctif, **activé par défaut le 17 octobre 2026 sur validation de l'utilisateur** (`analysisVersion` 4, `profileVersion` 2). Sur les 32 prises du corpus (Rock 80 %), aucun réglage ne change entre les deux comportements ; les anciens comportements restent accessibles par la politique (`setExcludeLeadFrames(false)`, `compressorUsesActiveCrest = false`, `--replay ... --no-active-crest`) :
 
 - **Problème 1** : `DrumAnalysis::setExcludeLeadFrames(true)` met de côté les trames dont le centre précède la frappe de moins d'une demi-FFT (environ 4 par frappe, comptées dans `leadFrameCount()`, colonne `ph_lead_frames`) ; elles restent dans le spectre global. Constante : `MeasureConstants::excludeLeadFramesByDefault`. Synthétique : la puissance du bleed à 6-12 kHz passe de 31 % de celle de l'attaque à 0,0006 %. Sur `wav_test_file` (Kick, rock) : 741 frappes, 2 964 trames mises de côté, rapport aigu du bleed 0,0090 → 0,0012, aucun réglage ne change (le cut d'aigu ne démarre qu'au-dessus de 1).
 - **Problème 2** : `ProposalPolicy::compressorUsesActiveCrest` fait lire `activeCrestDb()` par `KickProfile` pour la seule décision d'activation du compresseur (et du multibande). Constante : `ProposalDefaults::compressorUsesActiveCrest`. Le seuil de 10 dB n'est pas recalibré (hypothèse H). Synthétique : un kick en salves de 0,15 s par seconde a un crest global de 11,3 dB et actif de 3,0 dB : compresseur ON par défaut, OFF avec la politique. Sur le Kick réel du dépôt : crest 25,4 dB, actif 24,5 dB, même décision.

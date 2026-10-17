@@ -14,7 +14,7 @@ Légende : ⬜ à faire · 🔄 en cours · ✅ terminé · ⏸ en réserve
 | Branches de travail | aucune ouverte (`feature/t3-kit-phase` fusionnée) |
 | Passation | [REPRISE_PROCHAINE_SESSION.md](REPRISE_PROCHAINE_SESSION.md) : prompt à coller, état, décisions, menu des prochaines étapes, pièges |
 | Tag `v0.10.0` | version de départ, retour arrière possible (`git checkout v0.10.0`) |
-| Comportement audible | **inchangé** : les correctifs J3 sont désactivés par défaut, T3 ne touche pas à `Source/` |
+| Comportement audible | **changé le 17/10/2026 (branche `feature/activate-j3`)** : les deux correctifs J3 sont activés par défaut sur validation de l'utilisateur ; `analysisVersion` 4, `profileVersion` 2. Aucun réglage ne change sur les 32 prises du corpus ; effet attendu : Kick joué par salves sans compresseur, bleed sans trames d'attaque |
 
 ## Jalons
 
@@ -31,7 +31,7 @@ Légende : ⬜ à faire · 🔄 en cours · ✅ terminé · ⏸ en réserve
 | T4 | Tests de mesure restants : A05, A06, A07, A11 (+ mesure S04) | ✅ | `18ff67e` | CTest 3/3, 0 avertissement ; A12 / A13 en attente de O04 / R01 |
 | Registre de rôles | `RoleDescriptor` (sorties identiques à 1e-6) | ⏸ | | demande des cas dorés de référence |
 | Corrections Kit / Phase | constats 1 à 3 de T3 (biais du kick, refus hors fenêtre, diaphonie) | ⏸ | | décision de l'utilisateur + écoute dans un hôte |
-| Activation des correctifs J3 | `excludeLeadFramesByDefault`, `compressorUsesActiveCrest` | ⏸ | | écoute dans un hôte (Cubase) |
+| Activation des correctifs J3 | `excludeLeadFramesByDefault`, `compressorUsesActiveCrest` | ✅ | voir `git log` de `feature/activate-j3` | Activés sur validation de l'utilisateur le 17/10/2026 (sans écoute dédiée : aucun réglage ne bouge sur 32 prises) ; versions 4 / 2 ; CTest 3/3 ; test du défaut (J3 actif) + test de la politique « off » ; référence figée `LegacyDrumProposalReference` non régénérée (elle ne contient pas la décision de crest, équivalence toujours vraie) |
 | J4 / J4b | détecteurs par rôle (corrige A08), analyse continue Overheads / Room | ⏸ | | change le son ; corpus réel |
 | Sous-bus SB1-SB7 | | ⏸ | | extension préalable du registre Kit (mesures, trims, rôles Kick Sub / Hi-hat Bottom) |
 
@@ -145,7 +145,7 @@ Branche `feature/t3-kit-phase`. Fichiers : `tests/KitTests.cpp` (`FaultKit`, `te
 - **Export du corpus et essai J3** (17 octobre 2026, dossiers `snapshots/`, `snapshots_j3/`, `reports/` dans le dossier du corpus, hors dépôt) : 32 prises (kits 1 à 3, mixés compris ; exclus : KickSub, Kick2 du kit 2, pistes sample, Ride, Cymbals), style Rock 80 %, toutes valides, aucun refus, rejeu déterministe. `--export-wav` n'a pas d'argument de position : `kitMic` reste à 0 dans ces snapshots (le rôle Out, L, R n'est connu que par le nom du fichier). Comparaison base contre J3 (`--exclude-lead-frames --active-crest`) : **aucun réglage ne bouge** (32 sur 32 identiques) ; le crest actif des 5 Kick (17 à 22 dB) est loin du seuil de 10 dB ; la mesure de bleed change beaucoup (ex. Snare du kit 1 : 6,8 contre 0,2) mais aucun profil ne la consomme encore. **Rien à écouter, rien activé.** Anomalie de mesure à noter : `ph_bleed_treble_ratio` explose sur les Hi-hat (693 et 3 053 685), dénominateur proche de zéro.
 - **Corpus** (hors dépôt, `C:\Users\robin\Desktop\Database_drum`, listing dans `LISTING.md` de ce dossier) : 3 kits bruts (raw1 et raw2 à 44,1 kHz, raw3 à 48 kHz), mixés par piste seulement pour 2 pistes du kit 1 (Kick, Snare), bus final pour les kits 1 et 2. Durées différentes entre pistes d'un même kit : pas de point zéro commun, alignement brut / mixé à faire par corrélation. Rôles et positions marqués « ? » à confirmer par l'utilisateur.
 - **Seuil de la fenêtre active** (40 dB, 12 dB, plafond P95) : à calibrer sur des prises réelles (courbe crest actif / seuil, plateau à ±0,5 dB pour ±10 dB). Le vrai corpus n'est pas sur cette machine.
-- **Activation par défaut** des deux correctifs J3 : à décider après une écoute dans un hôte (pas possible sur cette machine). Procédure : exporter les prises avec `--exclude-lead-frames --active-crest`, `--replay` / `--compare`, écouter les prises listées.
+- **Activation par défaut** des deux correctifs J3 : **faite le 17/10/2026** sur validation de l'utilisateur (voir jalons). Retour arrière : remettre les deux constantes à `false` et réincrémenter les versions.
 - **Kit / Phase** : faut-il corriger les constats 1 à 3 de T3 (refus hors fenêtre, diaphonie, biais du kick) ? Ils changent le comportement de l'alignement : à décider, avec écoute dans un hôte.
 - **Corpus** : les WAV de `wav_test_file/` (5 fichiers, 113 Mo) sont toujours suivis par git ; le vrai corpus restera hors du dépôt (décision validée). Le retrait des 5 WAV du dépôt reste à décider (sans réécrire l'historique).
 - Le snapshot enregistre la proposition issue de `propose()` (phase 0), pas la version finale après les étapes de calibration (`refineThreshold`, `finish`) : c'est ce que le rejeu compare.
