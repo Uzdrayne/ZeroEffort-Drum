@@ -180,6 +180,38 @@ void testReplayCommands()
     check(run({ "--export-wav", wav.getFullPathName(), snapshots.getFullPathName(), "12" }) == 1, "An unknown role must fail");
     check(run({ "--export-wav", wav.getFullPathName(), snapshots.getFullPathName(), "0", "jazz" }) == 1, "An unknown style must fail");
 
+    // J3 is the default: the export must record it, and the opt-out flag must record the former behaviour.
+    const auto readExport = [&](const juce::File& file, drum::RestoredSnapshot& restored, juce::var& parsed)
+    {
+        auto target = std::make_unique<drum::DrumAnalyser>();
+        check(drum::DrumAnalysisSnapshot::readFile(file, parsed).wasOk()
+            && drum::DrumAnalysisSnapshot::restoreSnapshot(target->editableAnalysis(), parsed, restored).wasOk(), "The exported snapshot must restore");
+        return target->analysis().excludesLeadFrames();
+    };
+    drum::RestoredSnapshot restored;
+    juce::var parsed;
+    check(readExport(exported[0], restored, parsed) && restored.context.policy.compressorUsesActiveCrest,
+        "--export-wav must record the J3 defaults");
+    check(parsed["meta"]["channels"].isInt() && static_cast<int>(parsed["meta"]["channels"]) == 1 && parsed["meta"]["position"].toString() == "Kick In",
+        "--export-wav must record the channel count and the default position");
+    const auto legacy = output.getChildFile("legacy");
+    check(run({ "--export-wav", wav.getFullPathName(), legacy.getFullPathName(), "0", "rock", "0.8", "--no-exclude-lead-frames", "--no-active-crest" }) == 0,
+        "The opt-out flags must be accepted");
+    const auto legacyFiles = legacy.findChildFiles(juce::File::findFiles, false, "*.json");
+    check(legacyFiles.size() == 1 && !readExport(legacyFiles[0], restored, parsed) && !restored.context.policy.compressorUsesActiveCrest,
+        "The opt-out flags must record the former behaviour");
+
+    // Position of the microphone (kitMic), recorded in the settings and written in clear in meta.position
+    const auto positioned = output.getChildFile("positioned");
+    check(run({ "--export-wav", wav.getFullPathName(), positioned.getFullPathName(), "1", "--position", "1" }) == 0, "--position must be accepted");
+    const auto positionedFiles = positioned.findChildFiles(juce::File::findFiles, false, "*.json");
+    check(positionedFiles.size() == 1, "One positioned snapshot");
+    readExport(positionedFiles[0], restored, parsed);
+    check(restored.context.original[drum::kitMic] == 1.0f && parsed["meta"]["position"].toString() == "Snare Bottom",
+        "--position 1 on a Snare must record kitMic 1 and Snare Bottom");
+    check(run({ "--export-wav", wav.getFullPathName(), positioned.getFullPathName(), "1", "--position", "4" }) == 1, "A position above 3 must fail");
+    check(run({ "--export-wav", wav.getFullPathName(), positioned.getFullPathName(), "1", "--position" }) == 1, "--position needs a value");
+
     folder.deleteRecursively();
     output.deleteRecursively();
     std::cout << "PASS: replay, compare and export-wav commands" << std::endl;
@@ -188,20 +220,33 @@ void testReplayCommands()
 
 int runReplayCommand(const juce::StringArray& commandLine)
 {
-    // Policy flags may appear anywhere: --exclude-lead-frames (analysis, --export-wav), --active-crest and
-    // --no-active-crest (proposal, --export-wav records it, --replay overrides the recorded one).
+    // Flags may appear anywhere: --exclude-lead-frames / --no-exclude-lead-frames (analysis, --export-wav; J3 is the default),
+    // --active-crest / --no-active-crest (proposal, --export-wav records it, --replay overrides the recorded one) and
+    // --position <0-3> (kitMic of the take, --export-wav).
     juce::StringArray arguments;
-    bool excludeLeadFrames = false;
+    std::optional<bool> excludeLeadFrames;
     std::optional<bool> activeCrest;
-    for (const auto& item : commandLine)
+    std::optional<int> position;
+    bool badPosition = false;
+    for (int index = 0; index < commandLine.size(); ++index)
     {
+        const auto& item = commandLine[index];
         if (item == "--exclude-lead-frames") excludeLeadFrames = true;
+        else if (item == "--no-exclude-lead-frames") excludeLeadFrames = false;
         else if (item == "--active-crest") activeCrest = true;
         else if (item == "--no-active-crest") activeCrest = false;
+        else if (item == "--position")
+        {
+            const auto value = index + 1 < commandLine.size() ? commandLine[index + 1] : juce::String();
+            if (value.length() == 1 && value.containsOnly("0123")) position = value.getIntValue();
+            else badPosition = true;
+            ++index;
+        }
         else arguments.add(item);
     }
     if (arguments.isEmpty()) return -1;
     const auto fail = [](const juce::String& message) { std::cerr << "ERROR: " << message << std::endl; return 1; };
+    if (badPosition) return fail("--position needs a value from 0 to 3");
     const auto writeOutputs = [&](const juce::String& prefix, const juce::var& json, const juce::String& markdown)
     {
         if (prefix.isEmpty()) return true;
@@ -248,12 +293,13 @@ int runReplayCommand(const juce::StringArray& commandLine)
     if (command == "--export-wav")
     {
         if (arguments.size() < 4 || arguments.size() > 6)
-            return fail("usage: --export-wav <wav> <snapshot folder> <role 0-9> [natural|rock|metal] [intensity 0-1] [--exclude-lead-frames] [--active-crest]");
+            return fail("usage: --export-wav <wav> <snapshot folder> <role 0-9> [natural|rock|metal] [intensity 0-1] [--position 0-3] [--no-exclude-lead-frames] [--no-active-crest]");
         const juce::File wav(arguments[1]), folder(arguments[2]);
         if (!arguments[3].containsOnly("0123456789") || arguments[3].isEmpty() || arguments[3].getIntValue() > 9)
             return fail("role must be an integer from 0 to 9");
         drum::SnapshotContext context;
         context.original[drum::instrument] = arguments[3].getFloatValue();
+        if (position.has_value()) context.original[drum::kitMic] = static_cast<float>(*position);
         if (arguments.size() >= 5 && !drum::DrumAnalysisSnapshot::styleFromId(arguments[4].toLowerCase(), context.style))
             return fail("style must be natural, rock or metal");
         if (arguments.size() == 6)
@@ -270,7 +316,7 @@ int runReplayCommand(const juce::StringArray& commandLine)
             || reader->lengthInSamples <= 0 || reader->lengthInSamples > reader->sampleRate * 3600)
             return fail("supported: mono or stereo, 8-192 kHz, at most one hour");
         drum::DrumAnalyser analyser;
-        analyser.setExcludeLeadFrames(excludeLeadFrames);
+        if (excludeLeadFrames.has_value()) analyser.setExcludeLeadFrames(*excludeLeadFrames);
         analyser.prepare(reader->sampleRate);
         juce::AudioBuffer<float> audio(static_cast<int>(reader->numChannels), 32768);
         std::array<float, 32768> mono {};
@@ -289,6 +335,7 @@ int runReplayCommand(const juce::StringArray& commandLine)
             offset += count;
         }
         context.source = wav.getFileName();
+        context.channels = static_cast<int>(reader->numChannels);
         if (activeCrest.has_value()) context.policy.compressorUsesActiveCrest = *activeCrest;
         analyser.setPolicy(context.policy);
         const auto proposal = analyser.propose(context.original, context.style, context.intensity);

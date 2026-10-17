@@ -11,7 +11,8 @@ inline constexpr std::array<float, 3> kickGateReleases { 160, 100, 80 };
 // detector band, the six envelope attack/release times, kickGateReleases and MeasureConstants.
 // Also bump when the snapshot gains analysis fields. Snapshots recorded with another version are not
 // comparable. Version 2: active-window energy and hit decay added (J2). Version 3: lead frame policy (J3).
-inline constexpr int analysisVersion = 3;
+// Version 4: lead frames excluded from the bleed by default (J3 activated).
+inline constexpr int analysisVersion = 4;
 
 // H: starting points to calibrate on a corpus (document 05, 01-Q1 and 01-Q5).
 struct MeasureConstants
@@ -24,8 +25,8 @@ struct MeasureConstants
     static constexpr int minimumDecayHits = 3;        // hits needed before a median decay is reported
     static constexpr float t60Factor = 3;             // T60 is extrapolated from the 20 dB drop
     static constexpr double bandLimitRatio = 0.45;    // bands above this fraction of the rate are ignored (01-Q4)
-    // J3, problem 1. Off until listened to in a host: it changes the bleed spectrum, hence the Kick air correction.
-    static constexpr bool excludeLeadFramesByDefault = false;
+    // J3, problem 1. Activated on 17 October 2026 (validated by the user): it changes the bleed spectrum, hence the Kick air correction.
+    static constexpr bool excludeLeadFramesByDefault = true;
 };
 
 inline constexpr int thirdOctaveCount = 31;           // 20 Hz to 20 kHz, nominal centres 1000 * 10^(n/10), n = -17..13

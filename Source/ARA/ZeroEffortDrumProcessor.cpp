@@ -689,6 +689,7 @@ void ZeroEffortDrumProcessor::updateAutoPreset()
             context.intensity = session.intensity;
             context.source = isBoundToARA() ? "ara-region" : "live-capture";
             context.licence = juce::SystemStats::getEnvironmentVariable("ZED_ANALYSIS_EXPORT_LICENCE", "private-dev");
+            context.channels = isBoundToARA() ? singleAutoRegion(*this)->getAudioModification()->getAudioSource()->getChannelCount() : 1;
             if (const auto exported = drum::DrumAnalysisSnapshot::exportSnapshot(session.analyser.analysis(), context, session.proposal);
                 exported.failed())
                 juce::Logger::writeToLog("Analysis export failed: " + exported.getErrorMessage());

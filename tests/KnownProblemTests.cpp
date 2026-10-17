@@ -61,8 +61,8 @@ void testLeadFramesAreNotBleed(bool excludeLeadFrames)
     }
     else
     {
-        // Default: the current behaviour is kept until the fix has been listened to in a host.
-        check(contamination > 0.1 && analyser->analysis().leadFrameCount() == 0, "By default the lead frames stay in the bleed spectrum");
+        // Policy off: the former behaviour, still reachable.
+        check(contamination > 0.1 && analyser->analysis().leadFrameCount() == 0, "With the policy off the lead frames stay in the bleed spectrum");
     }
     // The overall spectrum and its frame count are not touched by the policy.
     check(analyser->analysis().spectrumFrames() == static_cast<int>((audio.size() - 4096) / 480 + 1),
@@ -118,17 +118,21 @@ void testCompressorUsesActiveCrest()
     std::cout << "  burst kick: global crest " << analysis.crestDb() << " dB, active crest " << analysis.activeCrestDb() << " dB" << std::endl;
     check(analysis.crestDb() > 10.0f && analysis.activeCrestDb() < 10.0f, "The burst signal must separate the two crests");
 
-    const auto original = drum::defaultSettings();
-    const auto current = analyser->propose(original, drum::DrumStyle::rock, 1.0f);
-    check(current.valid && current.settings[drum::compressorOn] == 1.0f, "By default the compressor follows the global crest");
+    // J3 is active by default (validated by the user on 17 October 2026); the legacy behaviour stays reachable through the policy.
+    check(drum::ProposalDefaults::compressorUsesActiveCrest && drum::MeasureConstants::excludeLeadFramesByDefault,
+        "Both J3 choices must be active by default");
 
-    auto policy = analyser->getPolicy();
-    policy.compressorUsesActiveCrest = true;
-    auto switched = analyse(audio, rate);
-    switched->setPolicy(policy);
-    const auto active = switched->propose(original, drum::DrumStyle::rock, 1.0f);
+    const auto original = drum::defaultSettings();
+    auto legacyPolicy = analyser->getPolicy();
+    legacyPolicy.compressorUsesActiveCrest = false;
+    auto legacy = analyse(audio, rate);
+    legacy->setPolicy(legacyPolicy);
+    const auto current = legacy->propose(original, drum::DrumStyle::rock, 1.0f);
+    check(current.valid && current.settings[drum::compressorOn] == 1.0f, "With the policy off the compressor follows the global crest");
+
+    const auto active = analyser->propose(original, drum::DrumStyle::rock, 1.0f);
     check(active.valid && active.settings[drum::compressorOn] == 0.0f && active.settings[drum::multibandOn] == 0.0f,
-        "With the active crest policy a sparse but steady kick does not get a compressor");
+        "By default a sparse but steady kick does not get a compressor");
     for (size_t control = 0; control < current.settings.size(); ++control)
         if (control != static_cast<size_t>(drum::compressorOn) && control != static_cast<size_t>(drum::multibandOn))
             check(current.settings[control] == active.settings[control], juce::String("Only the compressor decision may change, not ") + drum::controlSpecs[control].id);
@@ -136,7 +140,7 @@ void testCompressorUsesActiveCrest()
     // Other roles keep reading the global crest
     auto snare = original;
     snare[drum::instrument] = 1.0f;
-    check(analyser->propose(snare, drum::DrumStyle::rock, 1.0f).settings == switched->propose(snare, drum::DrumStyle::rock, 1.0f).settings,
+    check(analyser->propose(snare, drum::DrumStyle::rock, 1.0f).settings == legacy->propose(snare, drum::DrumStyle::rock, 1.0f).settings,
         "The policy only concerns the Kick profile");
 }
 

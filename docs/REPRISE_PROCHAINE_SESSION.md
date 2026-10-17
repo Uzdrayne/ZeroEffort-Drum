@@ -116,7 +116,9 @@ build-vs2022\ZeroEffortDrumTests_artefacts\Release\ZeroEffortDrumTests.exe
 #   chemin du dossier build/ si VS 2019 ; variable ZED_KIT_VERBOSE=1 affiche les mesures de Kit / Phase
 
 # Outils de rejeu
-ZeroEffortDrumTests.exe --export-wav <wav> <dossier> <role 0-9> [natural|rock|metal] [intensite 0-1] [--exclude-lead-frames] [--active-crest]
+ZeroEffortDrumTests.exe --export-wav <wav> <dossier> <role 0-9> [natural|rock|metal] [intensite 0-1] [--position 0-3] [--no-exclude-lead-frames] [--no-active-crest]
+#   --position = kitMic : 0 principal (Kick In, Snare Top), 1 secondaire (Kick Out, Snare Bottom), 2 gauche, 3 droite
+#   J3 est actif par defaut ; les deux options --no-... redonnent l'ancien comportement
 ZeroEffortDrumTests.exe --replay  <dossier> [prefixe] [--active-crest|--no-active-crest]
 ZeroEffortDrumTests.exe --compare <rapportA.json> <rapportB.json> [prefixe]
 #   rôles : 0 Kick, 1 Snare, 2-4 Toms, 5 Tom basse, 6 Hi-hat, 7 Overheads, 8 Room, 9 Bus

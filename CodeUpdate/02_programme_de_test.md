@@ -44,7 +44,7 @@ Les noms de commandes sont une proposition.
 **État (T1 + T2, 16/10/2026)** : pas de cible `drumtest` séparée (décision du plan) ; les commandes sont des options de `ZeroEffortDrumTests.exe` (dans `build*/ZeroEffortDrumTests_artefacts/<Config>/`) :
 
 ```
-ZeroEffortDrumTests.exe --export-wav <wav> <dossier snapshots> <role 0-9> [natural|rock|metal] [intensite 0-1]
+ZeroEffortDrumTests.exe --export-wav <wav> <dossier snapshots> <role 0-9> [natural|rock|metal] [intensite 0-1] [--position 0-3] [--no-exclude-lead-frames] [--no-active-crest]
 ZeroEffortDrumTests.exe --replay  <dossier snapshots> [prefixe de sortie]   # rejoue, compare a l'enregistre
 ZeroEffortDrumTests.exe --compare <rapport A.json> <rapport B.json> [prefixe de sortie]
 ```
