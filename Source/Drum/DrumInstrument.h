@@ -8,7 +8,7 @@ namespace drum
 {
 enum class DrumInstrument { kick, snare, tom1, tom2, tom3, floorTom, hiHat, overheads, room, master };
 inline constexpr std::array<const char*, 10> instrumentNames {
-    "Kick", "Snare", "Tom 1", "Tom 2", "Tom 3", "Tom basse", "Hi-hat", "Overheads", "Room", "Drum Master Bus"
+    "Kick", "Snare", "Tom 1", "Tom 2", "Tom 3", "Floor Tom", "Hi-hat", "Overheads", "Room", "Drum Master Bus"
 };
 inline DrumInstrument instrumentFromValue(float value) noexcept
 {

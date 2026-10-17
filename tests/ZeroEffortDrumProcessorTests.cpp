@@ -488,8 +488,7 @@ void testProposalEquivalence()
             check(actual.maximumReduction == expected.maximumReduction, "maximumReduction");
             check(actual.bandTargets == expected.bandTargets, "bandTargets");
             check(actual.bandCeilings == expected.bandCeilings, "bandCeilings");
-            check(actual.summary.startsWith(expected.summary.replace("Ambiance manuelle, OFF par defaut.",
-                "Ambiance proposee selon le role et les mesures.")), "historical summary");
+            check(actual.summary.startsWith(expected.summary), "historical summary");
             for (size_t control = 0; control < actual.settings.size(); ++control)
             {
                 if (actual.valid && normalizedDose > 0 && (control >= drum::ambienceOn
@@ -829,7 +828,7 @@ void testAutoPreset()
             {
                 require(calibrated.detectedHits.load() >= 7 && calibrated.detectedHits.load() <= 8,
                     "Full-chain Auto presence must trigger once on every synthetic kick");
-                require(candidate.summary.contains("VERIFICATION REELLE") && candidate.summary.contains("kickReinforceHz"),
+                require(candidate.summary.contains("ACTUAL VERIFICATION") && candidate.summary.contains("kickReinforceHz"),
                     "Bilan must include real render measurements and final new parameter values");
             }
             if (style != drum::DrumStyle::natural)
@@ -865,7 +864,7 @@ void testAutoPreset()
                                     + " / threshold " + juce::String(candidate.settings[static_cast<size_t>(drum::lowThreshold) + band * 7])).toStdString());
                 }
             }
-            require(candidate.valid && candidate.summary.contains("COMPRESSION MULTIBANDE"),
+            require(candidate.valid && candidate.summary.contains("MULTIBAND COMPRESSION"),
                 "Auto Bilan must include actual per-band calibration measurements");
             calibrated.prepare(rate, 257, 1);
             std::array<float, 3> maximums {};
@@ -1038,7 +1037,7 @@ void testAutoExpander()
         analyser.prepare(rate);
         analyser.push(source.data(), static_cast<int>(source.size()));
         const auto dense = analyser.propose(drum::defaultSettings(), drum::DrumStyle::rock);
-        if (!(dense.valid && dense.settings[drum::gateOn] == 0 && dense.summary.contains("contraste insuffisant")))
+        if (!(dense.valid && dense.settings[drum::gateOn] == 0 && dense.summary.contains("insufficient contrast")))
             throw std::runtime_error(("Dense expansion test at " + juce::String(rate, 0)
                 + " Hz: " + dense.summary).toStdString());
         drum::DrumEngine display;
@@ -1097,7 +1096,7 @@ void testTemporalAutoEQ()
         const auto clean = analyse(false, false, false, 1);
         require(clean.valid && clean.settings[drum::eqOn] == 0 && clean.settings[drum::boxGain] == 0,
             "Clean decaying kicks must remain neutral rather than receive an invented EQ");
-        require(clean.summary.contains("EQ neutre"), "Neutral EQ must be explicitly explained");
+        require(clean.summary.contains("Neutral EQ"), "Neutral EQ must be explicitly explained");
         const auto ringing = analyse(true, false, false, 1);
         require(ringing.valid && ringing.settings[drum::boxGain] < -0.1f,
             "A persistent low-mid resonance must receive a measured corrective cut");
@@ -1109,7 +1108,7 @@ void testTemporalAutoEQ()
         require(quiet.valid && std::abs(quiet.settings[drum::boxGain] - ringing.settings[drum::boxGain]) < 0.05f,
             "Resonance correction must be invariant to overall input gain");
         const auto bleed = analyse(false, true, false, 1);
-        require(bleed.valid && bleed.settings[drum::airGain] < -0.1f && bleed.summary.contains("Aigu persistant"),
+        require(bleed.valid && bleed.settings[drum::airGain] < -0.1f && bleed.summary.contains("Persistent high-frequency bleed"),
             "Persistent high-frequency bleed must be distinguished from a clean kick");
         const auto click = analyse(false, false, true, 1);
         require(click.valid && click.settings[drum::airGain] == 0,
@@ -1598,7 +1597,7 @@ void testDrumBus()
                 original[drum::autoMeasuredOn] = 1;
                 const auto proposal = measured.propose(original, drum::DrumStyle::rock, 0.7f);
                 require(proposal.valid && std::abs(proposal.settings[drum::bodyFrequency] - 150) < 12
-                    && proposal.summary.contains("Corps mesure") && proposal.settings[drum::autoMeasuredOn] == 1,
+                    && proposal.summary.contains("Measured body") && proposal.settings[drum::autoMeasuredOn] == 1,
                     "Measured Snare/Tom bodies must follow the source peak rather than a fixed frequency");
             }
             drum::DrumEngine monoMonitor;
@@ -1758,7 +1757,7 @@ void testDrumBus()
                 if (pass == 0) preview->refineThreshold(proposal); else preview->finish(proposal);
             }
             require(proposal.valid, "Per-instrument calibrated Bilan must remain valid");
-            if (element == 9) require(proposal.summary.contains("BUS GLUE") && proposal.summary.contains("somme seulement"),
+            if (element == 9) require(proposal.summary.contains("BUS GLUE") && proposal.summary.contains("sum only"),
                 "Master Bilan must show calibrated Glue and disclose no individual track measurements");
             engine.prepare(rate, 256, 1);
             double dryEnergy = 0, wetEnergy = 0;

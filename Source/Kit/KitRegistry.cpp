@@ -65,7 +65,7 @@ void Registry::startAnalysis(int group)
     std::lock_guard<std::mutex> guard(lock);
     groups[static_cast<size_t>(group)].startRequested = true;
     groups[static_cast<size_t>(group)].stopRequested = false;
-    groups[static_cast<size_t>(group)].status = "Preparation de l'analyse du kit";
+    groups[static_cast<size_t>(group)].status = "Preparing kit analysis";
     revisions[static_cast<size_t>(group)].fetch_add(1);
 }
 
@@ -196,8 +196,8 @@ void Registry::tick(int group, juce::uint32 now)
             state.ignored = 0;
             state.report = {};
             state.analysing = state.sessionMembers.size() >= 2;
-            state.status = state.analysing ? "Lancez la lecture du projet"
-                : "Kit incomplet : au moins deux pistes dans le meme groupe";
+            state.status = state.analysing ? "Start project playback"
+                : "Incomplete kit : at least two tracks in the same group";
             revisions[static_cast<size_t>(group)].fetch_add(1);
         }
         if (!state.analysing) return;
@@ -210,7 +210,7 @@ void Registry::tick(int group, juce::uint32 now)
                 state.analysing = false;
                 state.session.reset();
                 state.sessionMembers.clear();
-                state.status = "Composition du kit modifiee pendant l'analyse : relancer";
+                state.status = "Kit changed during analysis : restart it";
                 revisions[static_cast<size_t>(group)].fetch_add(1);
                 return;
             }
@@ -242,17 +242,17 @@ void Registry::tick(int group, juce::uint32 now)
         }
         if (mismatch)
         {
-            publish(group, {}, "Frequences d'echantillonnage differentes dans le kit", true);
+            publish(group, {}, "Different sample rates in the kit", true);
             return;
         }
         if (live < 2)
         {
             state.liveSinceMs = 0;
-            if (finishing) publish(group, {}, "Analyse annulee", true);
+            if (finishing) publish(group, {}, "Analysis cancelled", true);
             else
             {
                 std::lock_guard<std::mutex> guard(lock);
-                state.status = "Lancez la lecture du projet (" + juce::String(live) + " piste(s) du kit en lecture)";
+                state.status = "Start project playback (" + juce::String(live) + " kit track(s) playing)";
             }
             return;
         }
@@ -260,12 +260,12 @@ void Registry::tick(int group, juce::uint32 now)
         if (waiting > 0 && now - state.liveSinceMs < 1500 && !finishing)
         {
             std::lock_guard<std::mutex> guard(lock);
-            state.status = "Lecture recue sur " + juce::String(live) + " pistes, attente des autres...";
+            state.status = "Playback received on " + juce::String(live) + " tracks, waiting for the others...";
             return;
         }
         if (!(rate >= 8000.0 && rate <= 384000.0))
         {
-            publish(group, {}, "Frequence d'echantillonnage inconnue : relancer la lecture", true);
+            publish(group, {}, "Unknown sample rate : restart playback", true);
             return;
         }
         {
@@ -289,8 +289,8 @@ void Registry::tick(int group, juce::uint32 now)
         auto session = std::make_unique<KitSession>();
         if (state.sessionMembers.size() < 2 || !session->reset(state.inputs, rate))
         {
-            publish(group, {}, "Aucune paire analysable : il faut des overheads (ou Kick In + Kick Out, "
-                "Snare Top + Bottom) parmi les pistes en lecture", true);
+            publish(group, {}, "No analyzable pair : overheads (or Kick In + Kick Out, "
+                "Snare Top + Bottom) are needed among the playing tracks", true);
             return;
         }
         state.session = std::move(session);
@@ -350,15 +350,15 @@ void Registry::tick(int group, juce::uint32 now)
         report.progress = progress;
         juce::String status;
         if (finished)
-            status = report.valid ? "Analyse du kit terminee (" + juce::String(report.events) + " frappes)"
-                : "Analyse terminee sans mesure fiable : jouer un passage avec des frappes franches";
+            status = report.valid ? "Kit analysis finished (" + juce::String(report.events) + " hits)"
+                : "Analysis finished without a reliable measurement : play a passage with clear hits";
         else if (live < 2)
-            status = "Lecture arretee : reprendre la lecture pour continuer";
+            status = "Playback stopped : resume playback to continue";
         else
-            status = "Ecoute du kit " + juce::String(juce::roundToInt(progress * 100)) + " % ("
-                + juce::String(report.events) + " frappes)";
+            status = "Listening to the kit " + juce::String(juce::roundToInt(progress * 100)) + " % ("
+                + juce::String(report.events) + " hits)";
         if (state.ignored > 0)
-            status += " / " + juce::String(state.ignored) + " instance(s) sans lecture ignoree(s)";
+            status += " / " + juce::String(state.ignored) + " instance(s) not playing, ignored";
         publish(group, std::move(report), status, finished);
     }
 }

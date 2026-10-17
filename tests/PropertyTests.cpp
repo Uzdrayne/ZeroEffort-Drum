@@ -61,7 +61,7 @@ void testKnownSignals()
     for (const auto role : { 1, 2, 6, 9 })
     {
         const auto result = saturated->propose(roleSettings(role));
-        check(!result.valid && result.summary.containsIgnoreCase("sature"), "A03 clipped signal must be refused as saturated, role " + juce::String(role));
+        check(!result.valid && result.summary.containsIgnoreCase("clipped"), "A03 clipped signal must be refused as saturated, role " + juce::String(role));
     }
 
     // A04

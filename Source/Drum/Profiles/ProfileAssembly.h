@@ -24,12 +24,12 @@ public:
         const auto rms = analysis.samples > 0 ? std::sqrt(analysis.energy / static_cast<double>(analysis.samples)) : 0.0;
         if (analysis.invalid || analysis.rate < 8000 || analysis.samples < analysis.rate * 2 || analysis.peak < 0.001f || rms < 0.0001 || analysis.windows < 1)
         {
-            result.summary = "Analyse insuffisante : signal fini et audible sur au moins 2 s pour " + juce::String(instrumentName(selected));
+            result.summary = "Insufficient analysis: need a finite, audible signal of at least 2 s for " + juce::String(instrumentName(selected));
             return result;
         }
         if (analysis.clipped > analysis.samples / 100)
         {
-            result.summary = "Signal sature : reduire le niveau source puis analyser.";
+            result.summary = "Signal clipped: lower the source level, then analyze.";
             return result;
         }
         auto& settings = result.settings;
@@ -75,16 +75,16 @@ public:
             - result.targetReduction / (1 - 1 / settings[ratio]));
         result.valid = true;
         result.summary = juce::String(instrumentName(selected)) + " / " + drumStyleName(style) + " "
-            + juce::String(intensity * 100, 0) + "% / profil explicite, pas de reconnaissance d'instrument"
-            + " / RMS source " + juce::String(juce::Decibels::gainToDecibels(rms), 1) + " dBFS"
-            + " / crete " + juce::String(juce::Decibels::gainToDecibels(analysis.peak), 1) + " dBFS"
+            + juce::String(intensity * 100, 0) + "% / explicit profile, no instrument recognition"
+            + " / source RMS " + juce::String(juce::Decibels::gainToDecibels(rms), 1) + " dBFS"
+            + " / peak " + juce::String(juce::Decibels::gainToDecibels(analysis.peak), 1) + " dBFS"
             + " / crest " + juce::String(crest, 1) + " dB"
-            + " / coloration EQ " + (settings[eqOn] > 0 ? "volontaire" : "neutre")
-            + (profile.busGlue ? " / Bus Glue cible P75 " : " / COMP large bande cible P75 ") + juce::String(result.targetReduction, 1)
-            + " dB / plafond calibration " + juce::String(result.maximumReduction, 1)
-            + " dB / Focus et renfort Kick OFF / EXP " + (settings[gateOn] > 0 ? "ON prudent" : "OFF");
+            + " / EQ coloration " + (settings[eqOn] > 0 ? "deliberate" : "neutral")
+            + (profile.busGlue ? " / Bus Glue target P75 " : " / COMP broadband target P75 ") + juce::String(result.targetReduction, 1)
+            + " dB / calibration ceiling " + juce::String(result.maximumReduction, 1)
+            + " dB / Kick Focus and reinforcement OFF / EXP " + (settings[gateOn] > 0 ? "ON cautious" : "OFF");
         if (profile.stereoCaution)
-            result.summary += " / image stereo et decroissances a verifier a l'ecoute";
+            result.summary += " / check stereo image and decays by ear";
         return result;
     }
 };

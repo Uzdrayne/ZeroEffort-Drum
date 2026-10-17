@@ -184,7 +184,7 @@ void testAutoRadarFlow(const juce::File& imageFile)
     require(!panel->isVisible() && processor.getSettings() != before && processor.canRevertAutoPreset(),
         "Appliquer must apply the proposal, close the panel and offer Revenir");
 
-    // A refused analysis (silence) explains itself and closes with Fermer, without touching the settings
+    // A refused analysis (silence) explains itself and closes with Close, without touching the settings
     processor.revertAutoPreset();
     const auto untouched = processor.getSettings();
     child<juce::TextButton>(editor, "autoAnalyse")->onClick();
@@ -202,12 +202,12 @@ void testAutoRadarFlow(const juce::File& imageFile)
     juce::MessageManager::getInstance()->runDispatchLoopUntil(80);
     require(panel->isVisible() && processor.getAutoRadar().refused && !processor.getAutoRadar().ready,
         "A refused analysis must keep the panel open to say why");
-    require(!child<juce::TextButton>(*panel, "autoRadarIgnore")->getButtonText().compare("Fermer"), "A refusal is closed with Fermer");
+    require(!child<juce::TextButton>(*panel, "autoRadarIgnore")->getButtonText().compare("Close"), "A refusal is closed with Close");
     require(!child<juce::TextButton>(*panel, "autoRadarApply")->isVisible(), "A refusal has nothing to apply");
     writeSnapshot(editor, imageFile.getSiblingFile("AutoRadar_refused.png"));
     child<juce::TextButton>(*panel, "autoRadarIgnore")->onClick();
     juce::MessageManager::getInstance()->runDispatchLoopUntil(80);
-    require(!panel->isVisible() && processor.getSettings() == untouched, "Fermer must close the panel and change nothing");
+    require(!panel->isVisible() && processor.getSettings() == untouched, "Close must close the panel and change nothing");
 
     // Cancelling while it runs closes the panel without applying anything
     processor.revertAutoPreset();
@@ -244,8 +244,8 @@ void testEditor(ZeroEffortDrumProcessor& processor, const juce::File& imageFile)
         intensity->setValue(60, juce::sendNotificationSync);
         require(std::abs(processor.getAutoIntensity() - 0.6f) < 0.0001f, "Intensity slider must reach Auto options");
 
-        const juce::StringArray signalOrder { "Kit / Phase", "Filtres", "Expander", "Focus / Presence", "EQ",
-            "Compresseur", "Bus", "Precision", "Impact" };
+        const juce::StringArray signalOrder { "Kit / Phase", "Filters", "Expander", "Focus / Presence", "EQ",
+            "Compressor", "Bus", "Precision", "Impact" };
         std::vector<juce::TextButton*> tabs;
         for (auto* button : visible<juce::TextButton>(editor))
             if (button->getComponentID().startsWith("page")) tabs.push_back(button);
@@ -265,7 +265,7 @@ void testEditor(ZeroEffortDrumProcessor& processor, const juce::File& imageFile)
         for (auto* button : visible<juce::ToggleButton>(editor)) { juce::ignoreUnused(button); ++switches; }
         require(rotaries == 15 && switches == 5, "EQ page must expose bands, Q, gains, A/B, mono, spectrum and bypass");
         auto* bodyGain = child<juce::Slider>(editor, "bodyDb");
-        require(bodyGain != nullptr && bodyGain->getTooltip().startsWith("Poids"), "Kick EQ bands must use Kick vocabulary");
+        require(bodyGain != nullptr && bodyGain->getTooltip().startsWith("Weight"), "Kick EQ bands must use Kick vocabulary");
         bodyGain->setValue(3.0, juce::sendNotificationSync);
         require(processor.getSettings()[drum::bodyGain] == 3.0f, "Visible EQ control must update the real processor parameter");
         bodyGain->setValue(0.0, juce::sendNotificationSync);
@@ -308,7 +308,7 @@ void testEditor(ZeroEffortDrumProcessor& processor, const juce::File& imageFile)
         require(processor.getSettings() == expectedSettings, "Choosing Master must not alter any audio treatment");
         auto* position = child<juce::ComboBox>(editor, "kitMic");
         choose(2);
-        require(bodyGain->getTooltip().startsWith("Corps") && tab(editor, "pageFocus").getButtonText() == "Nettoyage",
+        require(bodyGain->getTooltip().startsWith("Body") && tab(editor, "pageFocus").getButtonText() == "Cleanup",
             "Snare must rename EQ bands and the cleanup page");
         require(position != nullptr && position->isVisible() && position->getNumItems() == 2, "Snare must offer Top / Bottom");
         open(editor, "pageFocus");
@@ -316,7 +316,7 @@ void testEditor(ZeroEffortDrumProcessor& processor, const juce::File& imageFile)
         choose(7);
         require(child<juce::TextButton>(editor, "pageFocus")->isVisible() == false && !position->isVisible(),
             "Hi-hat must hide Kick/Snare-only steps and microphone positions");
-        require(bodyGain->getTooltip().startsWith("Repisse"), "Hi-hat EQ must use cymbal vocabulary");
+        require(bodyGain->getTooltip().startsWith("Bleed"), "Hi-hat EQ must use cymbal vocabulary");
         choose(8);
         require(position->isVisible() && position->getNumItems() == 3, "Overheads must offer Stereo / Left / Right");
         choose(1);
@@ -437,8 +437,8 @@ void testEditor(ZeroEffortDrumProcessor& processor, const juce::File& imageFile)
     const auto activeDynamicImage = editor.createComponentSnapshot(editor.getLocalBounds());
     int activeIndicators = 0;
     for (auto* label : visible<juce::Label>(editor))
-        if (label->getText().startsWith("CRUSH ") || label->getText().startsWith("DYN G ")
-            || label->getText().startsWith("COULEUR ") || label->getText().startsWith("ROOM "))
+        if (label->getText().startsWith("CRUSH ") || label->getText().startsWith("DYN L ")
+            || label->getText().startsWith("COLOR ") || label->getText().startsWith("ROOM "))
         {
             ++activeIndicators;
             require(label->getY() >= 300 && label->getBottom() <= 346 && !label->getText().contains("OFF"),
@@ -464,7 +464,7 @@ void testEditor(ZeroEffortDrumProcessor& processor, const juce::File& imageFile)
                 && (orange(activeDynamicImage.getPixelAt(x, y)) || orange(quietDynamicImage.getPixelAt(x, y)))) ++movingCurvePixels;
     require(movingCurvePixels > 120, "Dynamic EQ curve must visibly move with actual audio reductions");
     for (auto* label : visible<juce::Label>(editor))
-        if (label->getText().startsWith("DYN G "))
+        if (label->getText().startsWith("DYN L "))
             require(label->getText().contains("0.0 dB") && !label->getText().contains("OFF"),
                 "Stopped processing must decay to zero without confusing silence with module OFF");
     writeSnapshot(editor, imageFile.getSiblingFile("DrumDynamicQuiet.png"));

@@ -23,18 +23,18 @@ struct RadarAxis
 };
 
 inline constexpr std::array<RadarAxis, radarAxisCount> radarAxes {{
-    { "sub", "Sub", "dB", -45.0f, -3.0f, "Energie 20-60 Hz, relative au total" },
-    { "grave", "Grave", "dB", -45.0f, -3.0f, "Energie 60-200 Hz, relative au total" },
-    { "basMedium", "Bas-med", "dB", -45.0f, -3.0f, "Energie 200-500 Hz, relative au total" },
-    { "medium", "Medium", "dB", -45.0f, -3.0f, "Energie 500 Hz-2 kHz, relative au total" },
-    { "presence", "Presence", "dB", -45.0f, -3.0f, "Energie 2-5 kHz, relative au total" },
-    { "brillance", "Brillance", "dB", -45.0f, -3.0f, "Energie 5-10 kHz, relative au total" },
-    { "air", "Air", "dB", -45.0f, -3.0f, "Energie 10-20 kHz, relative au total" },
-    { "crest", "Crest", "dB", 4.0f, 30.0f, "Pic moins niveau efficace des passages actifs : ecart entre frappes fortes et corps" },
-    { "range", "Plage", "dB", 10.0f, 80.0f, "Pic moins plancher de bruit : place disponible entre les frappes et le silence" },
-    { "attack", "Attaque", "dB", -5.0f, 30.0f, "Energie de l'attaque (0-70 ms) moins celle de la queue (70-230 ms)" },
-    { "density", "Densite", "/s", 0.0f, 12.0f, "Frappes detectees par seconde" },
-    { "decay", "Resonance", "ms", 0.0f, 1200.0f, "Temps de decroissance estime (T60) des frappes" }
+    { "sub", "Sub", "dB", -45.0f, -3.0f, "Energy 20-60 Hz, relative to the total" },
+    { "grave", "Low", "dB", -45.0f, -3.0f, "Energy 60-200 Hz, relative to the total" },
+    { "basMedium", "Low-mid", "dB", -45.0f, -3.0f, "Energy 200-500 Hz, relative to the total" },
+    { "medium", "Mid", "dB", -45.0f, -3.0f, "Energy 500 Hz-2 kHz, relative to the total" },
+    { "presence", "Presence", "dB", -45.0f, -3.0f, "Energy 2-5 kHz, relative to the total" },
+    { "brillance", "Brilliance", "dB", -45.0f, -3.0f, "Energy 5-10 kHz, relative to the total" },
+    { "air", "Air", "dB", -45.0f, -3.0f, "Energy 10-20 kHz, relative to the total" },
+    { "crest", "Crest", "dB", 4.0f, 30.0f, "Peak minus RMS level of the active passages: gap between loud hits and body" },
+    { "range", "Range", "dB", 10.0f, 80.0f, "Peak minus noise floor: room available between the hits and silence" },
+    { "attack", "Attack", "dB", -5.0f, 30.0f, "Attack energy (0-70 ms) minus tail energy (70-230 ms)" },
+    { "density", "Density", "/s", 0.0f, 12.0f, "Hits detected per second" },
+    { "decay", "Decay", "ms", 0.0f, 1200.0f, "Estimated decay time (T60) of the hits" }
 }};
 
 struct RadarCurve

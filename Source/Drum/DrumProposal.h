@@ -24,7 +24,7 @@ struct ProposalPolicy
 
 inline const char* drumStyleName(DrumStyle style)
 {
-    return style == DrumStyle::rock ? "Rock" : style == DrumStyle::metal ? "Metal" : "Naturel";
+    return style == DrumStyle::rock ? "Rock" : style == DrumStyle::metal ? "Metal" : "Natural";
 }
 
 struct DrumProposal

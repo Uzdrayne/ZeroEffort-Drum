@@ -35,10 +35,10 @@ public:
                 if (total > 0 && measurements.bandEnergy(lower, 200) / total >= 0.12)
                 {
                     result.settings[bodyFrequency] = measurements.spectralPeak(lower, 200);
-                    result.summary += " / Corps mesure " + juce::String(result.settings[bodyFrequency], 1)
-                        + " Hz (pic spectral, pas une fondamentale certifiee)";
+                    result.summary += " / Measured body " + juce::String(result.settings[bodyFrequency], 1)
+                        + " Hz (spectral peak, not a certified fundamental)";
                 }
-                else result.summary += " / Corps mesure incertain : frequence de profil conservee";
+                else result.summary += " / Measured body uncertain: profile frequency kept";
             }
             result.summary = result.summary.replace(juce::String(strength * 100, 0) + "%",
                 juce::String(intensity * 100, 0) + "%", false);
@@ -148,8 +148,8 @@ private:
         settings[ambienceLowPass] = 6500;
         settings[ambienceCharacter] = 25 * character * dose;
         settings[ambienceCompression] = 20 * character * dose;
-        proposal.summary += " / Finitions Auto : Crush " + juce::String(settings[crushOn] > 0 ? settings[crushAmount] : 0, 1)
-            + "%, Couleur " + juce::String(settings[colourOn] > 0 ? settings[colourMix] : 0, 1)
+        proposal.summary +=         " / Auto Finishing: Crush " + juce::String(settings[crushOn] > 0 ? settings[crushAmount] : 0, 1)
+                    + "%, Color " + juce::String(settings[colourOn] > 0 ? settings[colourMix] : 0, 1)
             + "%, Impact " + juce::String(settings[shapeOn] > 0 ? settings[shapeAttack] : 0, 1)
             + " dB, Dyn " + juce::String(settings[dynamicLowRange], 1) + "/" + juce::String(settings[dynamicHighRange], 1)
             + " dB, Room " + juce::String(ambience ? settings[ambienceAmount] : 0, 1)

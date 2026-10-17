@@ -11,8 +11,8 @@ namespace
 {
 // Pages follow the real signal order: kit alignment happens first, finishing modules last.
 enum Page { kitPage, filtersPage, expanderPage, focusPage, eqPage, compressorPage, busPage, precisionPage, impactPage, pageCount };
-const std::array<const char*, pageCount> pageNames { "Kit / Phase", "Filtres", "Expander", "Focus / Presence", "EQ",
-    "Compresseur", "Bus", "Precision", "Impact" };
+const std::array<const char*, pageCount> pageNames { "Kit / Phase", "Filters", "Expander", "Focus / Presence", "EQ",
+    "Compressor", "Bus", "Precision", "Impact" };
 const std::array<const char*, pageCount> pageIds { "pageKit", "pageFilters", "pageExpander", "pageFocus", "pageEq",
     "pageCompressor", "pageBus", "pagePrecision", "pageImpact" };
 
@@ -61,7 +61,7 @@ juce::String frequencyText(double frequency)
     return frequency < 1000 ? juce::String(juce::roundToInt(frequency)) + " Hz" : juce::String(frequency / 1000, 1) + " kHz";
 }
 
-// Kit-wide preview shown at the end of an analysis: nothing changes before "Appliquer".
+// Kit-wide preview shown at the end of an analysis: nothing changes before "Apply".
 class KitPreview final : public juce::Component
 {
 public:
@@ -75,9 +75,9 @@ public:
         closeButton.setComponentID("kitPreviewClose");
         resetButton.setComponentID("kitPreviewReset");
         applyButton.getProperties().set("primary", true);
-        applyButton.setTooltip("Appliquer les corrections cochees, chacune dosee par la Force de sa piste");
-        closeButton.setTooltip("Fermer sans rien modifier ; l'apercu reste disponible dans Kit / Phase");
-        resetButton.setTooltip("Remettre retard et polarite a zero sur toutes les pistes du groupe");
+        applyButton.setTooltip("Apply the checked corrections, each scaled by its track's Strength");
+        closeButton.setTooltip("Close without changing anything; the preview stays available in Kit / Phase");
+        resetButton.setTooltip("Reset delay and polarity to zero on all tracks in the group");
         applyButton.onClick = [this] {
             std::vector<juce::uint32> selected;
             for (const auto& row : rows)
@@ -99,14 +99,14 @@ public:
             row.id = recommendation.memberId;
             row.label = recommendation.label;
             if (recommendation.role == kit::Role::overhead)
-                row.proposal = "reference de temps (non modifiee)";
+                row.proposal = "timing reference (unchanged)";
             else if (!recommendation.measured)
                 row.proposal = recommendation.note;
             else
             {
                 juce::StringArray parts;
                 parts.add(recommendation.delayMs >= 0.01f ? "+" + juce::String(recommendation.delayMs, 2) + " ms" : juce::String("0 ms"));
-                if (recommendation.invert) parts.add("polarite inversee");
+                if (recommendation.invert) parts.add("polarity inverted");
                 row.proposal = parts.joinIntoString(", ") + "   (r " + juce::String(recommendation.confidence, 2) + ")";
                 row.invert = recommendation.invert;
                 if (recommendation.delayMs >= 0.01f || recommendation.invert)
@@ -117,7 +117,7 @@ public:
                     addAndMakeVisible(*row.check);
                 }
                 else
-                    row.proposal = "deja coherent";
+                    row.proposal = "already consistent";
             }
             rows.push_back(std::move(row));
         }
@@ -131,18 +131,18 @@ public:
     {
         graphics.setColour(palette::background.withAlpha(0.92f));
         graphics.fillRect(getLocalBounds());
-        drawPanel(graphics, getLocalBounds().reduced(2), "APERCU DES CORRECTIONS DU KIT", palette::amber);
+        drawPanel(graphics, getLocalBounds().reduced(2), "KIT CORRECTIONS PREVIEW", palette::amber);
         graphics.setFont(uiFont(12.5f));
         graphics.setColour(palette::textDim);
         juce::String summary;
         if (scores.phaseBefore >= 0)
-            summary << "Coherence de phase " << juce::roundToInt(scores.phaseBefore) << " -> " << juce::roundToInt(scores.phaseAfter) << " / 100";
+            summary << "Phase coherence " << juce::roundToInt(scores.phaseBefore) << " -> " << juce::roundToInt(scores.phaseAfter) << " / 100";
         if (scores.stereo >= 0) summary << "   Stereo " << juce::roundToInt(scores.stereo);
         if (scores.roomBefore >= 0) summary << "   Room " << juce::roundToInt(scores.roomBefore) << " -> " << juce::roundToInt(scores.roomAfter);
         graphics.drawText(summary, 16, 32, getWidth() - 32, 18, juce::Justification::centredLeft, true);
         graphics.setColour(palette::textFaint);
         graphics.setFont(uiFont(11.5f));
-        graphics.drawText("Rien n'est modifie avant Appliquer. Retards doses par la Force de chaque piste ; pistes en mode Analyse ignorees.",
+        graphics.drawText("Nothing changes before Apply. Delays scaled by each track's Strength; tracks in Analyze mode are ignored.",
             16, 50, getWidth() - 32, 16, juce::Justification::centredLeft, true);
         for (size_t index = 0; index < rows.size() && index < maximumRows; ++index)
         {
@@ -161,7 +161,7 @@ public:
         if (rows.size() > maximumRows)
         {
             graphics.setColour(palette::textFaint);
-            graphics.drawText("+ " + juce::String(static_cast<int>(rows.size() - maximumRows)) + " pistes (voir Rapport complet)",
+            graphics.drawText("+ " + juce::String(static_cast<int>(rows.size() - maximumRows)) + " more tracks (see Full report)",
                 52, rowTop + static_cast<int>(maximumRows) * rowHeight, 300, 16, juce::Justification::centredLeft);
         }
     }
@@ -192,8 +192,8 @@ private:
     static constexpr size_t maximumRows = 8;
     std::vector<Row> rows;
     kit::Scores scores;
-    juce::TextButton applyButton { "Appliquer la selection" }, closeButton { "Fermer sans appliquer" },
-        resetButton { "Remettre le kit a zero" };
+    juce::TextButton applyButton { "Apply selection" }, closeButton { "Close without applying" },
+        resetButton { "Reset kit to zero" };
 };
 
 class DrumEditor final : public juce::AudioProcessorEditor,
@@ -266,7 +266,7 @@ DrumEditor::DrumEditor(ZeroEffortDrumProcessor& processor)
     for (size_t index = 0; index < drum::instrumentNames.size(); ++index)
         instrumentMenu.addItem(drum::instrumentNames[index], static_cast<int>(index) + 1);
     instrumentMenu.setComponentID("drumInstrument");
-    instrumentMenu.setTooltip("Element traite par cette instance : nomme les reglages et choisit le profil Auto. Aucun changement audio.");
+    instrumentMenu.setTooltip("Item handled by this instance: names the settings and selects the Auto profile. No audio change.");
     instrumentMenu.onChange = [this] {
         owner.setControl(drum::instrument, static_cast<float>(instrumentMenu.getSelectedId() - 1));
         owner.cancelAutoPreset();
@@ -274,7 +274,7 @@ DrumEditor::DrumEditor(ZeroEffortDrumProcessor& processor)
     };
     addAndMakeVisible(instrumentMenu);
     positionMenu.setComponentID("kitMic");
-    positionMenu.setTooltip("Position du micro pour l'analyse du kit (Top/Bottom, In/Out, Gauche/Droite)");
+    positionMenu.setTooltip("Mic position for kit analysis (Top/Bottom, In/Out, Left/Right)");
     positionMenu.onChange = [this] {
         if (positionMenu.getSelectedId() > 0)
             owner.setKitControl(ZeroEffortDrumProcessor::kitMic, static_cast<float>(positionMenu.getSelectedId() - 1));
@@ -289,7 +289,7 @@ DrumEditor::DrumEditor(ZeroEffortDrumProcessor& processor)
         auto& button = styles[index];
         button.setButtonText(drum::drumStyleName(static_cast<drum::DrumStyle>(index)));
         button.setComponentID(juce::String("style") + juce::String(static_cast<int>(index)));
-        button.setTooltip(index == 0 ? "Correction prudente sans coloration imposee" : "Direction sonore volontaire, pas un defaut detecte");
+        button.setTooltip(index == 0 ? "Careful correction with no imposed coloring" : "Deliberate sonic direction, not a detected flaw");
         button.onClick = [this, index] { owner.setAutoStyle(static_cast<drum::DrumStyle>(index), owner.getAutoIntensity()); timerCallback(); };
         addAndMakeVisible(button);
     }
@@ -298,13 +298,13 @@ DrumEditor::DrumEditor(ZeroEffortDrumProcessor& processor)
     intensity.setRange(0, 100, 1);
     intensity.setTextValueSuffix(" %");
     intensity.setComponentID("autoIntensity");
-    intensity.setTooltip("Intensite du prochain preset : douce jusqu'a 50 %, accentuee vers 100 %. Aucun effet avant Appliquer.");
+    intensity.setTooltip("Intensity of the next preset: gentle up to 50 %, stronger towards 100 %. No effect before Apply.");
     intensity.onValueChange = [this] {
         owner.setAutoStyle(owner.getAutoStyle(), static_cast<float>(intensity.getValue()) / 100);
         timerCallback();
     };
     addAndMakeVisible(intensity);
-    intensityLabel.setText("Intensite", juce::dontSendNotification);
+    intensityLabel.setText("Intensity", juce::dontSendNotification);
     intensityLabel.setFont(uiFont(12.5f, true));
     intensityLabel.setColour(juce::Label::textColourId, palette::textDim);
     addAndMakeVisible(intensityLabel);
@@ -313,7 +313,7 @@ DrumEditor::DrumEditor(ZeroEffortDrumProcessor& processor)
     diagnostic.setComponentID("diagnostic");
     diagnostic.setClickingTogglesState(true);
     diagnostic.onClick = [this] { resized(); repaint(); };
-    diagnostic.setTooltip("Afficher les mesures techniques ARA et la sortie hote");
+    diagnostic.setTooltip("Show technical ARA measurements and the host output");
     addAndMakeVisible(diagnostic);
 
     for (size_t index = 0; index < tabs.size(); ++index)
@@ -321,14 +321,14 @@ DrumEditor::DrumEditor(ZeroEffortDrumProcessor& processor)
         auto& tab = tabs[index];
         tab.setButtonText(pageNames[index]);
         tab.setComponentID(pageIds[index]);
-        tab.setTooltip(juce::String("Etape ") + juce::String(static_cast<int>(index) + 1) + " du signal : " + pageNames[index]);
+        tab.setTooltip(juce::String("Signal step ") + juce::String(static_cast<int>(index) + 1) + ": " + pageNames[index]);
         tab.onClick = [this, index] { selectPage(static_cast<int>(index)); };
         addAndMakeVisible(tab);
     }
 
-    spectrumSwitch.setButtonText("Spectre");
+    spectrumSwitch.setButtonText("Spectrum");
     spectrumSwitch.setComponentID("spectrum");
-    spectrumSwitch.setTooltip("FFT de la sortie : echelle droite en dBFS, canal de plus forte amplitude. Aucun effet audio.");
+    spectrumSwitch.setTooltip("Output FFT: right scale in dBFS, loudest channel. No audio effect.");
     spectrumSwitch.onClick = [this] {
         owner.getSpectrumMailbox().subscribers.fetch_add(spectrumSwitch.getToggleState() ? 1 : -1);
         repaint();
@@ -338,22 +338,22 @@ DrumEditor::DrumEditor(ZeroEffortDrumProcessor& processor)
     owner.getSpectrumMailbox().subscribers.fetch_add(1);
 
     const std::array<const char*, 16> meterTips {
-        "Crush : reduction de la voie parallele, en dB.",
-        "EQ dynamique grave : frequence et attenuation mesuree, en dB.",
-        "EQ dynamique aigu : frequence et attenuation mesuree, en dB.",
-        "Attack/Sustain : plus grand changement de gain du bloc, en dB.",
-        "Couleur : crete du residu harmonique a 4x, en dBFS ; pas une reduction de gain.",
-        "Clip : crete du residu d'arrondi a 4x, en dBFS ; pas un plafond de sortie.",
-        "Room : crete du retour ajoute au direct, avant Output, en dBFS.",
-        "Niveau A/B : compensation RMS avant Output, en dB ; pas LUFS.",
-        "Glue : reduction mesuree du compresseur bus, en dB.",
-        "Multibande grave : reduction mesuree, en dB.",
-        "Multibande medium : reduction mesuree, en dB.",
-        "Multibande aigu : reduction mesuree, en dB.",
-        "Nettoyage : attenuation selective de l'aigu, en dB.",
-        "Renfort Kick : crete du corps synthetique, en dBFS.",
-        "Room : reduction du compresseur de retour, en dB.",
-        "Correlation L/R avant ecoute mono : -1 oppose, +1 similaire. L'alignement inter-micros est dans Kit / Phase."
+        "Crush: parallel path reduction, in dB.",
+        "Low dynamic EQ: frequency and measured attenuation, in dB.",
+        "High dynamic EQ: frequency and measured attenuation, in dB.",
+        "Attack/Sustain: largest gain change in the block, in dB.",
+        "Color: peak of the 4x harmonic residue, in dBFS; not a gain reduction.",
+        "Clip: peak of the 4x rounding residue, in dBFS; not an output ceiling.",
+        "Room: peak of the return added to the direct signal, before Output, in dBFS.",
+        "A/B level: RMS compensation before Output, in dB; not LUFS.",
+        "Glue: measured bus compressor reduction, in dB.",
+        "Low multiband: measured reduction, in dB.",
+        "Mid multiband: measured reduction, in dB.",
+        "High multiband: measured reduction, in dB.",
+        "Cleanup: selective high-band attenuation, in dB.",
+        "Kick Reinforce: peak of the synthetic body, in dBFS.",
+        "Room: return compressor reduction, in dB.",
+        "L/R correlation before mono listening: -1 opposite, +1 similar. Mic-to-mic alignment is in Kit / Phase."
     };
     for (size_t index = 0; index < headerIndicators.size(); ++index)
     {
@@ -365,26 +365,26 @@ DrumEditor::DrumEditor(ZeroEffortDrumProcessor& processor)
     }
 
     for (auto* button : { &analyse, &apply, &revert, &details }) addAndMakeVisible(*button);
-    analyse.setButtonText("Analyser");
-    apply.setButtonText("Appliquer");
-    revert.setButtonText("Revenir");
-    details.setButtonText("Bilan");
+    analyse.setButtonText("Analyze");
+    apply.setButtonText("Apply");
+    revert.setButtonText("Revert");
+    details.setButtonText("Report");
     analyse.setComponentID("autoAnalyse");
     apply.setComponentID("autoApply");
     revert.setComponentID("autoRevert");
     details.setComponentID("autoDetails");
     analyse.getProperties().set("primary", true);
-    analyse.setTooltip("ARA : un evenement. Insert : capturer 8 secondes d'audio entrant.");
-    apply.setTooltip("Remplacer les reglages par la proposition prudente");
-    revert.setTooltip("Retablir les reglages precedant la derniere application Auto");
-    details.setTooltip("Afficher la proposition et les mesures du rendu complet");
+    analyse.setTooltip("ARA: one event. Insert: capture 8 seconds of incoming audio.");
+    apply.setTooltip("Replace the settings with the careful proposal");
+    revert.setTooltip("Restore the settings from before the last Auto apply");
+    details.setTooltip("Show the proposal and the full render measurements");
     analyse.onClick = [this] {
         if (owner.autoPresetBusy()) owner.cancelAutoPreset(); else owner.startAutoPreset();
         timerCallback();
     };
     apply.onClick = [this] { owner.applyAutoPreset(); timerCallback(); };
     revert.onClick = [this] { owner.revertAutoPreset(); timerCallback(); };
-    details.onClick = [this] { showText("Auto / Bilan", owner.getAutoPresetText()); };
+    details.onClick = [this] { showText("Auto / Report", owner.getAutoPresetText()); };
     autoReport.setFont(uiFont(12.0f));
     autoReport.setColour(juce::Label::textColourId, palette::textDim);
     addAndMakeVisible(autoReport);
@@ -397,15 +397,15 @@ DrumEditor::DrumEditor(ZeroEffortDrumProcessor& processor)
     for (int group = 0; group < kit::groupCount; ++group)
         kitGroupMenu.addItem("Kit " + juce::String(group + 1), group + 1);
     kitGroupMenu.setComponentID("kitGroup");
-    kitGroupMenu.setTooltip("Toutes les pistes d'une meme batterie doivent partager le meme groupe. Un groupe par projet ouvert.");
+    kitGroupMenu.setTooltip("All tracks of one drum kit must share the same group. One group per open project.");
     kitGroupMenu.onChange = [this] {
         owner.setKitControl(ZeroEffortDrumProcessor::kitGroup, static_cast<float>(kitGroupMenu.getSelectedId() - 1));
         timerCallback();
     };
     addChildComponent(kitGroupMenu);
-    const std::array<const char*, 3> modeNames { "Analyse", "Suggerer", "Auto" };
-    const std::array<const char*, 3> modeTips { "Afficher les mesures sans jamais modifier cette piste",
-        "Proposer la correction : apercu du kit puis Appliquer", "Appliquer automatiquement la correction a la fin de l'analyse" };
+    const std::array<const char*, 3> modeNames { "Analyze", "Suggest", "Auto" };
+    const std::array<const char*, 3> modeTips { "Show measurements without ever changing this track",
+        "Propose the correction: kit preview, then Apply", "Apply the correction automatically when the analysis ends" };
     for (size_t index = 0; index < kitModes.size(); ++index)
     {
         kitModes[index].setButtonText(modeNames[index]);
@@ -432,23 +432,23 @@ DrumEditor::DrumEditor(ZeroEffortDrumProcessor& processor)
         addChildComponent(slider);
         addChildComponent(label);
     };
-    setupKnob(kitStrength, kitStrengthLabel, "kitStrength", "Force", 100.0, "%", ZeroEffortDrumProcessor::kitStrength);
+    setupKnob(kitStrength, kitStrengthLabel, "kitStrength", "Strength", 100.0, "%", ZeroEffortDrumProcessor::kitStrength);
     kitStrength.setDoubleClickReturnValue(true, 100.0);
-    kitStrength.setTooltip("Part de la correction de temps appliquee : 0 % aucune, 50 % partielle (garde du realisme), 100 % complete");
-    setupKnob(kitDelay, kitDelayLabel, "kitDelayMs", "Delai", kit::maxDelayMs, "ms", ZeroEffortDrumProcessor::kitDelay);
+    kitStrength.setTooltip("Share of the timing correction applied: 0 % none, 50 % partial (keeps realism), 100 % full");
+    setupKnob(kitDelay, kitDelayLabel, "kitDelayMs", "Delay", kit::maxDelayMs, "ms", ZeroEffortDrumProcessor::kitDelay);
     kitDelay.setDoubleClickReturnValue(true, 0.0);
-    kitDelay.setTooltip("Retard applique a cette piste en debut de chaine (aucune latence ajoutee)");
-    kitPolarity.setButtonText("POLARITE INVERSEE");
+    kitDelay.setTooltip("Delay applied to this track at the start of the chain (no latency added)");
+    kitPolarity.setButtonText("POLARITY INVERTED");
     kitPolarity.setComponentID("kitPolarity");
     kitPolarity.getProperties().set("module", true);
     kitPolarity.getProperties().set("accent", palette::amber.toString());
-    kitPolarity.setTooltip("Inverse la polarite de cette piste en debut de chaine");
+    kitPolarity.setTooltip("Invert the polarity of this track at the start of the chain");
     kitPolarity.onClick = [this] { owner.setKitControl(ZeroEffortDrumProcessor::kitPolarity, kitPolarity.getToggleState() ? 1.0f : 0.0f); };
     addChildComponent(kitPolarity);
-    kitAnalyse.setButtonText("Analyser le kit");
+    kitAnalyse.setButtonText("Analyze kit");
     kitAnalyse.setComponentID("kitAnalyse");
     kitAnalyse.getProperties().set("primary", true);
-    kitAnalyse.setTooltip("Lancer l'ecoute commune de toutes les pistes du groupe, puis lire le projet (20 a 45 s de jeu)");
+    kitAnalyse.setTooltip("Start listening to all tracks in the group together, then read the project (20 to 45 s of playback)");
     kitAnalyse.onClick = [this] {
         if (kitView.analysing) owner.stopKitAnalysis();
         else
@@ -458,23 +458,23 @@ DrumEditor::DrumEditor(ZeroEffortDrumProcessor& processor)
         }
         timerCallback();
     };
-    kitApply.setButtonText("Apercu et application");
+    kitApply.setButtonText("Preview and apply");
     kitApply.setComponentID("kitApply");
-    kitApply.setTooltip("Voir les corrections proposees pour tout le kit et choisir celles a appliquer");
+    kitApply.setTooltip("See the proposed corrections for the whole kit and choose which to apply");
     kitApply.onClick = [this] { preview.show(kitView.report); };
-    kitReport.setButtonText("Rapport complet");
+    kitReport.setButtonText("Full report");
     kitReport.setComponentID("kitReport");
     kitReport.onClick = [this] {
         juce::String text = kitView.status + "\n\n" + kitView.report.lines.joinIntoString("\n");
         const auto& scores = kitView.report.scores;
         if (scores.phaseBefore >= 0)
-            text += "\n\nCoherence de phase : " + juce::String(juce::roundToInt(scores.phaseBefore)) + " -> "
+            text += "\n\nPhase coherence: " + juce::String(juce::roundToInt(scores.phaseBefore)) + " -> "
                 + juce::String(juce::roundToInt(scores.phaseAfter)) + " / 100";
-        if (scores.stereo >= 0) text += "\nCoherence stereo : " + juce::String(juce::roundToInt(scores.stereo)) + " / 100";
+        if (scores.stereo >= 0) text += "\nStereo coherence: " + juce::String(juce::roundToInt(scores.stereo)) + " / 100";
         if (scores.roomBefore >= 0)
-            text += "\nCompatibilite room : " + juce::String(juce::roundToInt(scores.roomBefore)) + " -> "
+            text += "\nRoom compatibility: " + juce::String(juce::roundToInt(scores.roomBefore)) + " -> "
                 + juce::String(juce::roundToInt(scores.roomAfter)) + " / 100";
-        showText("Kit / Rapport", text);
+        showText("Kit / Report", text);
     };
     for (auto* button : { &kitAnalyse, &kitApply, &kitReport, &kitDelayDown, &kitDelayUp }) addChildComponent(*button);
     kitDelayDown.setButtonText("-");
@@ -484,7 +484,7 @@ DrumEditor::DrumEditor(ZeroEffortDrumProcessor& processor)
     for (auto* button : { &kitDelayDown, &kitDelayUp })
     {
         const auto sign = button == &kitDelayUp ? 1.0f : -1.0f;
-        button->setTooltip("Reglage fin : un echantillon de retard");
+        button->setTooltip("Fine adjustment: one sample of delay");
         button->onClick = [this, sign] {
             const auto rate = owner.getSampleRate() > 0 ? owner.getSampleRate() : 48000.0;
             const auto step = static_cast<float>(1000.0 / rate);
@@ -559,9 +559,9 @@ DrumEditor::DrumEditor(ZeroEffortDrumProcessor& processor)
     radarPanel.onApply = [this] { owner.applyAutoPreset(); timerCallback(); };
     radarPanel.onIgnore = [this] { owner.discardAutoPreset(); timerCallback(); };
     radarPanel.onCancel = [this] { owner.cancelAutoPreset(); timerCallback(); };
-    radarPanel.onDetails = [this] { showText("Auto / Bilan", owner.getAutoPresetText()); };
+    radarPanel.onDetails = [this] { showText("Auto / Report", owner.getAutoPresetText()); };
     addChildComponent(radarPanel);
-    owner.setAutoApplyWhenReady(false);   // the proposal waits for Appliquer in the radar panel
+    owner.setAutoApplyWhenReady(false);   // the proposal waits for Apply in the radar panel
     setSize(editorWidth, editorHeight);
     refreshNames();
     selectPage(eqPage);
@@ -623,16 +623,16 @@ void DrumEditor::refreshNames()
         if (spec.toggle)
         {
             toggles[index].setButtonText(switchName(control));
-            toggles[index].setTooltip(juce::String(spec.name) + " : activer / desactiver");
+            toggles[index].setTooltip(juce::String(spec.name) + " : switch on / off");
             continue;
         }
         labels[index].setText(knobName(control, role), juce::dontSendNotification);
         auto tip = longName(control, role) + " / " + spec.name + (juce::String(spec.unit).isNotEmpty() ? " (" + juce::String(spec.unit) + ")" : "");
-        if (index >= drum::bodyQ && index <= drum::airQ) tip += " / 0 = Q global, double-clic pour heriter";
+        if (index >= drum::bodyQ && index <= drum::airQ) tip += " / 0 = global Q, double-click to inherit";
         sliders[index].setTooltip(tip);
     }
-    toggles[drum::levelMatchOn].setTooltip("Compensation RMS progressive +/-6 dB avant Sortie. Comparer avec Bypass ; ni LUFS ni limiteur.");
-    toggles[drum::monitorMonoOn].setTooltip("Ecoute mono de la sortie. L'alignement entre micros est dans Kit / Phase.");
+    toggles[drum::levelMatchOn].setTooltip("Progressive RMS compensation +/-6 dB before Output. Compare with Bypass; neither LUFS nor limiter.");
+    toggles[drum::monitorMonoOn].setTooltip("Mono monitoring of the output. Mic-to-mic alignment is in Kit / Phase.");
     const auto focusName = focusPageName(role);
     tabs[focusPage].setButtonText(focusName.isNotEmpty() ? focusName : "Focus / Presence");
 
@@ -773,7 +773,7 @@ void DrumEditor::layoutPage(std::array<bool, drum::controlCount>& shown)
     const auto settings = owner.getSettings();
     const auto family = familyOf(juce::jmax(0, currentInstrument));
 
-    panels.push_back({ levelArea, "NIVEAUX", palette::accent, true });
+    panels.push_back({ levelArea, "LEVELS", palette::accent, true });
     knob(drum::input, levelArea.getX() + 18, levelArea.getY() + 34, 136, 90);
     knob(drum::output, levelArea.getX() + 18, levelArea.getY() + 146, 136, 90);
     toggle(drum::levelMatchOn, levelArea.getX() + 16, levelArea.getY() + 262, 150);
@@ -783,9 +783,9 @@ void DrumEditor::layoutPage(std::array<bool, drum::controlCount>& shown)
     {
         case kitPage:
         {
-            panel(16, 268, "IDENTITE DU KIT");
+            panel(16, 268, "KIT IDENTITY");
             panel(292, 236, "CORRECTION", palette::amber);
-            panel(536, 368, "RAPPORT DU KIT");
+            panel(536, 368, "KIT REPORT");
             kitGroupMenu.setBounds(30, 446, 240, 30);
             for (size_t index = 0; index < kitModes.size(); ++index)
                 kitModes[index].setBounds(30 + static_cast<int>(index) * 81, 560, 77, 26);
@@ -955,7 +955,7 @@ void DrumEditor::paint(juce::Graphics& graphics)
     paintHeader(graphics);
     drawPanel(graphics, graphArea, {});
     paintGraph(graphics, settings);
-    drawPanel(graphics, meterArea, "NIVEAUX / REDUCTION");
+    drawPanel(graphics, meterArea, "LEVELS / REDUCTION");
     paintMeters(graphics);
     drawPanel(graphics, indicatorArea, {}, palette::accent, false);
     paintIndicators(graphics);
@@ -1220,17 +1220,17 @@ void DrumEditor::paintPage(juce::Graphics& graphics, const drum::Settings& setti
         case kitPage:
         {
             const auto identity = owner.getKitIdentity();
-            caption("GROUPE", 30, 426, 200, palette::textFaint, 11.5f, true);
-            caption("MICRO", 30, 484, 200, palette::textFaint, 11.5f, true);
-            caption(identity.role == kit::Role::none ? juce::String("Hors kit (bus maitre)") : identity.name, 30, 502, 240, palette::text, 14.0f, true);
-            caption(juce::String("Role : ") + kit::roleName(identity.role), 30, 520, 240, palette::textDim, 12.0f);
+            caption("GROUP", 30, 426, 200, palette::textFaint, 11.5f, true);
+            caption("MIC", 30, 484, 200, palette::textFaint, 11.5f, true);
+            caption(identity.role == kit::Role::none ? juce::String("Outside kit (master bus)") : identity.name, 30, 502, 240, palette::text, 14.0f, true);
+            caption(juce::String("Role: ") + kit::roleName(identity.role), 30, 520, 240, palette::textDim, 12.0f);
             caption("MODE", 30, 540, 200, palette::textFaint, 11.5f, true);
             const auto* own = owner.findOwnRecommendation(kitView.report);
-            juce::String proposal = "Propose : analyser le kit";
+            juce::String proposal = "Proposal: analyze the kit";
             if (own != nullptr && own->measured && own->role != kit::Role::overhead)
-                proposal = "Propose : +" + juce::String(own->delayMs, 2) + " ms" + (own->invert ? ", polarite inversee" : "");
+                proposal = "Proposal: +" + juce::String(own->delayMs, 2) + " ms" + (own->invert ? ", polarity inverted" : "");
             else if (own != nullptr && own->role == kit::Role::overhead)
-                proposal = "Reference de temps : pas de retard";
+                proposal = "Timing reference: no delay";
             caption(proposal, 306, 578, 220, own != nullptr && own->invert ? palette::amber : palette::textDim, 11.5f, true);
             paintKitReport(graphics, { 536, 390, 368, 322 });
             break;
@@ -1239,20 +1239,20 @@ void DrumEditor::paintPage(juce::Graphics& graphics, const drum::Settings& setti
         {
             const auto hints = filterHints(role);
             caption(roleHint(role), 420, 440, 460, palette::text, 14.0f, true);
-            caption("Coupe-bas : " + juce::String(hints[0]), 420, 470, 460);
-            caption("Coupe-haut : " + juce::String(hints[1]), 420, 492, 460);
-            caption("Deux filtres 12 dB/oct en tete de chaine, avant l'expander et l'EQ.", 420, 530, 460, palette::textFaint, 12.0f);
-            caption("Courbes jaune / rose dans le graphique.", 420, 550, 460, palette::textFaint, 12.0f);
+            caption("High-pass: " + juce::String(hints[0]), 420, 470, 460);
+            caption("Low-pass: " + juce::String(hints[1]), 420, 492, 460);
+            caption("Two 12 dB/oct filters at the head of the chain, before the expander and EQ.", 420, 530, 460, palette::textFaint, 12.0f);
+            caption("Yellow / pink curves in the graph.", 420, 550, 460, palette::textFaint, 12.0f);
             break;
         }
         case expanderPage:
-            caption(expanderDiscouraged(role) ? "Deconseille sur ce role : l'expander couperait les decroissances naturelles."
-                : "Reduit la repisse entre les frappes ; plage et ratio doux pour garder les ghost notes.",
+            caption(expanderDiscouraged(role) ? "Not advised for this role: the expander would cut natural decays."
+                : "Reduces bleed between hits; gentle range and ratio keep ghost notes.",
                 40, 596, 820, expanderDiscouraged(role) ? palette::amber : palette::textDim, 13.0f);
             break;
         case focusPage:
             if (familyOf(role) == Family::snare || familyOf(role) == Family::tom)
-                caption("Attenue l'aigu de la repisse (cymbales) entre les frappes detectees.", 500, 452, 390, palette::textDim, 12.5f);
+                caption("Attenuates high-frequency bleed (cymbals) between detected hits.", 500, 452, 390, palette::textDim, 12.5f);
             break;
         case eqPage:
         {
@@ -1274,7 +1274,7 @@ void DrumEditor::paintPage(juce::Graphics& graphics, const drum::Settings& setti
             if (settings[drum::multibandOn] > 0.5f)
             {
                 const auto reductions = liveBands;
-                const std::array<const char*, 3> names { "GRAVE", "MEDIUM", "AIGU" };
+                const std::array<const char*, 3> names { "LOW", "MID", "HIGH" };
                 for (size_t band = 0; band < 3; ++band)
                 {
                     const auto x = 26 + static_cast<int>(band) * 292;
@@ -1335,16 +1335,16 @@ void DrumEditor::paintKitReport(juce::Graphics& graphics, juce::Rectangle<int> a
     const auto* mine = owner.findOwnRecommendation(report);
     graphics.setFont(uiFont(12.5f, true));
     graphics.setColour(palette::textDim);
-    juce::String mineText = "Cette piste : ";
-    if (mine == nullptr) mineText += report.recommendations.empty() ? "pas encore analysee" : "hors de la derniere analyse";
+    juce::String mineText = "This track: ";
+    if (mine == nullptr) mineText += report.recommendations.empty() ? "not analyzed yet" : "not in the last analysis";
     else if (!mine->measured) mineText += mine->note;
-    else if (mine->role == kit::Role::overhead) mineText += "reference du kit";
+    else if (mine->role == kit::Role::overhead) mineText += "kit reference";
     else
     {
         juce::StringArray parts;
-        if (mine->delayMs >= 0.01f) parts.add("retarder " + juce::String(mine->delayMs, 2) + " ms");
-        if (mine->invert) parts.add("inverser la polarite");
-        mineText += parts.isEmpty() ? juce::String("deja coherente") : parts.joinIntoString(", ");
+        if (mine->delayMs >= 0.01f) parts.add("delay by " + juce::String(mine->delayMs, 2) + " ms");
+        if (mine->invert) parts.add("invert polarity");
+        mineText += parts.isEmpty() ? juce::String("already consistent") : parts.joinIntoString(", ");
     }
     graphics.setColour(palette::text);
     graphics.drawFittedText(mineText, content.removeFromTop(18), juce::Justification::centredLeft, 1, 0.8f);
@@ -1366,7 +1366,7 @@ void DrumEditor::paintKitReport(juce::Graphics& graphics, juce::Rectangle<int> a
         if (row == maximumRows)
         {
             graphics.setColour(palette::textFaint);
-            graphics.drawText("+ " + juce::String(static_cast<int>(shownMembers.size()) - maximumRows) + " autres pistes",
+            graphics.drawText("+ " + juce::String(static_cast<int>(shownMembers.size()) - maximumRows) + " more tracks",
                 list.removeFromTop(17), juce::Justification::centredLeft);
             break;
         }
@@ -1385,7 +1385,7 @@ void DrumEditor::paintKitReport(juce::Graphics& graphics, juce::Rectangle<int> a
                 if (recommendation->invert) right += "  INV";
             }
         }
-        else if (member.identity.role == kit::Role::none) right = "hors kit";
+        else if (member.identity.role == kit::Role::none) right = "outside kit";
         graphics.setColour(member.id == kitMemberId ? palette::text : palette::textDim);
         graphics.drawText(member.identity.name, line.withTrimmedRight(110), juce::Justification::centredLeft, true);
         graphics.setColour(recommendation != nullptr && recommendation->invert ? palette::amber : palette::text);
@@ -1395,13 +1395,13 @@ void DrumEditor::paintKitReport(juce::Graphics& graphics, juce::Rectangle<int> a
     if (silent > 0)
     {
         graphics.setColour(palette::textFaint);
-        graphics.drawText(juce::String(silent) + " instance(s) sans lecture, ignoree(s) par l'analyse",
+        graphics.drawText(juce::String(silent) + " instance(s) with no playback, ignored by the analysis",
             list.removeFromTop(17), juce::Justification::centredLeft, true);
     }
     if (kitView.members.empty())
     {
         graphics.setColour(palette::textFaint);
-        graphics.drawText("Aucune autre piste dans ce groupe", list.removeFromTop(18), juce::Justification::centredLeft);
+        graphics.drawText("No other track in this group", list.removeFromTop(18), juce::Justification::centredLeft);
     }
 
     const auto& scores = report.scores;
@@ -1444,7 +1444,7 @@ void DrumEditor::paintKitReport(juce::Graphics& graphics, juce::Rectangle<int> a
         {
             graphics.setColour(palette::textFaint);
             graphics.setFont(uiFont(11.0f));
-            graphics.drawText("avant " + juce::String(juce::roundToInt(before)), labelArea.translated(0, 14), juce::Justification::centred);
+            graphics.drawText("before " + juce::String(juce::roundToInt(before)), labelArea.translated(0, 14), juce::Justification::centred);
         }
     }
 }
@@ -1490,7 +1490,7 @@ void DrumEditor::timerCallback()
     for (size_t index = 0; index < styles.size(); ++index)
         styles[index].setToggleState(static_cast<drum::DrumStyle>(index) == owner.getAutoStyle(), juce::dontSendNotification);
     if (!intensity.isMouseButtonDown()) intensity.setValue(owner.getAutoIntensity() * 100, juce::dontSendNotification);
-    analyse.setButtonText(owner.autoPresetBusy() ? "Annuler" : "Analyser");
+    analyse.setButtonText(owner.autoPresetBusy() ? "Cancel" : "Analyze");
     analyse.setEnabled(owner.autoPresetBusy() || owner.canEditSettings());
     apply.setEnabled(owner.canApplyAutoPreset());
     revert.setEnabled(owner.canRevertAutoPreset());
@@ -1500,7 +1500,7 @@ void DrumEditor::timerCallback()
         juce::dontSendNotification);
     autoReport.setTooltip(reportText);
     status.setText(owner.getDiagnosticText(), juce::dontSendNotification);
-    context.setText(owner.isBoundToARA() ? (owner.canEditSettings() ? "ARA / Selection active" : "ARA / Aucune region selectionnee")
+    context.setText(owner.isBoundToARA() ? (owner.canEditSettings() ? "ARA / Selection active" : "ARA / No region selected")
         : "VST3 / Insert", juce::dontSendNotification);
 
     const bool bypassed = settings[drum::bypass] > 0.5f;
@@ -1531,19 +1531,19 @@ void DrumEditor::timerCallback()
         return value > 0.000001f ? juce::jlimit(0.0f, 1.0f, (juce::Decibels::gainToDecibels(value) + 72) / 72) : 0.0f;
     };
     report(0, "CRUSH", settings[drum::crushOn] > 0.5f, db(liveMeters[0]), liveMeters[0] / 12);
-    report(1, "DYN G " + hz(settings[drum::dynamicLowHz]), settings[drum::dynamicOn] > 0.5f, db(liveMeters[1]), liveMeters[1] / 6);
-    report(2, "DYN A " + hz(settings[drum::dynamicHighHz]), settings[drum::dynamicOn] > 0.5f, db(liveMeters[2]), liveMeters[2] / 6);
+    report(1, "DYN L " + hz(settings[drum::dynamicLowHz]), settings[drum::dynamicOn] > 0.5f, db(liveMeters[1]), liveMeters[1] / 6);
+    report(2, "DYN H " + hz(settings[drum::dynamicHighHz]), settings[drum::dynamicOn] > 0.5f, db(liveMeters[2]), liveMeters[2] / 6);
     report(3, "IMPACT", settings[drum::shapeOn] > 0.5f, db(liveMeters[5]), std::abs(liveMeters[5]) / 6);
-    report(4, "COULEUR", settings[drum::colourOn] > 0.5f, peak(liveMeters[6]), peakActivity(liveMeters[6]));
+    report(4, "COLOR", settings[drum::colourOn] > 0.5f, peak(liveMeters[6]), peakActivity(liveMeters[6]));
     report(5, "CLIP", settings[drum::clipOn] > 0.5f, peak(liveMeters[7]), peakActivity(liveMeters[7]));
     report(6, "ROOM", settings[drum::ambienceOn] > 0.5f, peak(liveMeters[8]), peakActivity(liveMeters[8]));
     report(7, "A/B", settings[drum::levelMatchOn] > 0.5f, db(liveMeters[3]), std::abs(liveMeters[3]) / 6);
     report(8, "GLUE", settings[drum::glueOn] > 0.5f, db(liveMeters[11]), liveMeters[11] / 12);
     for (size_t band = 0; band < liveBands.size(); ++band)
-        report(9 + band, band == 0 ? "MB G" : band == 1 ? "MB M" : "MB A",
+        report(9 + band, band == 0 ? "MB L" : band == 1 ? "MB M" : "MB H",
             settings[drum::compressorOn] * settings[drum::multibandOn] > 0.5f, db(liveBands[band]), liveBands[band] / 12);
-    report(12, "NETT", settings[drum::cleanupOn] > 0.5f, db(liveMeters[12]), liveMeters[12] / 18);
-    report(13, "CORPS", settings[drum::presenceOn] > 0.5f, peak(liveMeters[13]), peakActivity(liveMeters[13]));
+    report(12, "CLEAN", settings[drum::cleanupOn] > 0.5f, db(liveMeters[12]), liveMeters[12] / 18);
+    report(13, "BODY", settings[drum::presenceOn] > 0.5f, peak(liveMeters[13]), peakActivity(liveMeters[13]));
     report(14, "ROOM GR", settings[drum::ambienceOn] > 0.5f, db(liveMeters[9]), liveMeters[9] / 12);
     report(15, "CORREL", true, juce::String(liveMeters[4], 2), std::abs(liveMeters[4]));
 
@@ -1557,9 +1557,9 @@ void DrumEditor::timerCallback()
         sliders[index].setEnabled(enabled);
         toggles[index].setEnabled(index == drum::bypass ? owner.canBypass() : enabled);
     }
-    toggles[drum::bypass].setTooltip(enabled ? "Bypass de la selection active (inclut la correction Kit / Phase)"
-        : owner.canBypass() ? "Bypass de la derniere selection ARA editee, meme sans selection active"
-        : "Selectionner une region ARA au moins une fois pour activer Bypass");
+    toggles[drum::bypass].setTooltip(enabled ? "Bypass the active selection (includes the Kit / Phase correction)"
+        : owner.canBypass() ? "Bypass the last edited ARA selection, even with no active selection"
+        : "Select an ARA region at least once to enable Bypass");
 
     positionMenu.setSelectedId(static_cast<int>(std::lround(owner.getKitControl(ZeroEffortDrumProcessor::kitMic))) + 1, juce::dontSendNotification);
     kitGroupMenu.setSelectedId(static_cast<int>(std::lround(owner.getKitControl(ZeroEffortDrumProcessor::kitGroup))) + 1, juce::dontSendNotification);
@@ -1578,7 +1578,7 @@ void DrumEditor::timerCallback()
     {
         kitView = owner.getKitView();
         kitMemberId = owner.getKitMemberId();
-        kitAnalyse.setButtonText(kitView.analysing ? "Arreter l'analyse" : "Analyser le kit");
+        kitAnalyse.setButtonText(kitView.analysing ? "Stop analysis" : "Analyze kit");
         kitApply.setEnabled(kitView.report.final && kitView.report.valid);
         if (previewPending && !kitView.analysing && kitView.report.final)
         {

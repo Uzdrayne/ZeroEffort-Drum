@@ -29,16 +29,16 @@ struct MasterBusProfile
         settings[glueRatio] = style == DrumStyle::metal ? 4.0f : 2.0f;
         settings[glueAttack] = 30;
         settings[glueRelease] = style == DrumStyle::natural ? 200.0f : 100.0f;
-        result.summary += " / Bus Glue : knee doux, sidechain HP 80 Hz, attaque 30 ms, pas une emulation SSL";
-        result.summary += "\nBUS : analyse de la somme seulement. Aucun niveau individuel Kick/Snare/Tom mesurable."
-            "\nVerifier niveaux et phase des pistes avant compression. Ambiance proposee selon le role et les mesures.";
+        result.summary += " / Bus Glue: soft knee, sidechain HP 80 Hz, attack 30 ms, not an SSL emulation";
+        result.summary += "\nBUS: analysis of the sum only. No individual Kick/Snare/Tom level can be measured."
+            "\nCheck track levels and phase before compression. Ambience proposed from the role and measurements.";
         if (analysis.peak > juce::Decibels::decibelsToGain(-1.0f))
-            result.summary += "\nCretes source proches de 0 dBFS : reduire le gain du groupe avant les traitements suivants.";
+            result.summary += "\nSource peaks close to 0 dBFS: lower the group gain before the following processing.";
         const auto total = analysis.bandEnergy(20, juce::jmin(16000.0, analysis.rate * 0.45));
         if (total > 0 && analysis.bandEnergy(35, 150) / total < 0.08)
-            result.summary += "\nGrave discret : verifier niveau, timbre et phase du Kick ; pas une mesure de son niveau individuel.";
+            result.summary += "\nSubdued low end: check Kick level, tone and phase; this does not measure its individual level.";
         if (crest < 8)
-            result.summary += "\nBus deja dense : surveiller le pompage, eviter de rechercher une forte reduction.";
+            result.summary += "\nBus already dense: watch for pumping and avoid chasing strong reduction.";
         return result;
     }
 };

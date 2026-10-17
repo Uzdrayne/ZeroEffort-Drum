@@ -168,7 +168,7 @@ public:
         if (samples == 0 || dryEnergy <= 0 || wetEnergy <= 0 || !std::isfinite(wetEnergy))
         {
             proposal.valid = false;
-            proposal.summary = "Verification du rendu impossible";
+            proposal.summary = "Render verification not possible";
             return;
         }
         const auto compensation = static_cast<float>(10 * std::log10(dryEnergy / wetEnergy));
@@ -187,54 +187,54 @@ public:
             actualChange += proposal.settings[compensationControl] - settings[compensationControl];
         }
         proposal.summary += " / EXP max " + juce::String(maximumExpansion, 1)
-            + " dB / EXP >1 dB sur " + juce::String(audibleSamples > 0
+            + " dB / EXP >1 dB over " + juce::String(audibleSamples > 0
                 ? 100.0 * static_cast<double>(expansionSamples) / static_cast<double>(audibleSamples) : 0, 1)
-            + "% des blocs audibles / COMP actif P75 " + juce::String(activeReduction(), 1)
-            + " dB / rendu COMP max " + juce::String(maximumReduction, 1)
-            + " dB / ecart RMS " + juce::String(actualChange - compensation, 1)
+            + "% of audible blocks / COMP active P75 " + juce::String(activeReduction(), 1)
+            + " dB / rendered COMP max " + juce::String(maximumReduction, 1)
+            + " dB / RMS gap " + juce::String(actualChange - compensation, 1)
             + " dB / MAKEUP " + juce::String(proposal.settings[compensationControl], 1)
             + " dB / OUT " + juce::String(proposal.settings[output], 1) + " dB";
         if (settings[multibandOn] > 0.5f)
         {
-            proposal.summary += "\n\nCOMPRESSION MULTIBANDE / LR24\nCoupures "
+            proposal.summary +=             "\n\nMULTIBAND COMPRESSION / LR24\nCrossovers "
                 + juce::String(settings[crossoverLow], 1) + " Hz / " + juce::String(settings[crossoverHigh], 0) + " Hz";
-            const std::array<const char*, 3> names { "Grave", "Medium", "Aigu" };
+                        const std::array<const char*, 3> names { "Low", "Mid", "High" };
             for (size_t band = 0; band < 3; ++band)
             {
                 const auto base = static_cast<size_t>(lowThreshold) + band * 7;
-                proposal.summary += "\n" + juce::String(names[band]) + " / seuil " + juce::String(settings[base], 1)
+                            proposal.summary += "\n" + juce::String(names[band]) + " / threshold " + juce::String(settings[base], 1)
                     + " dB / ratio " + juce::String(settings[base + 1], 2)
                     + " / attack " + juce::String(settings[base + 2], 1) + " ms / release " + juce::String(settings[base + 3], 0)
-                    + " ms / cible P75 " + juce::String(proposal.bandTargets[band], 1)
-                    + " dB / P75 mesure " + juce::String(percentileReduction((*bandActivity)[band], bandPeaks[band]), 1)
+                                + " ms / target P75 " + juce::String(proposal.bandTargets[band], 1)
+                                + " dB / measured P75 " + juce::String(percentileReduction((*bandActivity)[band], bandPeaks[band]), 1)
                     + " dB / max " + juce::String(bandMaximums[band], 1)
-                    + " dB / plafond " + juce::String(proposal.bandCeilings[band], 1) + " dB";
-                if (settings[base + 1] == 1) proposal.summary += " / non comprimee : energie insuffisante";
+                                + " dB / ceiling " + juce::String(proposal.bandCeilings[band], 1) + " dB";
+                            if (settings[base + 1] == 1) proposal.summary += " / not compressed: insufficient energy";
             }
         }
         if (settings[glueOn] > 0.5f)
-            proposal.summary += "\n\nBUS GLUE / seuil " + juce::String(settings[glueThreshold], 1)
+                        proposal.summary += "\n\nBUS GLUE / threshold " + juce::String(settings[glueThreshold], 1)
                 + " dB / ratio " + juce::String(settings[glueRatio], 1)
-                + " / attaque " + juce::String(settings[glueAttack], 1) + " ms / release " + juce::String(settings[glueRelease], 0)
+                            + " / attack " + juce::String(settings[glueAttack], 1) + " ms / release " + juce::String(settings[glueRelease], 0)
                 + " ms / sidechain HP " + juce::String(settings[glueSidechain], 0)
                 + " Hz / knee " + juce::String(settings[glueKnee], 1)
-                + " dB / cible P75 blocs actifs " + juce::String(proposal.targetReduction, 1)
-                + " dB / P75 GR blocs actifs " + juce::String(activeReduction(), 1)
-                + " dB / max " + juce::String(maximumReduction, 1) + " dB / plafond moteur "
-                + juce::String(settings[glueRange], 1) + " dB / ambiance "
+                            + " dB / target P75 active blocks " + juce::String(proposal.targetReduction, 1)
+                            + " dB / P75 GR active blocks " + juce::String(activeReduction(), 1)
+                            + " dB / max " + juce::String(maximumReduction, 1) + " dB / engine ceiling "
+                            + juce::String(settings[glueRange], 1) + " dB / ambience "
                 + (settings[ambienceOn] > 0.5f ? juce::String(settings[ambienceAmount], 1) + "%" : "OFF");
-        proposal.summary += "\n\nVERIFICATION REELLE\n";
+                    proposal.summary += "\n\nACTUAL VERIFICATION\n";
         if (instrumentFromValue(settings[instrument]) == DrumInstrument::kick)
-            proposal.summary += "Declenchements Focus : " + juce::String(renderedHits)
-                + " / nettoyage aigu max " + juce::String(maximumCleanup, 1)
-                + " dB / renfort crete avant EQ-COMP "
+                        proposal.summary += "Focus triggers: " + juce::String(renderedHits)
+                            + " / treble cleanup max " + juce::String(maximumCleanup, 1)
+                            + " dB / reinforcement peak before EQ-COMP "
                 + juce::String(juce::Decibels::gainToDecibels(maximumBody, -160.0f), 1) + " dBFS\n";
         else proposal.summary += "Element " + juce::String(instrumentName(instrumentFromValue(settings[instrument])))
-            + " / Focus et renfort synthetique Kick desactives"
+                        + " / Kick Focus and synthetic reinforcement disabled"
             + " / Bleed Clean max " + juce::String(maximumCleanup, 1) + " dB"
-            + (settings[cleanupOn] > 0.5f ? " / detecteur adapte au corps\n" : " / OFF\n");
-        proposal.summary += "Pas de separation de sources, limiteur ni garantie de phase avec les autres micros."
-            "\n\nREGLAGES FINAUX\n";
+                        + (settings[cleanupOn] > 0.5f ? " / body-adapted detector\n" : " / OFF\n");
+                    proposal.summary += "No source separation, limiter or phase guarantee with the other mics."
+                        "\n\nFINAL SETTINGS\n";
         for (size_t index = 0; index < proposal.settings.size(); ++index)
             proposal.summary += juce::String(controlSpecs[index].id) + " = "
                 + juce::String(proposal.settings[index], 2) + " " + controlSpecs[index].unit + "\n";

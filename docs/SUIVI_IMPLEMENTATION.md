@@ -39,6 +39,7 @@ Légende : ⬜ à faire · 🔄 en cours · ✅ terminé · ⏸ en réserve
 | Export enrichi | `meta.position` et `meta.channels`, `--position`, options `--no-...` pour l'ancien comportement, `ph_bleed_treble_ratio` exporté pour le Kick seulement | ✅ | `c0bd7ec` | CTest 3/3, 0 avertissement ; mutation (P03 pour tous les rôles) détectée ; aucun changement audible (schéma 1, `analysisVersion` 4 inchangée) ; corpus de 32 prises ré-exporté avec positions (Kick Out du kit 2, OvH L / R du kit 3, SnareDown) |
 | Calibration 01-Q1 | `activeBelowP95Db` 40 → 55 dB, `analysisVersion` 5, `scripts/CalibrateActiveWindow.py` | ✅ | voir `git log` de `feature/calibration-fenetre-active` | Critère du doc 05 (écart du crest actif < 0,5 dB sur ± 10 dB de seuil) : réglage sur kits 1 et 3 (17 prises), validation sur le kit 2 (11 prises) ; CTest 3/3, 0 avertissement ; corpus de 32 prises ré-exporté, rejeu déterministe, **aucun réglage ne change** ; script vérifié contre l'export (écart 0,00000 dB) |
 | J4a doubles frappes | `doubleHitMinimumWindows` / `doubleHitRise`, `setDoubleHitDetection`, `--double-hits` | ✅ **activé par défaut le 17/10/2026** (validé par l'utilisateur) | voir `git log` | CTest 3/3, 0 avertissement ; A08 : 48 frappes sur 48 avec le correctif, jeu ordinaire inchangé ; corpus : +1 à +16 % de frappes, 1 seul réglage modifié sur 37 (Kick Out kit 1, < 9 Hz) ; activé : `analysisVersion` 6, plug-in **0.11.0**, corpus de 37 prises ré-exporté (anciens snapshots dans `archive_v5/`) ; retour arrière : `doubleHitsByDefault = false` + version suivante |
+| Interface en anglais | tous les textes affichés par le plug-in (éditeur, infobulles, noms de réglages et de bandes, kit, radar, bilan Auto) | ✅ | voir `git log` | CTest 3/3, 0 avertissement ; **changement visible, pas audible** : identifiants (paramètres, composants, clés JSON, codes) inchangés ; rejeu des 37 snapshots : « Réglages modifiés : Aucun » ; `tests/RoleReferenceHashes.h` régénéré (les hachages incluent le bilan, donc le texte) ; rapports des outils développeur (`--replay`, `--kit`, `--pair`, `--bus`) et documents laissés en français ; état global dans `docs/ETAT_ACTUEL.md` |
 | J4 / J4b | détecteurs par rôle, analyse continue Overheads / Room | ⏸ | | change le son ; corpus réel |
 | Sous-bus SB1-SB7 | | ⏸ | | extension préalable du registre Kit (mesures, trims, rôles Kick Sub / Hi-hat Bottom) |
 
@@ -123,6 +124,15 @@ Branche `feature/t3-kit-phase`. Fichiers : `tests/KitTests.cpp` (`FaultKit`, `te
   3. **Diaphonie de la caisse claire à partir de −16 dB dans le micro du kick** : le retard du kick suit la caisse claire. Pistes de correction (non faites) : ne garder que les événements dont le niveau est proche du pic du micro, ou refuser quand les paires de frappes donnent deux retards distincts.
   4. `diaphonie_db` (K04) n'existe pas.
 - Ces constats sont des tests « échec attendu » (comme A08) : ils échouent dès que le comportement change.
+
+### Interface en anglais (17/10/2026)
+
+Branche `main`. Traduction de tout ce que le plug-in affiche : `Source/UI/*`, `DrumControlNames.h`, noms d'affichage de `DrumEngine.h`, `DrumAutoRadar.h`, `DrumInstrument.h`, `DrumProposal.h`, `Source/Kit/*`, `ZeroEffortDrumProcessor.cpp`, profils (`KickProfile.h`, `ProfileAssembly.h`, `MasterBusProfile.h`), `DrumAutoPreset.h`, `DrumPresetPreview.h`. Glossaire commun (Color, Body, Weight, Bleed, Cleanup, Close, etc.).
+
+- Les noms d'affichage des réglages changent aussi pour l'hôte (les identifiants non).
+- Tests adaptés aux nouveaux textes (`LegacyDrumProposalReference.h`, Kit, Editor, Snapshot, Property, ZeroEffortDrumProcessorTests). La comparaison du bilan historique passe à `startsWith`.
+- Équivalence numérique : rejeu des 37 snapshots du corpus avant/après, aucun réglage modifié, déterminisme E08 OK. Filet de 270 propositions régénéré : seuls les hachages changent, car ils couvrent le texte du bilan.
+- Constat : `scripts/ExtractDrumProfiles.ps1` et `scripts/FreezeProposalReference.ps1` régénèrent encore la référence française : ils sont périmés (la référence est maintenant traduite à la main).
 ## Écarts avec les spécifications
 
 - **Emplacement des fonctions** : `toSnapshot` / `restoreSnapshot` / `measuresToVar` sont des fonctions statiques de `struct DrumAnalysisSnapshot` (ami de `DrumAnalysis`), pas des méthodes de `DrumAnalysis` : la classe de mesure reste inchangée. Le doc 07 disait « dans la classe DrumAnalysis ».

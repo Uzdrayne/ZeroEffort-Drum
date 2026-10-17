@@ -136,7 +136,7 @@ void testMeasuresAndFiles()
     check(labelled(7, 0, 2)["position"].toString() == "Overheads (stereo)" && labelled(7, 2, 1)["position"].toString() == "Overheads L"
         && labelled(7, 3, 1)["position"].toString() == "Overheads R" && labelled(8, 3, 1)["position"].toString() == "Room R",
         "Overheads and Room positions");
-    check(labelled(6, 3, 1)["position"].toString() == "Hi-hat" && labelled(5, 1, 1)["position"].toString() == "Tom basse",
+    check(labelled(6, 3, 1)["position"].toString() == "Hi-hat" && labelled(5, 1, 1)["position"].toString() == "Floor Tom",
         "The position means nothing for the other instruments");
     check(static_cast<int>(labelled(7, 0, 2)["channels"]) == 2 && static_cast<int>(labelled(0, 0, 1)["channels"]) == 1, "Channel count recorded");
     {

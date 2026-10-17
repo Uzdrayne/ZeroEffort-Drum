@@ -1,6 +1,6 @@
 # Reprise de session : ZeroEffort Drum, chantier « analyse v1 »
 
-Document de passation, mis à jour le 17 octobre 2026. Il contient un **prompt à coller** (section 1) puis le contexte complet pour qu'un assistant reparte sans rien redécouvrir.
+Document de passation, mis à jour le 17 octobre 2026. **Pour l'état global (fait, désactivé, manquant), lire d'abord `docs/ETAT_ACTUEL.md`.** L'interface du plug-in est maintenant entièrement en anglais (documents et rapports développeur en français). Il contient un **prompt à coller** (section 1) puis le contexte complet pour qu'un assistant reparte sans rien redécouvrir.
 
 ---
 

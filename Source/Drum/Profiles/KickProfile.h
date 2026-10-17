@@ -18,12 +18,12 @@ struct KickProfile
         if (analysis.invalid || analysis.rate < 8000 || analysis.samples < analysis.rate * 2 || analysis.peak < 0.001f || analysis.hits < 3
             || crest < 6 || total <= 0 || bass / total < 0.15)
         {
-            result.summary = "Analyse insuffisante : au moins 3 frappes de kick nettes sur 2 s.";
+            result.summary = "Insufficient analysis: at least 3 clear kick hits within 2 s.";
             return result;
         }
         if (analysis.clipped > analysis.samples / 100)
         {
-            result.summary = "Signal sature : reduire le niveau source puis analyser.";
+            result.summary = "Signal clipped: lower the source level, then analyze.";
             return result;
         }
         auto& settings = result.settings;
@@ -119,9 +119,9 @@ struct KickProfile
         settings[saturationDrive] = (style == DrumStyle::metal ? 6.0f : style == DrumStyle::rock ? 4.0f : 1.0f) * intensity;
         result.valid = true;
         result.summary = juce::String(drumStyleName(style)) + " " + juce::String(intensity * 100, 0) + "% / "
-            + juce::String(analysis.hits) + " attaques candidates / Body EQ " + juce::String(settings[bodyFrequency], 0) + " Hz / ";
+            + juce::String(analysis.hits) + " candidate hits / Body EQ " + juce::String(settings[bodyFrequency], 0) + " Hz / ";
         if (settings[eqOn] == 0)
-                result.summary += "EQ neutre : pas de correction fiable / ";
+                result.summary += "Neutral EQ: no reliable correction / ";
         else
         {
             if (settings[bodyGain] > 0.1f)
@@ -132,32 +132,32 @@ struct KickProfile
             if (settings[attackGain] > 0.1f)
                 result.summary += "Attack +" + juce::String(settings[attackGain], 1) + " dB / ";
             if (settings[airGain] < -0.1f)
-                result.summary += "Aigu persistant " + juce::String(settings[airGain], 1) + " dB";
+                result.summary += "Persistent high-frequency bleed " + juce::String(settings[airGain], 1) + " dB";
         }
-        result.summary += " COMP actif P75 cible " + juce::String(settings[compressorOn] > 0 ? result.targetReduction : 0, 1)
-            + " dB / plafond " + juce::String(result.maximumReduction, 1) + " dB";
+        result.summary +=         " COMP active P75 target " + juce::String(settings[compressorOn] > 0 ? result.targetReduction : 0, 1)
+                    + " dB / ceiling " + juce::String(result.maximumReduction, 1) + " dB";
         result.summary += " / EQ Q " + juce::String(settings[eqQ], 2)
             + " / Q Body " + juce::String(bandQ(settings, 0), 2)
             + " / Box " + juce::String(bandQ(settings, 1), 2)
             + " / Attack " + juce::String(bandQ(settings, 2), 2)
             + " / EXP " + juce::String(settings[gateOn] > 0 ? "ON" : "OFF")
-            + " seuil " + juce::String(settings[gateThreshold], 1)
-            + " dB / detecteur P20 " + juce::String(analysis.percentileOf(analysis.envelopeHistograms[styleIndex + 3], 0.2f), 1)
+            + " threshold " + juce::String(settings[gateThreshold], 1)
+            + " dB / detector P20 " + juce::String(analysis.percentileOf(analysis.envelopeHistograms[styleIndex + 3], 0.2f), 1)
             + " / P90 " + juce::String(analysis.percentileOf(analysis.envelopeHistograms[styleIndex + 3], 0.9f), 1) + " dB";
-        result.summary += " / COMP " + juce::String(settings[multibandOn] > 0 ? "Multibande" : "Large bande");
+        result.summary += " / COMP " + juce::String(settings[multibandOn] > 0 ?         "Multiband" : "Broadband");
         if (settings[gateOn] == 0)
-            result.summary += intensity == 0 ? " (intensite nulle)" : " (contraste insuffisant)";
-        result.summary += "\n\nFOCUS / PRESENCE\nDetecteur grave " + juce::String(settings[focusLow], 0)
+                    result.summary += intensity == 0 ? " (zero intensity)" : " (insufficient contrast)";
+                result.summary += "\n\nFOCUS / PRESENCE\nLow detector " + juce::String(settings[focusLow], 0)
             + "-" + juce::String(settings[focusHigh], 0) + " Hz / " + (settings[focusOn] > 0 ? "ON" : "OFF")
             + "\nEXP hold " + juce::String(settings[gateHold], 0) + " ms / hysteresis "
-            + juce::String(settings[gateHysteresis], 1) + " dB\nNettoyage aigu >1.6 kHz : "
+            + juce::String(settings[gateHysteresis], 1) + " dB\nTreble cleanup >1.6 kHz: "
             + (settings[cleanupOn] > 0 ? "ON" : "OFF") + " / range " + juce::String(settings[cleanupDepth], 1)
-            + " dB\nRenfort accorde : " + (settings[presenceOn] > 0 ? "ON" : "OFF") + " / "
+            + " dB\nTuned reinforcement: " + (settings[presenceOn] > 0 ? "ON" : "OFF") + " / "
             + juce::String(settings[reinforceFrequency], 1) + " Hz / " + juce::String(settings[reinforceAmount], 0)
-            + "% / extinction -60 dB en " + juce::String(settings[reinforceDecay], 0)
-            + " ms\nPunch +" + juce::String(settings[transientAmount], 1) + " dB / Drive grave +"
+            + "% / decay -60 dB in " + juce::String(settings[reinforceDecay], 0)
+            + " ms\nPunch +" + juce::String(settings[transientAmount], 1) + " dB / Low drive +"
             + juce::String(settings[saturationDrive], 1)
-            + " dB\nRenfort synthetique, pas une correction du pitch original. Polarity manuel disponible.";
+            + " dB\nSynthetic reinforcement, not a correction of the original pitch. Manual Polarity available.";
         return result;
     }
 };

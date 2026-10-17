@@ -351,7 +351,7 @@ public:
             if (policy.refuseCrosstalk && std::isfinite(crosstalk) && crosstalk > KitConstants::crosstalkRefusalDb)
             {
                 refused[track] = true;
-                notes[track] = "diaphonie " + juce::String(crosstalk, 1) + " dB : mesure refusee (un autre instrument couvre ce micro)";
+                notes[track] = "crosstalk " + juce::String(crosstalk, 1) + " dB : measurement refused (another instrument masks this mic)";
                 continue;
             }
             double weight = 0, lag = 0, sign = 0;
@@ -371,7 +371,7 @@ public:
             if (outside && weight <= 0)
             {
                 refused[track] = true;
-                notes[track] = "correlation la plus forte hors de la fenetre de recherche : mesure refusee";
+                notes[track] = "strongest correlation outside the search window : measurement refused";
                 continue;
             }
             if (weight > 0 && best >= 0.15f)
@@ -381,7 +381,7 @@ public:
                 delays[track] = juce::jlimit(0.0f, maxDelayMs, measured[track]);
                 inverted[track] = sign < 0;
                 confidence[track] = best;
-                if (measured[track] > maxDelayMs) notes[track] = "ecart superieur a 20 ms : limite";
+                if (measured[track] > maxDelayMs) notes[track] = "gap above 20 ms : limited";
             }
         }
         for (size_t track = 0; track < trackCount; ++track)
@@ -394,7 +394,7 @@ public:
                 if (refused[primary])
                 {
                     refused[track] = true;
-                    notes[track] = juce::String(roleName(tracks[primary].role)) + " refuse : pas de mesure";
+                    notes[track] = juce::String(roleName(tracks[primary].role)) + " refused : no measurement";
                     continue;
                 }
                 const bool opposite = pair.r < 0;
@@ -403,8 +403,8 @@ public:
                     auto delay = delays[primary] - pair.lagMs;
                     if (delay < 0)
                     {
-                        notes[track] = "arrive apres " + juce::String(roleName(tracks[primary].role))
-                            + " : alignement partiel sans latence";
+                        notes[track] = "arrives after " + juce::String(roleName(tracks[primary].role))
+                            + " : partial alignment, no latency";
                         delay = 0;
                     }
                     delays[track] = delay;
@@ -418,12 +418,12 @@ public:
                     inverted[track] = opposite;
                     known[primary] = true;
                     confidence[primary] = juce::jmax(confidence[primary], std::abs(pair.r));
-                    notes[primary] = "aligne sur " + juce::String(roleName(tracks[track].role)) + " (pas d'overheads)";
+                    notes[primary] = "aligned to " + juce::String(roleName(tracks[track].role)) + " (no overheads)";
                 }
                 measured[track] = pair.lagMs;
                 confidence[track] = std::abs(pair.r);
                 known[track] = true;
-                notes[track] = notes[track].isEmpty() ? "mesure par rapport a " + juce::String(roleName(tracks[primary].role)) : notes[track];
+                notes[track] = notes[track].isEmpty() ? "measured against " + juce::String(roleName(tracks[primary].role)) : notes[track];
             }
         }
         // Rooms are never advanced (that would need plugin latency); only their polarity is corrected.
@@ -449,8 +449,8 @@ public:
             roomRelative[track] = measured[track];
             confidence[track] = std::abs(best->r);
             notes[track] = juce::String(measured[track] >= 0 ? "+" : "") + juce::String(measured[track], 2)
-                + (hasOverheads ? " ms apres les OH" : " ms apres " + juce::String(roleName(tracks[close].role)))
-                + ", non avancee (realisme)";
+                + (hasOverheads ? " ms after the OH" : " ms after " + juce::String(roleName(tracks[close].role)))
+                + ", not advanced (realism)";
         }
         for (size_t track = 0; track < trackCount; ++track)
         {
@@ -462,7 +462,7 @@ public:
             if (tracks[track].role == Role::overhead)
             {
                 recommendation.measured = hasOverheads;
-                recommendation.note = "reference de temps du kit";
+                recommendation.note = "kit time reference";
             }
             else
             {
@@ -474,7 +474,7 @@ public:
                 recommendation.crosstalkDb = crosstalkDb(track);
                 recommendation.note = notes[track];
                 if (!known[track] && isClose(tracks[track].role) && notes[track].isEmpty())
-                    recommendation.note = hasOverheads ? "pas assez de frappes correlees" : "aucune reference : ajouter les overheads au kit";
+                    recommendation.note = hasOverheads ? "not enough correlated hits" : "no reference : add the overheads to the kit";
             }
             result.recommendations.push_back(recommendation);
         }
@@ -509,7 +509,7 @@ public:
             if (pair.kind != PairKind::overheadPair || pair.events < 4) continue;
             if (pair.xTrack == pair.yTrack && pair.r0 > 0.98f && std::abs(pair.lagMs) < 0.05f)
             {
-                result.lines.add("Overheads : les deux canaux de la piste sont identiques (mono) : choisir Gauche (L) ou Droite (R)");
+                result.lines.add("Overheads : both channels of the track are identical (mono) : choose Left (L) or Right (R)");
                 continue;
             }
             const auto correlation = juce::jlimit(0.0f, 1.0f, (pair.r0 + 1.0f) * 0.5f);
@@ -533,7 +533,7 @@ public:
                 }
             const auto balanceTerm = bands > 0 ? static_cast<float>(std::exp(-(balance / bands) / 4.0)) : 0.5f;
             result.scores.stereo = 100.0f * (0.4f * correlation + 0.35f * std::exp(-difference / 1.5f) + 0.25f * balanceTerm);
-            result.lines.add("Overheads L/R : ecart " + juce::String(difference, 2) + " ms, correlation "
+            result.lines.add("Overheads L/R : gap " + juce::String(difference, 2) + " ms, correlation "
                 + juce::String(pair.r0, 2));
         }
         const auto room = [&](bool after) {
@@ -574,9 +574,9 @@ public:
             else
             {
                 juce::StringArray actions;
-                if (recommendation.invert) actions.add("polarite inversee");
-                if (recommendation.delayMs >= 0.01f) actions.add("retarder de " + juce::String(recommendation.delayMs, 2) + " ms");
-                if (actions.isEmpty()) actions.add("deja coherent");
+                if (recommendation.invert) actions.add("polarity inverted");
+                if (recommendation.delayMs >= 0.01f) actions.add("delay by " + juce::String(recommendation.delayMs, 2) + " ms");
+                if (actions.isEmpty()) actions.add("already consistent");
                 else ++corrected;
                 line += actions.joinIntoString(", ") + " (r " + juce::String(recommendation.confidence, 2) + ")";
                 if (recommendation.note.isNotEmpty()) line += " / " + recommendation.note;
@@ -584,7 +584,7 @@ public:
             result.lines.add(line);
         }
         result.valid = result.scores.phaseBefore >= 0 || result.scores.roomBefore >= 0 || result.scores.stereo >= 0;
-        result.headline = result.valid ? juce::String(corrected) + " correction(s) proposee(s)" : "Mesures insuffisantes";
+        result.headline = result.valid ? juce::String(corrected) + " correction(s) proposed" : "Not enough measurements";
         return result;
     }
 
@@ -603,7 +603,7 @@ private:
         int events = 0;
     };
 
-    // Constat 5 (kit 4 of the corpus): a low close mic (Kick, whose correlation oscillates at about 125 Hz) can lock one
+    // Finding 5 (kit 4 of the corpus): a low close mic (Kick, whose correlation oscillates at about 125 Hz) can lock one
     // cycle (8 ms) apart on the two overheads; the weighted mean of the two lags then matches neither. The L / R overhead
     // spacing is a property of the room, so every close mic must agree with the most trustworthy one. A mic that does not
     // gets its less confident pair re-located near the expected lag; if that fails, its pairs are refused.
@@ -658,7 +658,7 @@ private:
             }
             if (std::abs(bestValue) >= 0.5f * std::abs(moved.r) && std::abs(bestValue) >= 0.12f)
             {
-                notes[track] = "ecart L/R des overheads incoherent (saut de cycle) : " + juce::String(moved.lagMs, 2) + " ms recale a "
+                notes[track] = "overhead L/R gap inconsistent (cycle slip) : " + juce::String(moved.lagMs, 2) + " ms relocated to "
                     + juce::String(static_cast<float>(bestLag) * 1000.0f / static_cast<float>(rate), 2) + " ms";
                 moved.lagSamples = static_cast<float>(bestLag);
                 moved.lagMs = static_cast<float>(bestLag * 1000.0 / rate);
@@ -666,7 +666,7 @@ private:
             }
             else
             {
-                notes[track] = "ecart L/R des overheads incoherent avec les autres micros : mesure refusee";
+                notes[track] = "overhead L/R gap inconsistent with the other mics : measurement refused";
                 left.valid = right.valid = false;
             }
         }

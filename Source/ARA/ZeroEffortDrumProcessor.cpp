@@ -385,7 +385,7 @@ struct ZeroEffortDrumProcessor::AutoSession
     int phase = 0;
     drum::Settings before {}, applied {};
     juce::AudioBuffer<float> scratch { 2, 32768 };
-    juce::String key, text { "Auto / Pret" };
+    juce::String key, text { "Auto / Ready" };
     double rate = 0;
     juce::int64 offset = 0, total = 0;
     unsigned int generation = 0;
@@ -431,10 +431,10 @@ juce::AudioProcessorValueTreeState::ParameterLayout ZeroEffortDrumProcessor::cre
             layout.add(std::make_unique<juce::AudioParameterChoice>(juce::ParameterID { spec.id, 1 }, spec.name, groups, 0, fixed));
         else if (id == "kitMic")
             layout.add(std::make_unique<juce::AudioParameterChoice>(juce::ParameterID { spec.id, 1 }, spec.name,
-                juce::StringArray { "Principal", "Secondaire", "Gauche", "Droite" }, 0, fixed));
+                juce::StringArray { "Main", "Secondary", "Left", "Right" }, 0, fixed));
         else if (id == "kitMode")
             layout.add(std::make_unique<juce::AudioParameterChoice>(juce::ParameterID { spec.id, 1 }, spec.name,
-                juce::StringArray { "Analyse seule", "Suggerer", "Auto" }, 1, fixed));
+                juce::StringArray { "Analyze only", "Suggest", "Auto" }, 1, fixed));
         else if (spec.toggle)
             layout.add(std::make_unique<juce::AudioParameterBool>(juce::ParameterID { spec.id, 1 }, spec.name, spec.initial > 0));
         else
@@ -569,7 +569,7 @@ void ZeroEffortDrumProcessor::startAutoPreset()
         + drum::drumStyleName(session.style) + " " + juce::String(juce::roundToInt(session.intensity * 100)) + " %";
     if (session.key.isEmpty())
     {
-        session.text = "Auto / Selectionner un seul evenement audio";
+        session.text = "Auto / Select a single audio event";
         return;
     }
     if (isBoundToARA())
@@ -585,18 +585,18 @@ void ZeroEffortDrumProcessor::startAutoPreset()
             || !std::isfinite(start) || start < 0 || start > 86400
             || std::abs(region->getDurationInPlaybackTime() - duration) > 0.000001)
         {
-            session.text = "Auto / Source indisponible, etiree ou duree hors 2 s - 1 h";
+            session.text = "Auto / Source unavailable, stretched or duration outside 2 s - 1 h";
             return;
         }
         session.total = static_cast<juce::int64>(std::llround(duration * session.rate));
         session.analyser.prepare(session.rate);
-        session.text = "Auto / Analyse ARA 0 %";
+        session.text = "Auto / ARA analysis 0 %";
     }
     else
     {
         session.generation = autoCapture.begin();
         session.total = 0;
-        session.text = "Auto / Lecture : capture 8 s";
+        session.text = "Auto / Playback : capture 8 s";
     }
     session.busy = true;
 }
@@ -604,7 +604,7 @@ void ZeroEffortDrumProcessor::startAutoPreset()
 void ZeroEffortDrumProcessor::cancelAutoPreset()
 {
     autoCapture.cancel();
-    if (autoSession->busy) autoSession->text = "Auto / Annule";
+    if (autoSession->busy) autoSession->text = "Auto / Cancelled";
     autoSession->busy = false;
     autoSession->radar.refused = false;
 }
@@ -617,7 +617,7 @@ void ZeroEffortDrumProcessor::updateAutoPreset()
     {
         cancelAutoPreset();
         session.ready = session.changed = false;
-        session.text = "Auto / Selection ou reglages modifies : analyser a nouveau";
+        session.text = "Auto / Selection or settings changed : analyze again";
         return;
     }
     if (!session.busy) return;
@@ -628,7 +628,7 @@ void ZeroEffortDrumProcessor::updateAutoPreset()
         if (!source->isSampleAccessEnabled())
         {
             cancelAutoPreset();
-            session.text = "Auto / Acces audio interrompu";
+            session.text = "Auto / Audio access interrupted";
             return;
         }
         juce::ARAAudioSourceReader reader(source);
@@ -639,7 +639,7 @@ void ZeroEffortDrumProcessor::updateAutoPreset()
             || !reader.read(&session.scratch, 0, count, position, true, true))
         {
             cancelAutoPreset();
-            session.text = "Auto / Echec de lecture source";
+            session.text = "Auto / Source read failed";
             return;
         }
         if (session.phase != 0)
@@ -662,7 +662,7 @@ void ZeroEffortDrumProcessor::updateAutoPreset()
     {
         if (!autoCapture.ready(session.generation))
         {
-            session.text = "Auto / Lecture : capture " + juce::String(autoCapture.progress() * 100, 0) + " %";
+            session.text = "Auto / Playback : capture " + juce::String(autoCapture.progress() * 100, 0) + " %";
             session.radar.progress = autoCapture.progress();
             return;
         }
@@ -682,7 +682,7 @@ void ZeroEffortDrumProcessor::updateAutoPreset()
         }
         session.offset += count;
     }
-    session.text = juce::String("Auto / ") + (session.phase == 0 ? "Analyse " : session.phase == 1 ? "Calibration " : "Verification ")
+    session.text = juce::String("Auto / ") + (session.phase == 0 ? "Analysis " : session.phase == 1 ? "Calibration " : "Verification ")
         + juce::String(session.total > 0 ? 100.0 * session.offset / session.total : 0.0, 0) + " %";
     session.radar.progress = session.total > 0 ? static_cast<float>(session.offset) / static_cast<float>(session.total) : 0.0f;
     if (session.phase == 0)
@@ -771,7 +771,7 @@ bool ZeroEffortDrumProcessor::discardAutoPreset()
     const bool wasReady = session.ready;
     session.ready = false;
     session.radar.refused = false;
-    if (wasReady) session.text = "Auto / Proposition ignoree : reglages inchanges";
+    if (wasReady) session.text = "Auto / Proposal ignored : settings unchanged";
     return true;
 }
 
@@ -797,7 +797,7 @@ void ZeroEffortDrumProcessor::setAutoStyle(drum::DrumStyle style, float intensit
     autoSession->intensity = intensity;
     setControl(drum::autoStyleOption, static_cast<float>(style));
     setControl(drum::autoIntensityOption, intensity * 100);
-    autoSession->text = "Auto / " + juce::String(drum::drumStyleName(style)) + " / Analyser";
+    autoSession->text = "Auto / " + juce::String(drum::drumStyleName(style)) + " / Analyze";
 }
 drum::DrumStyle ZeroEffortDrumProcessor::getAutoStyle() const
 {
@@ -838,7 +838,7 @@ bool ZeroEffortDrumProcessor::applyAutoPreset()
     autoSession->applied = getSettings();
     autoSession->ready = false;
     autoSession->changed = true;
-    autoSession->text = "Auto / Applique / " + autoSession->proposal.summary;
+    autoSession->text = "Auto / Applied / " + autoSession->proposal.summary;
     return true;
 }
 
@@ -849,7 +849,7 @@ bool ZeroEffortDrumProcessor::revertAutoPreset()
     drum::keepKitSettings(settings, getSettings());
     writeSettings(settings);
     autoSession->changed = false;
-    autoSession->text = "Auto / Reglages precedents retablis";
+    autoSession->text = "Auto / Previous settings restored";
     return true;
 }
 

@@ -159,7 +159,7 @@ private:
         int ignored = 0;
         Report report;
         ApplyRequest apply;
-        juce::String status { "Pret" };
+        juce::String status { "Ready" };
     };
 
     class Worker final : public juce::Thread

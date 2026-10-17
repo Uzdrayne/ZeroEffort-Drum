@@ -22,10 +22,10 @@ public:
         cancelButton.setComponentID("autoRadarCancel");
         detailsButton.setComponentID("autoRadarDetails");
         applyButton.getProperties().set("primary", true);
-        applyButton.setTooltip("Appliquer la proposition aux reglages de cette piste (Revenir permet de la retirer)");
-        ignoreButton.setTooltip("Ne rien modifier : les reglages restent comme avant l'analyse");
-        cancelButton.setTooltip("Interrompre l'analyse");
-        detailsButton.setTooltip("Afficher le bilan complet en texte");
+        applyButton.setTooltip("Apply the proposal to this track's settings (Revert undoes it)");
+        ignoreButton.setTooltip("Change nothing: settings stay as they were before the analysis");
+        cancelButton.setTooltip("Stop the analysis");
+        detailsButton.setTooltip("Show the full report as text");
         applyButton.onClick = [this] { if (onApply) onApply(); };
         ignoreButton.onClick = [this] { if (onIgnore) onIgnore(); };
         cancelButton.onClick = [this] { if (onCancel) onCancel(); };
@@ -64,7 +64,7 @@ public:
         if (view.hasResult && !resultSeeded && view.result.any()) { shownResult = shownTarget; resultSeeded = true; }
         applyButton.setEnabled(view.ready);
         ignoreButton.setEnabled(view.ready || view.refused);
-        ignoreButton.setButtonText(view.refused ? "Fermer" : "Ignorer");
+        ignoreButton.setButtonText(view.refused ? "Close" : "Ignore");
         applyButton.setVisible(!view.refused);
         cancelButton.setVisible(view.busy);
         ignoreButton.setVisible(!view.busy);
@@ -84,7 +84,7 @@ public:
     {
         graphics.fillAll(palette::background.withAlpha(0.78f));
         const auto box = boxBounds();
-        drawPanel(graphics, box, "AUTO / " + (view.title.isNotEmpty() ? view.title.toUpperCase() : juce::String("ANALYSE")), palette::accent);
+        drawPanel(graphics, box, "AUTO / " + (view.title.isNotEmpty() ? view.title.toUpperCase() : juce::String("ANALYSIS")), palette::accent);
         paintSteps(graphics, box);
         paintChart(graphics, box);
         paintChanges(graphics, box);
@@ -156,7 +156,7 @@ private:
 
     static juce::String valueText(const drum::RadarAxis& axis, float value)
     {
-        if (!std::isfinite(value)) return "n/d";
+        if (!std::isfinite(value)) return "n/a";
         const juce::String unit(axis.unit);
         if (unit == "ms") return juce::String(juce::roundToInt(value)) + " ms";
         if (unit == "/s") return juce::String(value, 1) + " /s";
@@ -178,7 +178,7 @@ private:
 
     void paintSteps(juce::Graphics& graphics, juce::Rectangle<int> box) const
     {
-        const std::array<const char*, 3> names { "1  Analyse", "2  Calcul", "3  Verification" };
+        const std::array<const char*, 3> names { "1  Analysis", "2  Calculation", "3  Verification" };
         const std::array<juce::Colour, 3> colours { palette::blue, palette::amber, palette::accent };
         const auto step = static_cast<int>(view.phase);
         for (int index = 0; index < 3; ++index)
@@ -271,14 +271,14 @@ private:
             paintCurve(graphics, shownResult, view.result, palette::accent, 0.26f, 1.0f, true);
         graphics.setColour(palette::textFaint);
         graphics.setFont(uiFont(10.5f));
-        graphics.drawText("Centre = faible, bord = fort (echelle propre a chaque axe)", chartBounds().withTrimmedTop(chartBounds().getHeight() - 16), juce::Justification::centred);
+        graphics.drawText("Centre = low, edge = high (each axis has its own scale)", chartBounds().withTrimmedTop(chartBounds().getHeight() - 16), juce::Justification::centred);
     }
 
     void paintLegend(juce::Graphics& graphics, juce::Rectangle<int> box) const
     {
         const auto corner = juce::Rectangle<int>(box.getX() + 24, box.getY() + 92, 170, 64);
-        const std::array<std::pair<const char*, juce::Colour>, 3> entries {{ { "Source (mesure)", palette::blue },
-            { "Vise (calcul)", palette::amber }, { "Obtenu (rendu)", palette::accent } }};
+        const std::array<std::pair<const char*, juce::Colour>, 3> entries {{ { "Source (measured)", palette::blue },
+            { "Target (calculated)", palette::amber }, { "Result (measured)", palette::accent } }};
         const std::array<bool, 3> shown { true, view.hasTarget, view.hasResult };
         for (size_t index = 0; index < entries.size(); ++index)
         {
@@ -303,8 +303,8 @@ private:
             graphics.setFont(uiFont(11.5f));
             graphics.drawFittedText(spec.meaning, { info.getX(), info.getY() + 18, 290, 30 }, juce::Justification::topLeft, 2);
             juce::String values = "Source " + valueText(spec, view.source.raw[axis]);
-            if (view.hasTarget) values << "  /  Vise " << valueText(spec, view.target.raw[axis]);
-            if (view.hasResult && view.result.any()) values << "  /  Obtenu " << valueText(spec, view.result.raw[axis]);
+            if (view.hasTarget) values << "  /  Target " << valueText(spec, view.target.raw[axis]);
+            if (view.hasResult && view.result.any()) values << "  /  Result " << valueText(spec, view.result.raw[axis]);
             graphics.setColour(palette::text);
             graphics.drawFittedText(values, { info.getX(), info.getY() + 52, 290, 30 }, juce::Justification::topLeft, 2);
         }
@@ -312,7 +312,7 @@ private:
         {
             graphics.setColour(palette::textFaint);
             graphics.setFont(uiFont(11.5f));
-            graphics.drawFittedText("Passez la souris sur un axe pour lire ses valeurs.", info.withHeight(30), juce::Justification::topLeft, 2);
+            graphics.drawFittedText("Hover an axis to read its values.", info.withHeight(30), juce::Justification::topLeft, 2);
         }
     }
 
@@ -334,8 +334,8 @@ private:
         {
             graphics.setColour(palette::textFaint);
             graphics.setFont(uiFont(12.0f));
-            graphics.drawFittedText(view.phase == drum::AutoRadarView::analysis ? "La proposition apparait apres l'analyse."
-                : "Aucun reglage ne change de facon notable.", area.withTrimmedTop(32).withHeight(40), juce::Justification::topLeft, 2);
+            graphics.drawFittedText(view.phase == drum::AutoRadarView::analysis ? "The proposal appears after the analysis."
+                : "No setting changes noticeably.", area.withTrimmedTop(32).withHeight(40), juce::Justification::topLeft, 2);
             return;
         }
         // module switches as pills: green when switched on, amber when switched off
@@ -355,7 +355,7 @@ private:
         }
         const auto rows = static_cast<int>((modules.size() + 2) / 3);
         const auto valuesTop = area.getY() + 30 + rows * (pillHeight + 4) + 10;
-        heading("REGLAGES", valuesTop);
+        heading("SETTINGS", valuesTop);
         const auto rowHeight = 28;
         for (size_t index = 0; index < values.size() && index < 6; ++index)
         {
@@ -380,6 +380,6 @@ private:
     bool targetSeeded = false, resultSeeded = false;
     int hoverAxis = -1;
     double started = 0;
-    juce::TextButton applyButton { "Appliquer" }, ignoreButton { "Ignorer" }, cancelButton { "Annuler l'analyse" }, detailsButton { "Bilan" };
+    juce::TextButton applyButton { "Apply" }, ignoreButton { "Ignore" }, cancelButton { "Cancel analysis" }, detailsButton { "Report" };
 };
 }

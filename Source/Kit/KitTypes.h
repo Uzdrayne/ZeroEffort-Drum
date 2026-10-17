@@ -53,13 +53,13 @@ inline const char* roleName(Role role) noexcept
         case Role::snareTop: return "Snare Top";
         case Role::snareBottom: return "Snare Bottom";
         case Role::tom: return "Tom";
-        case Role::floorTom: return "Tom basse";
+        case Role::floorTom: return "Floor Tom";
         case Role::hiHat: return "Hi-hat";
         case Role::overhead: return "Overheads";
         case Role::room: return "Room";
         case Role::none: break;
     }
-    return "Hors kit";
+    return "Not in kit";
 }
 
 // Names of the kitMic choices for one instrument; empty when the position is meaningless.
@@ -69,7 +69,7 @@ inline juce::StringArray positionNames(int instrument)
     {
         case 0: return { "Kick In", "Kick Out" };
         case 1: return { "Snare Top", "Snare Bottom" };
-        case 7: case 8: return { "Stereo (2 canaux)", "", "Gauche (L)", "Droite (R)" };
+        case 7: case 8: return { "Stereo (2 channels)", "", "Left (L)", "Right (R)" };
         default: return {};
     }
 }
@@ -110,9 +110,9 @@ struct Recommendation
 // (a refusal instead of a correction), so they wait for a listening session in a host.
 struct KitPolicy
 {
-    bool refuseOutsideWindow = false;   // refuse when the strongest correlation lies outside the search window (constat 2)
-    bool refuseCrosstalk = false;       // refuse a close mic that hears another instrument too loudly (constat 3)
-    bool reconcileOverheads = true;     // a close mic whose L / R overhead spacing disagrees with the best mic is re-located (constat 5, active since 17/10/2026)
+    bool refuseOutsideWindow = false;   // refuse when the strongest correlation lies outside the search window (finding 2)
+    bool refuseCrosstalk = false;       // refuse a close mic that hears another instrument too loudly (finding 3)
+    bool reconcileOverheads = true;     // a close mic whose L / R overhead spacing disagrees with the best mic is re-located (finding 5, active since 17/10/2026)
 };
 
 // H: starting points to calibrate on a kit corpus.

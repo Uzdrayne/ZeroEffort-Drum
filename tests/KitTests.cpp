@@ -192,7 +192,7 @@ void testSyntheticKit()
         { 3, kit::Role::overhead, kit::positionMain, 2, "Overheads" } };
     const auto mono = analyseOffline(dualMono, { &kitAudio.kick, &kitAudio.snareTop, &kitAudio.overheadLeft }, rate, 0,
         static_cast<juce::int64>(kitAudio.kick.size()));
-    check(mono.scores.stereo < 0 && mono.lines.joinIntoString("\n").contains("identiques"),
+    check(mono.scores.stereo < 0 && mono.lines.joinIntoString("\n").contains("identical"),
         "A mono overhead rendered on two identical channels must not produce a fake 100/100 stereo score");
     check(mono.find(1) != nullptr && mono.find(1)->measured, "A dual-mono overhead must still serve as time reference");
 }
@@ -686,8 +686,8 @@ void testFaultCrosstalkAndNoise()
 float stereoGapMs(const kit::Report& report)
 {
     for (const auto& line : report.lines)
-        if (line.startsWith("Overheads L/R : ecart "))
-            return line.fromFirstOccurrenceOf("ecart ", false, false).upToFirstOccurrenceOf(" ms", false, false).getFloatValue();
+        if (line.startsWith("Overheads L/R : gap "))
+            return line.fromFirstOccurrenceOf("gap ", false, false).upToFirstOccurrenceOf(" ms", false, false).getFloatValue();
     return -1.0f;
 }
 
@@ -1002,7 +1002,7 @@ void testOverheadSpacing()
         "Constat 5 reproduced: the kick is delayed by the mean of two cycles, got " + describe(slipped.find(1)));
     const auto fixed = solve(true, 10.33, 2.95);
     const auto* kick = fixed.find(1);
-    check(kick != nullptr && kick->measured && kick->delayMs > 10.2f && kick->delayMs < 11.2f && kick->note.contains("recale"),
+    check(kick != nullptr && kick->measured && kick->delayMs > 10.2f && kick->delayMs < 11.2f && kick->note.contains("relocated"),
         "With the policy the kick must follow the Snare spacing (about 10.6 ms), got " + describe(kick));
     check(fixed.find(2)->measured && std::abs(fixed.find(2)->delayMs - 2.15f) < 0.2f, "The Snare must be untouched");
     // Consistent kits are never touched
@@ -1037,11 +1037,11 @@ void testKitFaults()
 
 void testRoleNames()
 {
-    check(juce::String(drum::ui::eqBands(0)[2].name) == "Batte" && juce::String(drum::ui::eqBands(1)[3].name) == "Timbre",
+    check(juce::String(drum::ui::eqBands(0)[2].name) == "Beater" && juce::String(drum::ui::eqBands(1)[3].name) == "Snares",
         "EQ bands must be named after the selected drum role");
-    check(drum::ui::longName(drum::bodyGain, 1) == "Corps Gain" && drum::ui::longName(drum::bodyGain, 0) == "Poids Gain",
+    check(drum::ui::longName(drum::bodyGain, 1) == "Body Gain" && drum::ui::longName(drum::bodyGain, 0) == "Weight Gain",
         "Tooltips must follow the role-specific band names");
-    check(drum::ui::focusPageName(6).isEmpty() && drum::ui::focusPageName(1) == "Nettoyage",
+    check(drum::ui::focusPageName(6).isEmpty() && drum::ui::focusPageName(1) == "Cleanup",
         "Kick-specific focus page must be renamed or hidden for other roles");
     check(kit::roleFor(1, kit::positionSecondary) == kit::Role::snareBottom && kit::roleFor(9, 0) == kit::Role::none,
         "Snare Bottom must be selectable and the master bus excluded from the kit");
