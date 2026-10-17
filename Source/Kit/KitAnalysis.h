@@ -59,6 +59,8 @@ struct PairResult
     PairKind kind = PairKind::closeToOverhead;
     int xTrack = -1, yTrack = -1, xChannel = -1, yChannel = -1, sourceTrack = -1;
     bool valid = false;
+    bool outsideWindow = false;     // the strongest correlation lies outside the search window (only set when the guard is on)
+    float outsideRatio = 0;         // outside / inside peak of the whitened envelope
     int events = 0;
     float lagSamples = 0, lagMs = 0;
     float r = 0, r0 = 0, rStar = 0, rLowStar = 0;
@@ -222,6 +224,9 @@ public:
         detectors.resize(sources.size());
         sourceEvents.assign(sources.size(), 0);
         for (auto& detector : detectors) detector.prepare(rate);
+        hitRows.clear();
+        hitWindow = juce::jmax(16, static_cast<int>(std::lround(rate * KitConstants::hitWindowMs / 1000.0)));
+        levelBuffer.assign(static_cast<size_t>(hitWindow), 0.0f);
         timeBuffer.assign(static_cast<size_t>(size) * 2, 0.0f);
         complexBuffer.assign(static_cast<size_t>(size), {});
         analytic.assign(static_cast<size_t>(size), {});
@@ -234,10 +239,12 @@ public:
     int lookback() const noexcept { return pre + maximumLag + 64; }
     double sampleRate() const noexcept { return rate; }
     const std::vector<TrackInput>& inputs() const noexcept { return tracks; }
+    void setPolicy(const KitPolicy& newPolicy) noexcept { policy = newPolicy; }
 
     void process(juce::int64 from, juce::int64 to, const Reader& read)
     {
         std::vector<juce::int64> events;
+        std::vector<juce::int64> hits;
         for (size_t source = 0; source < sources.size(); ++source)
         {
             events.clear();
@@ -254,9 +261,13 @@ public:
                 position += count;
             }
             for (const auto event : events)
+            {
+                hits.push_back(event);
                 if (accumulate(sources[source], event, read))
                     ++sourceEvents[source];
+            }
         }
+        recordHits(hits, read);
     }
 
     int eventCount() const noexcept
@@ -284,6 +295,40 @@ public:
 
     Report report() const { return solve(evaluate()); }
 
+    // K04: mean power of a close mic during the hits of the other instruments minus its mean power during its own hits,
+    // in dB. A hit belongs to the instrument whose mic is the loudest relative to its own loudest hit. NaN until
+    // enough own and foreign hits were seen.
+    float crosstalkDb(size_t track) const
+    {
+        if (track >= tracks.size() || !isClose(tracks[track].role) || hitRows.empty()) return std::numeric_limits<float>::quiet_NaN();
+        const auto groupOf = [this](size_t index) {
+            return tracks[index].role == Role::tom ? 1000 + static_cast<int>(index) : static_cast<int>(primaryOf(tracks[index].role));
+        };
+        std::vector<float> reference(tracks.size(), 0.0f);
+        for (const auto& row : hitRows)
+            for (size_t index = 0; index < row.size(); ++index) reference[index] = juce::jmax(reference[index], row[index]);
+        double own = 0, foreign = 0;
+        int ownCount = 0, foreignCount = 0;
+        for (const auto& row : hitRows)
+        {
+            if (row[track] < 0) continue;
+            int owner = -1;
+            float best = 0;
+            for (size_t index = 0; index < row.size(); ++index)
+                if (row[index] >= 0 && reference[index] > 0 && row[index] / reference[index] > best)
+                {
+                    best = row[index] / reference[index];
+                    owner = groupOf(index);
+                }
+            if (owner < 0) continue;
+            if (owner == groupOf(track)) { own += row[track]; ++ownCount; }
+            else { foreign += row[track]; ++foreignCount; }
+        }
+        if (ownCount < KitConstants::minimumCrosstalkHits || foreignCount < KitConstants::minimumCrosstalkHits || !(own > 0))
+            return std::numeric_limits<float>::quiet_NaN();
+        return static_cast<float>(10.0 * std::log10(juce::jmax(1.0e-12, (foreign / foreignCount) / (own / ownCount))));
+    }
+
     Report solve(const std::vector<PairResult>& results) const
     {
         Report result;
@@ -293,23 +338,40 @@ public:
         std::vector<float> delays(trackCount, 0.0f), measured(trackCount, 0.0f), confidence(trackCount, 0.0f);
         std::vector<bool> inverted(trackCount, false), known(trackCount, false);
         std::vector<juce::String> notes(trackCount);
+        std::vector<bool> refused(trackCount, false);
         bool hasOverheads = false;
         for (const auto& track : tracks) hasOverheads = hasOverheads || track.role == Role::overhead;
 
         for (size_t track = 0; track < trackCount; ++track)
         {
             if (!isClose(tracks[track].role)) continue;
+            const auto crosstalk = crosstalkDb(track);
+            if (policy.refuseCrosstalk && std::isfinite(crosstalk) && crosstalk > KitConstants::crosstalkRefusalDb)
+            {
+                refused[track] = true;
+                notes[track] = "diaphonie " + juce::String(crosstalk, 1) + " dB : mesure refusee (un autre instrument couvre ce micro)";
+                continue;
+            }
             double weight = 0, lag = 0, sign = 0;
             float best = 0;
+            bool outside = false;
             for (const auto& pair : results)
-                if (pair.kind == PairKind::closeToOverhead && pair.xTrack == static_cast<int>(track) && pair.valid)
+                if (pair.kind == PairKind::closeToOverhead && pair.xTrack == static_cast<int>(track))
                 {
+                    outside = outside || pair.outsideWindow;
+                    if (!pair.valid) continue;
                     const auto w = std::abs(pair.r);
                     weight += w;
                     lag += w * pair.lagMs;
                     sign += pair.r;
                     best = juce::jmax(best, w);
                 }
+            if (outside && weight <= 0)
+            {
+                refused[track] = true;
+                notes[track] = "correlation la plus forte hors de la fenetre de recherche : mesure refusee";
+                continue;
+            }
             if (weight > 0 && best >= 0.15f)
             {
                 known[track] = true;
@@ -327,6 +389,12 @@ public:
             {
                 if (pair.kind != PairKind::secondary || pair.yTrack != static_cast<int>(track) || !pair.valid) continue;
                 const auto primary = static_cast<size_t>(pair.xTrack);
+                if (refused[primary])
+                {
+                    refused[track] = true;
+                    notes[track] = juce::String(roleName(tracks[primary].role)) + " refuse : pas de mesure";
+                    continue;
+                }
                 const bool opposite = pair.r < 0;
                 if (known[primary])
                 {
@@ -401,8 +469,9 @@ public:
                 recommendation.delayMs = known[track] ? delays[track] : 0.0f;
                 recommendation.measuredMs = measured[track];
                 recommendation.confidence = confidence[track];
+                recommendation.crosstalkDb = crosstalkDb(track);
                 recommendation.note = notes[track];
-                if (!known[track] && isClose(tracks[track].role))
+                if (!known[track] && isClose(tracks[track].role) && notes[track].isEmpty())
                     recommendation.note = hasOverheads ? "pas assez de frappes correlees" : "aucune reference : ajouter les overheads au kit";
             }
             result.recommendations.push_back(recommendation);
@@ -561,6 +630,41 @@ private:
         for (int bin = 0; bin <= half; ++bin)
             destination[static_cast<size_t>(bin)] = { timeBuffer[static_cast<size_t>(bin) * 2], timeBuffer[static_cast<size_t>(bin) * 2 + 1] };
         return true;
+    }
+
+    // One row per hit (events of all sources closer than hitClusterMs): the mean power of every close mic over a short
+    // window after the first event, -1 for the tracks that are not close mics or could not be read.
+    void recordHits(std::vector<juce::int64>& events, const Reader& read)
+    {
+        if (events.empty()) return;
+        std::sort(events.begin(), events.end());
+        const auto cluster = static_cast<juce::int64>(rate * KitConstants::hitClusterMs / 1000.0);
+        auto clusterStart = events.front() - cluster - 1;
+        for (const auto event : events)
+        {
+            if (event - clusterStart <= cluster) continue;
+            clusterStart = event;
+            if (static_cast<int>(hitRows.size()) >= KitConstants::maximumHitRows) return;
+            std::vector<float> row(tracks.size(), -1.0f);
+            int readable = 0;
+            for (size_t track = 0; track < tracks.size(); ++track)
+            {
+                if (!isClose(tracks[track].role)) continue;
+                if (!read(static_cast<int>(track), -1, event - pre, hitWindow, levelBuffer.data())) continue;
+                double power = 0;
+                bool finite = true;
+                for (int index = 0; index < hitWindow; ++index)
+                {
+                    const auto value = levelBuffer[static_cast<size_t>(index)];
+                    finite = finite && std::isfinite(value);
+                    power += static_cast<double>(value) * value;
+                }
+                if (!finite) continue;
+                row[track] = static_cast<float>(power / hitWindow);
+                ++readable;
+            }
+            if (readable >= 2) hitRows.push_back(std::move(row));
+        }
     }
 
     bool accumulate(int sourceTrack, juce::int64 event, const Reader& read)
@@ -728,9 +832,21 @@ private:
         for (int index = 0; index <= 2 * maximumLag; ++index)
             result.curve[static_cast<size_t>(index)] = norm > 0 ? static_cast<float>(analytic[static_cast<size_t>(index)].real() / norm) : 0.0f;
         result.r0 = result.curve[static_cast<size_t>(maximumLag)];
-        float star = 0;
         const auto first = maximumLag + static_cast<int>(std::lround(pair.minimumMs * rate / 1000.0));
         const auto last = maximumLag + static_cast<int>(std::lround(pair.maximumMs * rate / 1000.0));
+        if (main.ok)
+        {
+            double inside = 0, outside = 0;
+            for (int index = 0; index <= 2 * maximumLag; ++index)
+            {
+                const auto value = static_cast<double>(std::abs(whitened[static_cast<size_t>(index)]));
+                if (index >= first && index <= last) inside = juce::jmax(inside, value);
+                else outside = juce::jmax(outside, value);
+            }
+            result.outsideRatio = inside > 0 ? static_cast<float>(outside / inside) : 0.0f;
+            result.outsideWindow = policy.refuseOutsideWindow && result.outsideRatio >= KitConstants::outsideWindowRatio;
+        }
+        float star = 0;
         for (int index = first; index <= last; ++index) star = juce::jmax(star, std::abs(result.curve[static_cast<size_t>(index)]));
         result.rStar = star;
         if (main.ok)
@@ -738,7 +854,7 @@ private:
             result.lagSamples = main.lag;
             result.lagMs = static_cast<float>(main.lag * 1000.0 / rate);
             result.r = juce::jlimit(-1.0f, 1.0f, main.value);
-            result.valid = pair.events >= 6 && std::abs(main.value) >= 0.12f;
+            result.valid = pair.events >= 6 && std::abs(main.value) >= 0.12f && !result.outsideWindow;
         }
         const auto lowNorm = std::sqrt(pair.exLow * pair.eyLow);
         if (lowNorm > 1.0e-20 && pair.band.low < 200.0f && pair.band.high > 30.0f)
@@ -774,6 +890,10 @@ private:
     std::vector<int> sources;
     std::vector<OnsetDetector> detectors;
     std::vector<int> sourceEvents;
+    std::vector<std::vector<float>> hitRows;
+    std::vector<float> levelBuffer;
+    KitPolicy policy;
+    int hitWindow = 1440;
     std::unique_ptr<juce::dsp::FFT> fft;
     std::vector<float> timeBuffer, scratch;
     mutable std::vector<std::complex<float>> complexBuffer, analytic, whitened;

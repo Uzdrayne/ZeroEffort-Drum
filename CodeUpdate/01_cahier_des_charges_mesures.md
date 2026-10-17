@@ -152,7 +152,7 @@ Ces mesures viennent du module Kit / Phase (`kit::KitSession`) et se rattachent 
 | K01 | `retard_vs_oh_ms`, `correlation_max` | corrélation croisée (enveloppe blanchie), première arrivée | Retard proposé | P1 | Existant |
 | K02 | `polarite_relative` | signe de la corrélation | Inversion de polarité proposée | P1 | Existant |
 | K03 | `coherence_phase_avant`, `coherence_phase_apres` | score 0-100 | Résultat affiché à l'utilisateur | P1 | Existant |
-| K04 | `diaphonie_db` | niveau de la piste pendant les frappes des *autres* instruments, moins son niveau pendant ses propres frappes | Réglage de l'expander, qualité de la prise | P2 | À faire |
+| K04 | `diaphonie_db` | niveau de la piste pendant les frappes des *autres* instruments, moins son niveau pendant ses propres frappes | Réglage de l'expander, qualité de la prise | P2 | **Fait (17/10/2026)** : `KitSession::crosstalkDb()`, champ `Recommendation::crosstalkDb` (NaN si indisponible), commande `--kit`. Une frappe appartient à l'instrument dont le micro est le plus fort par rapport à sa propre frappe la plus forte ; 4 frappes propres et 4 étrangères au moins. Inclut la queue du propre instrument (plancher vers −20 dB sur le kit synthétique). Valeurs réelles : Kick In −16 dB, Snare −21 dB (kit 1) ; kit de référence −19 / −24 dB |
 | K05 | `niveau_relatif_oh_db` | niveau actif de la piste moins celui des overheads | Équilibre du kit (information) | P3 | À faire |
 | K06 | `recouvrement_spectral` | part de l'énergie 60-300 Hz commune entre kick et caisse claire | Conseil d'EQ complémentaire | P3 | À faire |
 
