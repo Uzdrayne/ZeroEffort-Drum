@@ -29,6 +29,12 @@ struct MeasureConstants
     static constexpr double bandLimitRatio = 0.45;    // bands above this fraction of the rate are ignored (01-Q4)
     // J3, problem 1. Activated on 17 October 2026 (validated by the user): it changes the bleed spectrum, hence the Kick air correction.
     static constexpr bool excludeLeadFramesByDefault = true;
+    // J4, problem 3 (double kicks). Off until listened to in a host: it changes the hit count, hence the onset / tail / bleed
+    // split of the spectrum. A hit may re-arm after doubleHitMinimumWindows (10 ms each) instead of 12 when the window peak
+    // rises by doubleHitRise against the previous window. H: to calibrate on a corpus of fast playing.
+    static constexpr bool doubleHitsByDefault = false;
+    static constexpr int doubleHitMinimumWindows = 6;
+    static constexpr float doubleHitRise = 4.0f;
 };
 
 inline constexpr int thirdOctaveCount = 31;           // 20 Hz to 20 kHz, nominal centres 1000 * 10^(n/10), n = -17..13
@@ -139,8 +145,11 @@ public:
                     }
                 }
                 const auto bassLevel = std::sqrt(bassEnergy / windowSamples);
+                const auto gap = windows - lastHit;
+                const auto rearmed = gap >= 12 || (detectDoubleHits && gap >= MeasureConstants::doubleHitMinimumWindows
+                    && windowPeak > previousPeak * MeasureConstants::doubleHitRise);
                 if (bassLevel > 0.0003 && bassLevel > previousBass * 1.8
-                    && windowPeak > previousPeak * 1.3f && windows - lastHit >= 12)
+                    && windowPeak > previousPeak * 1.3f && rearmed)
                 {
                     ++hits;
                     lastHit = windows;
@@ -379,6 +388,9 @@ public:
     // the overall spectrum). Set before prepare(); the default is MeasureConstants::excludeLeadFramesByDefault.
     void setExcludeLeadFrames(bool exclude) noexcept { excludeLeadFrames = exclude; }
     bool excludesLeadFrames() const noexcept { return excludeLeadFrames; }
+    // J4: allow a hit to follow the previous one after 60 ms when its attack is much louder than the decayed tail.
+    void setDoubleHitDetection(bool enable) noexcept { detectDoubleHits = enable; }
+    bool detectsDoubleHits() const noexcept { return detectDoubleHits; }
     int leadFrameCount() const noexcept { return leadFrames; }
 
     // Average FFT power per frame of one phase in a band (onset, tail or bleed spectra); NaN without frames.
@@ -525,6 +537,7 @@ private:
     bool invalid = false;
     int onsetFrames = 0, tailFrames = 0, bleedFrames = 0, leadFrames = 0;
     bool excludeLeadFrames = MeasureConstants::excludeLeadFramesByDefault;
+    bool detectDoubleHits = MeasureConstants::doubleHitsByDefault;
     juce::int64 lastHitSample = -1000000000;
     double lowFast = 0, lowSlow = 0, previousBass = 0, bassEnergy = 0;
     double fastCoefficient = 0, slowCoefficient = 0;

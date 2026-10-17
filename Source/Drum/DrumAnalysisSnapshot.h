@@ -152,6 +152,7 @@ struct DrumAnalysisSnapshot
         object->setProperty("bleedFrames", analysis.bleedFrames);
         object->setProperty("leadFrames", analysis.leadFrames);
         object->setProperty("excludeLeadFrames", analysis.excludeLeadFrames);
+        object->setProperty("doubleHits", analysis.detectDoubleHits);
         object->setProperty("histogram", counts(analysis.histogram));
         juce::Array<juce::var> envelopes;
         for (const auto& values : analysis.envelopeHistograms) envelopes.add(counts(values));
@@ -228,6 +229,8 @@ struct DrumAnalysisSnapshot
             return juce::Result::fail("invalid spectrum");
         }
         analysis.excludeLeadFrames = static_cast<bool>(excludeLead);
+        const auto& doubleHits = object->getProperty("doubleHits");
+        analysis.detectDoubleHits = doubleHits.isBool() ? static_cast<bool>(doubleHits) : MeasureConstants::doubleHitsByDefault;
         analysis.leadFrames = static_cast<int>(leadFrames);
         analysis.decayHistogram = decayHistogram;
         analysis.decayCensored = static_cast<int>(decayCensored);

@@ -11,6 +11,7 @@ public:
     const DrumAnalysis& analysis() const { return measurements; }
     DrumAnalysis& editableAnalysis() { return measurements; }  // snapshot restore only
     void setExcludeLeadFrames(bool exclude) noexcept { measurements.setExcludeLeadFrames(exclude); }
+    void setDoubleHitDetection(bool enable) noexcept { measurements.setDoubleHitDetection(enable); }
     void setPolicy(const ProposalPolicy& newPolicy) noexcept { policy = newPolicy; }
     const ProposalPolicy& getPolicy() const noexcept { return policy; }
 

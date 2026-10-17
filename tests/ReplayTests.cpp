@@ -225,6 +225,7 @@ int runReplayCommand(const juce::StringArray& commandLine)
     // --position <0-3> (kitMic of the take, --export-wav).
     juce::StringArray arguments;
     std::optional<bool> excludeLeadFrames;
+    std::optional<bool> doubleHits;
     std::optional<bool> activeCrest;
     std::optional<int> position;
     bool badPosition = false;
@@ -233,6 +234,8 @@ int runReplayCommand(const juce::StringArray& commandLine)
         const auto& item = commandLine[index];
         if (item == "--exclude-lead-frames") excludeLeadFrames = true;
         else if (item == "--no-exclude-lead-frames") excludeLeadFrames = false;
+        else if (item == "--double-hits") doubleHits = true;
+        else if (item == "--no-double-hits") doubleHits = false;
         else if (item == "--active-crest") activeCrest = true;
         else if (item == "--no-active-crest") activeCrest = false;
         else if (item == "--position")
@@ -317,6 +320,7 @@ int runReplayCommand(const juce::StringArray& commandLine)
             return fail("supported: mono or stereo, 8-192 kHz, at most one hour");
         drum::DrumAnalyser analyser;
         if (excludeLeadFrames.has_value()) analyser.setExcludeLeadFrames(*excludeLeadFrames);
+        if (doubleHits.has_value()) analyser.setDoubleHitDetection(*doubleHits);
         analyser.prepare(reader->sampleRate);
         juce::AudioBuffer<float> audio(static_cast<int>(reader->numChannels), 32768);
         std::array<float, 32768> mono {};

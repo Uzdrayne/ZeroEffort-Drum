@@ -70,13 +70,11 @@ void testLeadFramesAreNotBleed(bool excludeLeadFrames)
 }
 
 // A08: double kicks at 180 bpm (83 ms) are under-counted because of the fixed 120 ms refractory period (problem 3).
-// Expected failure today: the test passes while the count is wrong and fails when somebody fixes the detector,
-// as a reminder to turn it into a plain test.
-void testDoubleKicksExpectedFailure()
+// Default (J4 correction off): the test passes while the count is wrong and fails when somebody fixes the detector by
+// default, as a reminder to turn it into a plain test. With the correction on, the count must be right.
+std::vector<float> doubleKickTake(double rate, double seconds, double period)
 {
-    constexpr double rate = 48000;
-    const auto period = 60.0 / 180.0 / 4.0;    // sixteenth notes at 180 bpm: 83.3 ms
-    std::vector<float> audio(static_cast<size_t>(rate * 4));
+    std::vector<float> audio(static_cast<size_t>(rate * seconds));
     juce::Random random(3);
     for (size_t index = 0; index < audio.size(); ++index)
     {
@@ -84,12 +82,43 @@ void testDoubleKicksExpectedFailure()
         const auto age = std::fmod(time, period);
         audio[index] = static_cast<float>(0.6 * std::exp(-age * 45) * std::sin(twoPi * 60 * time) + 0.0001 * (random.nextDouble() * 2 - 1));
     }
+    return audio;
+}
+
+void testDoubleKicksExpectedFailure()
+{
+    constexpr double rate = 48000;
+    const auto audio = doubleKickTake(rate, 4, 60.0 / 180.0 / 4.0);    // sixteenth notes at 180 bpm: 83.3 ms
     const auto realHits = static_cast<int>(4.0 * 12.0);   // 12 hits per second for 4 s
     const auto counted = analyse(audio, rate)->analysis().hitCount();
     std::cout << "  A08 double kicks at 180 bpm: " << counted << " hits counted for " << realHits << " played" << std::endl;
+    check(!drum::MeasureConstants::doubleHitsByDefault, "J4 double hit detection is off by default until it has been listened to");
     check(std::abs(counted - realHits) > realHits / 10,
         "A08 now counts the double kicks correctly (" + juce::String(counted) + " of " + juce::String(realHits)
-        + "): problem 3 is fixed, turn this expected failure into a plain test");
+        + "): problem 3 is fixed by default, turn this expected failure into a plain test");
+
+    auto corrected = std::make_unique<drum::DrumAnalyser>();
+    corrected->setDoubleHitDetection(true);
+    corrected->prepare(rate);
+    for (size_t offset = 0; offset < audio.size(); offset += 4096)
+        corrected->push(audio.data() + offset, static_cast<int>(juce::jmin(size_t { 4096 }, audio.size() - offset)));
+    const auto fixed = corrected->analysis().hitCount();
+    std::cout << "  A08 with the J4 correction: " << fixed << " hits counted for " << realHits << " played" << std::endl;
+    check(std::abs(fixed - realHits) <= realHits / 10, "A08 with the correction the double kicks must be counted, got " + juce::String(fixed) + " of " + juce::String(realHits));
+
+    // Ordinary playing is not disturbed: the same count with and without the correction
+    for (const auto period : { 0.5, 0.35, 0.25 })
+    {
+        const auto take = doubleKickTake(rate, 6, period);
+        auto plain = analyse(take, rate);
+        auto changed = std::make_unique<drum::DrumAnalyser>();
+        changed->setDoubleHitDetection(true);
+        changed->prepare(rate);
+        for (size_t offset = 0; offset < take.size(); offset += 4096)
+            changed->push(take.data() + offset, static_cast<int>(juce::jmin(size_t { 4096 }, take.size() - offset)));
+        check(plain->analysis().hitCount() == changed->analysis().hitCount(), "The correction must not change the count at a period of "
+            + juce::String(period) + " s: " + juce::String(plain->analysis().hitCount()) + " against " + juce::String(changed->analysis().hitCount()));
+    }
 }
 
 // 60 Hz bursts of constant level: 0.15 s of sound every second. The global crest is high only because of the silence.
