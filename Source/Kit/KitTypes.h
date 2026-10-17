@@ -112,11 +112,14 @@ struct KitPolicy
 {
     bool refuseOutsideWindow = false;   // refuse when the strongest correlation lies outside the search window (constat 2)
     bool refuseCrosstalk = false;       // refuse a close mic that hears another instrument too loudly (constat 3)
+    bool reconcileOverheads = true;     // a close mic whose L / R overhead spacing disagrees with the best mic is re-located (constat 5, active since 17/10/2026)
 };
 
 // H: starting points to calibrate on a kit corpus.
 struct KitConstants
 {
+    static constexpr float spacingToleranceMs = 1.5f;       // L / R overhead spacing may differ by this between two close mics
+    static constexpr float relocateWindowMs = 1.0f;         // search window around the expected lag of the re-located pair
     static constexpr float outsideWindowRatio = 1.2f;       // outside / inside peak of the whitened envelope that triggers a refusal
     static constexpr float crosstalkRefusalDb = -15.0f;     // K04 above this level refuses the close mic (synthetic kit: right at -16.0, wrong at -14.2)
     static constexpr int minimumCrosstalkHits = 4;          // own and foreign hits needed before K04 is reported

@@ -72,7 +72,7 @@ Ce que je veux faire : [à compléter, ou « propose-moi »]
 1. Le retard du kick est lu avec un biais de +0,05 ms (2-3 échantillons) ; la caisse claire est exacte. Spécification : ±1 échantillon. **Non traité** (demande de reprendre la corrélation du Kick).
 2. Hors fenêtre de recherche : garde-fou `KitPolicy::refuseOutsideWindow` écrit, **désactivé par défaut**.
 3. Diaphonie : mesure K04 faite ; garde-fou `KitPolicy::refuseCrosstalk` (seuil −15 dB, H fragile : le Kick In du kit 1 est à −16 dB) écrit, **désactivé par défaut**. Aucun des deux n'est relié à l'interface.
-4. Le kit 4 (autre jour) donne une cohérence de phase de 59 après correction contre 93 sur le kit 3 : à regarder.
+4. Le kit 4 (autre jour) donnait une cohérence de 59 : saut de cycle du Kick sur les overheads, **corrigé et activé** (`KitPolicy::reconcileOverheads`, cohérence 96,6) ; voir le suivi.
 
 **Analyse** :
 5. Le détecteur de frappes a un seuil absolu (niveau grave 0,0003, environ −70 dBFS) : un bruit de fond rose à −54 dBFS ajoute des frappes fantômes (risque R3).
@@ -91,7 +91,7 @@ Choisir selon ce qui est disponible.
 ### Sans écoute (sûr)
 3. **Registre de rôles, étape 2** : migrer les réglages propres aux profils (`Profiles/*.h`), les bandes de mesure par rôle (`DrumAnalysis::attackBodyGapDb`), le détecteur Kick de `DrumReplay`, puis l'interface ; le filet de 270 propositions doit rester vrai.
 4. **Seuil de 10 dB du compresseur du Kick** et autres constantes H : il faut des prises sparses (Kick joué par salves) ; aucun Kick du corpus n'est à moins de 7 dB du seuil.
-5. **Kit 4** : comprendre la cohérence de phase de 59 (détail des paires avec `--kit`).
+5. **Kit / Phase** : valider `reconcileOverheads` sur d'autres kits (un seul est concerné, tolérance 1,5 ms = H) ; `--kit --detail` affiche les paires.
 
 ### Plus lourd (à planifier, pas à improviser)
 6. **Constat 1** (biais du kick de +0,05 ms) : reprendre la corrélation du Kick (30-250 Hz).

@@ -66,7 +66,8 @@ struct SyntheticKit
 };
 
 kit::Report analyseOffline(const std::vector<kit::TrackInput>& inputs, const std::vector<const std::vector<float>*>& audio,
-                           double sampleRate, juce::int64 start, juce::int64 end, const kit::KitPolicy& policy = {})
+                           double sampleRate, juce::int64 start, juce::int64 end, const kit::KitPolicy& policy = {},
+                           std::vector<kit::PairResult>* pairResults = nullptr)
 {
     kit::KitSession session;
     session.setPolicy(policy);
@@ -85,6 +86,7 @@ kit::Report analyseOffline(const std::vector<kit::TrackInput>& inputs, const std
         session.process(position, next, read);
         position = next;
     }
+    if (pairResults != nullptr) *pairResults = session.evaluate();
     return session.report();
 }
 
@@ -948,6 +950,77 @@ void testGuards()
     std::cout << "PASS: guards (outside window, crosstalk): no wrong answer left, ordinary faults unchanged (worst error " << log.worst << " ms)" << std::endl;
 }
 
+// Constat 5 (kit 4 of the corpus): the Kick locks one 125 Hz cycle (8.1 ms) apart on the two overheads (10.33 ms and 2.95 ms)
+// while the Snare says the overheads are 0.27 ms apart. Built from the numbers measured on that kit, because a synthetic take
+// cannot be made to slip on demand.
+void testOverheadSpacing()
+{
+    constexpr double sampleRate = 48000;
+    std::vector<kit::TrackInput> inputs { { 1, kit::Role::kickIn, 0, 1, "Kick" }, { 2, kit::Role::snareTop, 0, 1, "Snare" },
+        { 3, kit::Role::overhead, kit::positionLeft, 1, "OH L" }, { 4, kit::Role::overhead, kit::positionRight, 1, "OH R" } };
+    const auto solve = [&](bool reconcile, double kickLeft, double kickRight) {
+        kit::KitSession session;
+        kit::KitPolicy policy;
+        policy.reconcileOverheads = reconcile;
+        session.setPolicy(policy);
+        check(session.reset(inputs, sampleRate), "Spacing test: the session must build pairs");
+        auto pairs = session.evaluate();
+        const auto lags = [&](const kit::PairResult& pair) -> std::array<double, 2> {
+            const bool kickPair = pair.xTrack == 0;
+            const bool left = pair.yTrack == 2;
+            return kickPair ? std::array<double, 2> { left ? kickLeft : kickRight, left ? 0.63 : 0.49 }
+                            : std::array<double, 2> { left ? 2.02 : 2.29, left ? 0.76 : 0.67 };
+        };
+        for (auto& pair : pairs)
+        {
+            if (pair.kind != kit::PairKind::closeToOverhead) continue;
+            const auto [lagMs, r] = lags(pair);
+            pair.events = 100;
+            pair.rate = sampleRate;
+            pair.valid = true;
+            pair.lagMs = static_cast<float>(lagMs);
+            pair.lagSamples = static_cast<float>(lagMs * sampleRate / 1000.0);
+            pair.r = static_cast<float>(r);
+            pair.r0 = 0.0f;
+            pair.rStar = static_cast<float>(r);
+            pair.rLowStar = pair.rStar;
+            pair.consistencyMs = 0.05f;
+            const auto size = static_cast<size_t>(2 * pair.centre + 1);
+            pair.curve.assign(size, 0.0f);
+            for (size_t index = 0; index < size; ++index)
+            {
+                const auto ms = (static_cast<double>(index) - pair.centre) * 1000.0 / sampleRate;
+                const auto period = pair.xTrack == 0 ? 8.1 : 4.0;
+                pair.curve[index] = static_cast<float>(r * std::cos(juce::MathConstants<double>::twoPi * (ms - lagMs) / period));
+            }
+        }
+        return session.solve(pairs);
+    };
+    // Without the policy the weighted mean of the two lags is a silent wrong answer
+    const auto slipped = solve(false, 10.33, 2.95);
+    check(slipped.find(1) != nullptr && slipped.find(1)->measured && slipped.find(1)->delayMs > 6.5f && slipped.find(1)->delayMs < 7.5f,
+        "Constat 5 reproduced: the kick is delayed by the mean of two cycles, got " + describe(slipped.find(1)));
+    const auto fixed = solve(true, 10.33, 2.95);
+    const auto* kick = fixed.find(1);
+    check(kick != nullptr && kick->measured && kick->delayMs > 10.2f && kick->delayMs < 11.2f && kick->note.contains("recale"),
+        "With the policy the kick must follow the Snare spacing (about 10.6 ms), got " + describe(kick));
+    check(fixed.find(2)->measured && std::abs(fixed.find(2)->delayMs - 2.15f) < 0.2f, "The Snare must be untouched");
+    // Consistent kits are never touched
+    const auto agreeing = solve(true, 10.40, 11.05);
+    const auto reference = solve(false, 10.40, 11.05);
+    check(agreeing.find(1)->measured && std::abs(agreeing.find(1)->delayMs - reference.find(1)->delayMs) < 1.0e-6f && agreeing.find(1)->note.isEmpty(),
+        "A kit whose overhead spacing agrees must not be modified");
+    // Nothing to match against, so no change (a single close mic)
+    std::vector<kit::TrackInput> alone { { 1, kit::Role::kickIn, 0, 1, "Kick" }, { 3, kit::Role::overhead, kit::positionLeft, 1, "OH L" },
+        { 4, kit::Role::overhead, kit::positionRight, 1, "OH R" } };
+    kit::KitSession session;
+    kit::KitPolicy policy;
+    policy.reconcileOverheads = true;
+    session.setPolicy(policy);
+    check(session.reset(alone, sampleRate), "A single close mic still builds pairs");
+    std::cout << "PASS: overhead spacing (kick " << slipped.find(1)->delayMs << " ms silently wrong, " << kick->delayMs << " ms with the policy)" << std::endl;
+}
+
 void testKitFaults()
 {
     testFaultDelays();
@@ -959,6 +1032,7 @@ void testKitFaults()
     testRealFaults();
     testCrosstalkMeasure();
     testGuards();
+    testOverheadSpacing();
 }
 
 void testRoleNames()
@@ -993,6 +1067,7 @@ int runKitCommand(const juce::StringArray& commandLine)
     if (commandLine.isEmpty() || commandLine[0] != "--kit") return -1;
     const auto fail = [](const juce::String& message) { std::cerr << "ERROR: " << message << std::endl; return 1; };
     kit::KitPolicy policy;
+    bool detail = false;
     double startSeconds = 0, seconds = 60;
     struct Entry { juce::String name; kit::Role role; int position; juce::File file; };
     std::vector<Entry> entries;
@@ -1000,6 +1075,9 @@ int runKitCommand(const juce::StringArray& commandLine)
     {
         const auto& item = commandLine[index];
         if (item == "--guards") policy.refuseOutsideWindow = policy.refuseCrosstalk = true;
+        else if (item == "--detail") detail = true;
+        else if (item == "--reconcile") policy.reconcileOverheads = true;
+        else if (item == "--no-reconcile") policy.reconcileOverheads = false;
         else if ((item == "--start" || item == "--seconds") && index + 1 < commandLine.size())
             (item == "--start" ? startSeconds : seconds) = commandLine[++index].getDoubleValue();
         else
@@ -1045,7 +1123,8 @@ int runKitCommand(const juce::StringArray& commandLine)
     std::vector<const std::vector<float>*> pointers;
     size_t shortest = audio[0].size();
     for (const auto& track : audio) { pointers.push_back(&track); shortest = std::min(shortest, track.size()); }
-    const auto report = analyseOffline(inputs, pointers, sampleRate, 0, static_cast<juce::int64>(shortest), policy);
+    std::vector<kit::PairResult> pairs;
+    const auto report = analyseOffline(inputs, pointers, sampleRate, 0, static_cast<juce::int64>(shortest), policy, &pairs);
     std::cout << "# Kit : " << entries.size() << " pistes, " << sampleRate << " Hz, garde-fous " << (policy.refuseOutsideWindow ? "actifs" : "inactifs") << "\n\n";
     std::cout << "| Piste | Mesure | Retard (ms) | Polarite | r | Diaphonie K04 (dB) | Note |\n|---|---|---|---|---|---|---|\n";
     for (const auto& recommendation : report.recommendations)
@@ -1054,5 +1133,20 @@ int runKitCommand(const juce::StringArray& commandLine)
                   << (std::isfinite(recommendation.crosstalkDb) ? juce::String(recommendation.crosstalkDb, 1) : juce::String("-")) << " | "
                   << recommendation.note << " |\n";
     std::cout << "\nCoherence de phase " << report.scores.phaseBefore << " -> " << report.scores.phaseAfter << ", frappes " << report.events << std::endl;
+    if (detail)
+    {
+        std::cout << "\n| Paire | Evenements | Retard (ms) | r | valide | coherence pair/impair (ms) | hors fenetre / dans | r a 3 / 5 / 7 / 9 / 11 ms |\n|---|---|---|---|---|---|---|---|\n";
+        for (const auto& pair : pairs)
+        {
+            if (pair.kind != kit::PairKind::closeToOverhead && pair.kind != kit::PairKind::secondary) continue;
+            const auto name = [&](int track, int channel) { return entries[static_cast<size_t>(track)].name + (channel >= 0 ? "." + juce::String(channel) : juce::String()); };
+            std::cout << "| " << name(pair.xTrack, pair.xChannel) << " -> " << name(pair.yTrack, pair.yChannel) << " | " << pair.events << " | "
+                      << juce::String(pair.lagMs, 2) << " | " << juce::String(pair.r, 2) << " | " << (pair.valid ? "oui" : "non") << " | "
+                      << (pair.consistencyMs >= 0 ? juce::String(pair.consistencyMs, 2) : juce::String("-")) << " | " << juce::String(pair.outsideRatio, 2) << " | ";
+            for (const auto ms : { 3.0f, 5.0f, 7.0f, 9.0f, 11.0f })
+                std::cout << juce::String(pair.at(ms * static_cast<float>(pair.rate) / 1000.0f), 2) << " ";
+            std::cout << "|\n";
+        }
+    }
     return 0;
 }

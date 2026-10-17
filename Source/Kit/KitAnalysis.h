@@ -3,6 +3,7 @@
 #include <juce_dsp/juce_dsp.h>
 #include "KitTypes.h"
 #include <complex>
+#include <cstdint>
 #include <functional>
 
 // Kit analysis engine: measures arrival time and polarity between drum microphones and derives
@@ -329,7 +330,7 @@ public:
         return static_cast<float>(10.0 * std::log10(juce::jmax(1.0e-12, (foreign / foreignCount) / (own / ownCount))));
     }
 
-    Report solve(const std::vector<PairResult>& results) const
+    Report solve(const std::vector<PairResult>& rawResults) const
     {
         Report result;
         result.progress = progress();
@@ -338,6 +339,7 @@ public:
         std::vector<float> delays(trackCount, 0.0f), measured(trackCount, 0.0f), confidence(trackCount, 0.0f);
         std::vector<bool> inverted(trackCount, false), known(trackCount, false);
         std::vector<juce::String> notes(trackCount);
+        const auto results = policy.reconcileOverheads ? reconcileOverheads(rawResults, notes) : rawResults;
         std::vector<bool> refused(trackCount, false);
         bool hasOverheads = false;
         for (const auto& track : tracks) hasOverheads = hasOverheads || track.role == Role::overhead;
@@ -600,6 +602,76 @@ private:
         std::array<double, 4> xBands {}, yBands {};
         int events = 0;
     };
+
+    // Constat 5 (kit 4 of the corpus): a low close mic (Kick, whose correlation oscillates at about 125 Hz) can lock one
+    // cycle (8 ms) apart on the two overheads; the weighted mean of the two lags then matches neither. The L / R overhead
+    // spacing is a property of the room, so every close mic must agree with the most trustworthy one. A mic that does not
+    // gets its less confident pair re-located near the expected lag; if that fails, its pairs are refused.
+    std::vector<PairResult> reconcileOverheads(const std::vector<PairResult>& results, std::vector<juce::String>& notes) const
+    {
+        auto adjusted = results;
+        const auto sideOf = [this](const PairResult& pair) {
+            const auto& output = tracks[static_cast<size_t>(pair.yTrack)];
+            if (output.position == positionLeft) return 1;
+            if (output.position == positionRight) return 2;
+            return pair.yChannel == 0 ? 1 : pair.yChannel == 1 ? 2 : 0;
+        };
+        struct Mic { size_t left = SIZE_MAX, right = SIZE_MAX; };
+        std::vector<Mic> mics(tracks.size());
+        for (size_t index = 0; index < adjusted.size(); ++index)
+        {
+            const auto& pair = adjusted[index];
+            if (pair.kind != PairKind::closeToOverhead || !pair.valid || pair.xTrack < 0) continue;
+            const auto side = sideOf(pair);
+            auto& mic = mics[static_cast<size_t>(pair.xTrack)];
+            if (side == 1 && (mic.left == SIZE_MAX || std::abs(pair.r) > std::abs(adjusted[mic.left].r))) mic.left = index;
+            if (side == 2 && (mic.right == SIZE_MAX || std::abs(pair.r) > std::abs(adjusted[mic.right].r))) mic.right = index;
+        }
+        const auto confidenceOf = [&](const Mic& mic) { return juce::jmin(std::abs(adjusted[mic.left].r), std::abs(adjusted[mic.right].r)); };
+        int reference = -1;
+        for (size_t track = 0; track < mics.size(); ++track)
+            if (mics[track].left != SIZE_MAX && mics[track].right != SIZE_MAX
+                && (reference < 0 || confidenceOf(mics[track]) > confidenceOf(mics[static_cast<size_t>(reference)])))
+                reference = static_cast<int>(track);
+        if (reference < 0) return adjusted;
+        const auto& best = mics[static_cast<size_t>(reference)];
+        const auto spacing = adjusted[best.right].lagMs - adjusted[best.left].lagMs;
+        for (size_t track = 0; track < mics.size(); ++track)
+        {
+            const auto& mic = mics[track];
+            if (static_cast<int>(track) == reference || mic.left == SIZE_MAX || mic.right == SIZE_MAX) continue;
+            auto& left = adjusted[mic.left];
+            auto& right = adjusted[mic.right];
+            if (std::abs((right.lagMs - left.lagMs) - spacing) <= KitConstants::spacingToleranceMs) continue;
+            const bool moveRight = std::abs(right.r) < std::abs(left.r);
+            auto& moved = moveRight ? right : left;
+            const auto& anchor = moveRight ? left : right;
+            const auto expectedMs = anchor.lagMs + (moveRight ? spacing : -spacing);
+            const auto centre = static_cast<int>(std::lround(expectedMs * rate / 1000.0));
+            const auto reach = static_cast<int>(std::lround(KitConstants::relocateWindowMs * rate / 1000.0));
+            int bestLag = centre;
+            float bestValue = 0;
+            for (int lag = centre - reach; lag <= centre + reach; ++lag)
+            {
+                const auto value = moved.at(static_cast<float>(lag));
+                if (std::abs(value) > std::abs(bestValue)) { bestValue = value; bestLag = lag; }
+            }
+            if (std::abs(bestValue) >= 0.5f * std::abs(moved.r) && std::abs(bestValue) >= 0.12f)
+            {
+                notes[track] = "ecart L/R des overheads incoherent (saut de cycle) : " + juce::String(moved.lagMs, 2) + " ms recale a "
+                    + juce::String(static_cast<float>(bestLag) * 1000.0f / static_cast<float>(rate), 2) + " ms";
+                moved.lagSamples = static_cast<float>(bestLag);
+                moved.lagMs = static_cast<float>(bestLag * 1000.0 / rate);
+                moved.r = juce::jlimit(-1.0f, 1.0f, bestValue);
+            }
+            else
+            {
+                notes[track] = "ecart L/R des overheads incoherent avec les autres micros : mesure refusee";
+                left.valid = right.valid = false;
+            }
+        }
+        return adjusted;
+    }
 
     void addPair(PairKind kind, int source, int x, int y, Band band, float minimumMs, float maximumMs)
     {
