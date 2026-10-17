@@ -84,7 +84,7 @@ Build VS 2019 / 2022 (`scripts/Build.ps1`), build d'export pour Cubase (`build-e
 ## 5. Ce qui n'a pas été vérifié
 
 - **Aucune écoute dans Cubase** des correctifs activés (J3, J4a, seuil à 55 dB, saut de cycle) : ils sont validés par les tests et sur le corpus, pas à l'oreille. Sur les 38 prises du corpus, seul un réglage change (Kick Out du kit 1, J4a).
-- **Le radar Auto** n'a été jugé que sur des captures d'écran produites par les tests, pas dans l'hôte (rythme de l'animation, lisibilité, comportement avec ARA réel). En insert, la source se dessine maintenant pendant la capture de 8 s (lecture nécessaire) ; à vérifier dans Cubase.
+- **Le radar Auto** n'a été jugé que sur des captures d'écran produites par les tests, pas dans l'hôte (rythme de l'animation, lisibilité, comportement avec ARA réel). En insert, la source se dessine maintenant pendant la capture de 8 s (lecture nécessaire) ; **validé dans Cubase par l'utilisateur le 17/10/2026**.
 - **L'interface en anglais** : vérifiée par les tests et des captures ; les textes longs peuvent déborder dans l'hôte.
 - Le build installé dans Cubase est peut-être encore le **build d'export** : recopier le build Release de production (`build\ZeroEffortDrum_artefacts\Release\VST3\`).
 

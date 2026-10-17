@@ -141,7 +141,7 @@ Branche `main`. En insert, le plug-in ne voit l'audio que pendant la lecture : l
 - **Aucun changement audible** : l'analyseur reçoit les mêmes échantillons dans le même ordre ; test `testAutoLiveCapture` : réglages identiques à l'analyse faite après la capture, et courbe de source déjà présente avant la fin de la capture.
 - Test de l'éditeur : la phase 0 (analyse) est maintenant observée pendant la capture (`AutoRadar_phase0.png` montre la courbe à 60 %).
 - Texte de statut « capture 60.0667 % » corrigé (arrondi).
-- Reste : le panneau ne dit pas encore « lance la lecture » ; non vérifié dans Cubase.
+- Reste : le panneau ne dit pas encore « lance la lecture ». Validé dans Cubase par l'utilisateur (« ça marche plutôt bien »).
 ## Écarts avec les spécifications
 
 - **Emplacement des fonctions** : `toSnapshot` / `restoreSnapshot` / `measuresToVar` sont des fonctions statiques de `struct DrumAnalysisSnapshot` (ami de `DrumAnalysis`), pas des méthodes de `DrumAnalysis` : la classe de mesure reste inchangée. Le doc 07 disait « dans la classe DrumAnalysis ».
