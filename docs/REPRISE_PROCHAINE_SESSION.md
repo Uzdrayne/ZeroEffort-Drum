@@ -1,6 +1,6 @@
 # Reprise de session : ZeroEffort Drum, chantier « analyse v1 »
 
-Document de passation écrit le 16 octobre 2026. Il contient un **prompt à coller** (section 1) puis le contexte complet pour qu'un assistant reparte sans rien redécouvrir.
+Document de passation, mis à jour le 17 octobre 2026. Il contient un **prompt à coller** (section 1) puis le contexte complet pour qu'un assistant reparte sans rien redécouvrir.
 
 ---
 
@@ -15,8 +15,8 @@ Tu reprends le chantier « analyse v1 » du plug-in ZeroEffort Drum (JUCE 8, VST
 3. Ne modifie rien avant que je t'aie dit quel chantier on prend. Propose-moi ensuite 3 options, de la
    plus sûre à la plus risquée, selon ce qui est disponible aujourd'hui (Cubase ? vrai corpus WAV ?).
 4. Règles : aucun changement audible sans me le dire, tout correctif de comportement reste désactivé par
-   défaut tant que je ne l'ai pas écouté, ne valide jamais un cas doré à ma place, tiens à jour
-   docs/SUIVI_IMPLEMENTATION.md à chaque étape, un commit par étape, une branche par chantier.
+   défaut tant que je ne l'ai pas écouté (ou validé), ne valide jamais un cas doré à ma place, tiens à jour
+   docs/SUIVI_IMPLEMENTATION.md à chaque étape, un commit par étape, travail directement sur main.
 
 Aujourd'hui je dispose de : [Cubase : oui / non] [vrai corpus WAV : oui / non] [temps : ...]
 Ce que je veux faire : [à compléter, ou « propose-moi »]
@@ -26,31 +26,33 @@ Ce que je veux faire : [à compléter, ou « propose-moi »]
 
 ## 2. Où on en est
 
-- **Dépôt** : `Uzdrayne/ZeroEffort-Drum`. Version du plug-in : **0.10.0** (inchangée, rien d'audible n'a changé par défaut).
-- **`main`** contient tout le travail des deux premières pull requests (#1 et #2) : phase 0, build VS 2019 / 2022, J1, T1, T2, J2, J3, T3, T4. Tag `v0.10.0` = version de départ.
-- **Aucune branche de travail ouverte.** Pour continuer : `git switch main`, *Pull*, puis `git switch -c feature/<nom>`.
-- **Suivi détaillé** : `docs/SUIVI_IMPLEMENTATION.md` (jalons, journal, écarts avec les spécifications, questions ouvertes). Plan et décisions validées : `docs/PLAN_IMPLEMENTATION.md`. Spécifications : `CodeUpdate/01` à `08`.
+*(Mis à jour le 17 octobre 2026, fin de la session de travail sur `main`.)*
+
+- **Dépôt** : `Uzdrayne/ZeroEffort-Drum`. Version du plug-in : **0.10.0**. On travaille **directement sur `main`**, un commit par étape (décision du 17/10/2026).
+- **Versions d'analyse** : `analysisVersion` **5**, `profileVersion` **2**.
+- **Suivi détaillé** : `docs/SUIVI_IMPLEMENTATION.md` (jalons, journal chiffré, écarts, questions ouvertes). Plan : `docs/PLAN_IMPLEMENTATION.md`. Spécifications : `CodeUpdate/01` à `08`.
+- **Corpus (hors dépôt)** : `C:\Users\robin\Desktop\Database_drum` : `raw1` à `raw4`, `mix1`, `mix2`, `LISTING.md`, `snapshots\`, `reports\`. Variables d'environnement utilisateur : `ZED_WAV_DIRECTORY` (= `raw3`, pour les tests de kit réel) et `ZED_ANALYSIS_EXPORT_DIR`.
 
 ### Ce qui est fait
 
 | Jalon | Résultat |
 |---|---|
-| Build | `scripts/Build.ps1` choisit VS 2019 si installé, sinon VS 2022 (`-Toolchain VS2019\|VS2022` pour forcer). Presets `windows-vs2019` et `windows-vs2022` (dossier `build-vs2022/`, ignoré par git). |
-| J1 | `Source/Drum/DrumAnalysisSnapshot.h` : snapshot JSON d'une analyse (réglages par identifiant de paramètre), rechargement strict. `analysisVersion` (actuellement **3**) et `profileVersion` (1). Export développeur : `-DZED_ANALYSIS_EXPORT=ON` **et** variable `ZED_ANALYSIS_EXPORT_DIR`. |
-| T1 | `tests/PropertyTests.cpp` : A01-A04, A10, propriétés E01, E02, E06-E10 sur 7 200 propositions. |
-| T2 | `Source/Drum/DrumReplay.h`, `tests/ReplayTests.cpp` : options `--export-wav`, `--replay`, `--compare` de `ZeroEffortDrumTests.exe` (rapport Markdown + JSON, liste « à écouter »). |
-| J2 | Mesures additives dans `DrumAnalysis.h` : L03, L05, D02, H02, H06, S01, S02, P02 (valeurs indisponibles = `null`, jamais 0). `push()` ne fait aucune allocation (test avec compteur). |
-| J3 | Deux correctifs **désactivés par défaut** : trames d'attaque écartées du bleed (problème 1) et crest actif pour le compresseur du Kick (problème 2). A08 (doubles pédales) est un « échec attendu ». |
-| T3 | `tests/KitTests.cpp` : défauts artificiels D01-D10 (synthétique + kit réel de `wav_test_file`). Aucun fichier de `Source/` modifié. 4 constats sur Kit / Phase, **non corrigés**. |
-| T4 | `tests/SignalTests.cpp` : A05, A06, A07, A11 ; mesure S04 (`spectralSlopeDbPerOctave`). |
+| Build | `scripts/Build.ps1` (VS 2019 si installé, sinon 2022). `build/` = production (export désactivé) ; `build-export/` = build d'export pour Cubase (`-DZED_ANALYSIS_EXPORT=ON`, ignoré par git). |
+| J1, T1, T2, J2, T4 | Snapshot JSON, tests de propriétés, rejeu `--export-wav` / `--replay` / `--compare`, mesures additives, tests de mesure. |
+| Export réel | Vérifié dans Cubase le 17/10/2026 ; `meta.position` et `meta.channels` ajoutés ; `ph_bleed_treble_ratio` exporté pour le Kick seulement. |
+| J3 | **Activé par défaut** (17/10/2026, validé par l'utilisateur) : trames d'attaque écartées du bleed, crest actif pour le compresseur du Kick. |
+| Calibration 01-Q1 | Seuil de la fenêtre active 40 → **55 dB** (script `scripts/CalibrateActiveWindow.py`). Décalage de plancher 12 dB étudié et **conservé** (A09 ≤ 1 dB l'impose). |
+| T3, K04, garde-fous Kit / Phase | Mesure K04 (`crosstalkDb`), garde-fous `KitPolicy` (hors fenêtre, diaphonie) **désactivés par défaut**, commande `--kit`. |
+| Registre de rôles | Étape 1 faite : `Source/Drum/DrumRole.h` (table de 10 descripteurs), filet `tests/RoleReferenceTests.cpp` (270 propositions gelées). |
+| J4a | Détection des doubles frappes (`setDoubleHitDetection`, `--double-hits`), **désactivée par défaut**. |
+| Corpus | 5 WAV retirés de git ; kits 1 à 4 exportés (38 snapshots), K04 mesuré sur 3 kits. |
 
-État des tests à la fin de la session : build VS 2022 sans avertissement, CTest 3/3 (`RegionCacheTests`, `ZeroEffortDrumTests` ≈ 80 s, `ARADiscoveryTests`).
+État des tests : build VS 2019 sans avertissement, CTest 3/3 (`RegionCacheTests`, `ZeroEffortDrumTests` ≈ 70-100 s, `ARADiscoveryTests`).
 
-### Ce qui n'a PAS pu être vérifié (aucun Cubase, aucun vrai corpus sur le PC de travail)
+### Ce qui reste non vérifié
 
-- L'export JSON réel depuis une session Auto dans Cubase.
-- L'écoute des deux correctifs J3.
-- Toute calibration des valeurs « H » (hypothèses à calibrer) : fenêtre active 40 dB / 12 dB, seuil de compresseur du Kick à 10 dB de crest, 400 ms de trame longue, cohérence 0,8, `k = 0,5`, etc. Seuls 5 WAV de test étaient dans `wav_test_file/` (retirés du dépôt le 17/10/2026, voir le suivi).
+- L'écoute (Cubase) des correctifs activés ou en réserve : aucun réglage ne change sur les 38 prises du corpus pour J3, la calibration 01-Q1 et le registre ; J4a ne change qu'un réglage (Kick Out du kit 1, < 9 Hz).
+- Les valeurs « H » non calibrées : seuil de 10 dB du compresseur du Kick, 400 ms de trame longue, cohérence 0,8, `k = 0,5`, seuils K04 (−15 dB) et hors fenêtre (rapport 1,2). Elles demandent des paires brut / mixé par piste, que le corpus ne fournit pas (mixés = bus).
 
 ---
 
@@ -66,39 +68,35 @@ Ce que je veux faire : [à compléter, ou « propose-moi »]
 
 ## 4. Constats ouverts, à décider avec l'utilisateur
 
-**Kit / Phase** (issus de T3, tous reproduits par des tests « échec attendu ») :
-1. Le retard du kick est lu avec un biais de +0,05 ms (2-3 échantillons) ; la caisse claire est exacte. Spécification : ±1 échantillon.
-2. Au-delà de la fenêtre de recherche (caisse claire > 10 ms, kick entendu 5 ms avant son micro), l'outil propose une correction **fausse sans refuser**.
-3. Diaphonie de la caisse claire dans le micro du kick à partir de −16 dB : le retard du kick suit la caisse claire.
-4. La mesure `diaphonie_db` (K04) n'existe pas.
+**Kit / Phase** (issus de T3) :
+1. Le retard du kick est lu avec un biais de +0,05 ms (2-3 échantillons) ; la caisse claire est exacte. Spécification : ±1 échantillon. **Non traité** (demande de reprendre la corrélation du Kick).
+2. Hors fenêtre de recherche : garde-fou `KitPolicy::refuseOutsideWindow` écrit, **désactivé par défaut**.
+3. Diaphonie : mesure K04 faite ; garde-fou `KitPolicy::refuseCrosstalk` (seuil −15 dB, H fragile : le Kick In du kit 1 est à −16 dB) écrit, **désactivé par défaut**. Aucun des deux n'est relié à l'interface.
+4. Le kit 4 (autre jour) donne une cohérence de phase de 59 après correction contre 93 sur le kit 3 : à regarder.
 
 **Analyse** :
 5. Le détecteur de frappes a un seuil absolu (niveau grave 0,0003, environ −70 dBFS) : un bruit de fond rose à −54 dBFS ajoute des frappes fantômes (risque R3).
 6. La puissance S01 absolue dépend de la taille de FFT (+6 dB à 96 kHz) : seules les mesures relatives (S02, S04) se comparent entre fréquences d'échantillonnage.
-7. Problème 3 du doc 01 (doubles pédales à 180 bpm sous-comptées : 24 frappes pour 48 jouées) : A08 le matérialise, la correction est en J4.
-8. A09 : écart de crest actif de 1,2 dB au lieu de ±1 dB (seuil relatif au P95 sensible à la densité du jeu) : à régler avec la calibration de 01-Q1.
+7. Problème 3 (doubles pédales) : correctif J4a écrit et **désactivé par défaut** ; à activer après écoute (incrémenter `analysisVersion`, régénérer le corpus).
+8. Le Hi-hat est refusé par K04 (−1,4 dB) : sa mesure Kit / Phase par les frappes du kit est douteuse de toute façon.
 
 ## 5. Menu pour la prochaine session
 
 Choisir selon ce qui est disponible.
 
-### Si Cubase est disponible (le plus utile)
-1. Compiler avec `-DZED_ANALYSIS_EXPORT=ON`, définir `ZED_ANALYSIS_EXPORT_DIR`, lancer une analyse Auto, vérifier qu'un `snapshot_*.json` apparaît, le rejouer avec `--replay`.
-2. Écouter les prises avec `--exclude-lead-frames --active-crest` (export) puis `--compare` : si c'est bon, activer par défaut `MeasureConstants::excludeLeadFramesByDefault` et `ProposalDefaults::compressorUsesActiveCrest`, incrémenter `profileVersion` / `analysisVersion`, **régénérer la référence figée** (`scripts/FreezeProposalReference.ps1`, `tests/LegacyDrumProposalReference.h`) et documenter. C'est un changement audible : une branche et un commit dédiés.
+### Avec Cubase (écoute)
+1. **Activer J4a** (doubles frappes) : exporter avec et sans `--double-hits`, écouter le Kick Out du kit 1 (seule prise dont un réglage change), puis passer `MeasureConstants::doubleHitsByDefault` à `true`, incrémenter `analysisVersion`, régénérer le corpus.
+2. **Garde-fous Kit / Phase** : décider si on les active et les relier à l'interface (aujourd'hui seulement `KitPolicy` dans `KitSession`).
 
-### Si le vrai corpus est disponible (hors dépôt)
-3. Générer les snapshots avec `--export-wav` (un dossier par kit), rejouer, lire le rapport de comparaison. Constituer les jeux de réglage et de validation (doc 02, section 4).
-4. Calibrer les constantes H une par une (doc 04, section 6) en commençant par la fenêtre active (courbe `crest_actif` / seuil) ; une constante à la fois, tout noté dans le suivi.
-
-### Sans Cubase ni corpus (sûr, aucun changement audible)
-5. **Registre de rôles** (`RoleDescriptor`, doc 06 sections 2 et 5) : d'abord figer des cas de référence Kick / Snare / Tom × 3 styles × 3 intensités (snapshots + propositions actuelles), puis migrer un rôle à la fois en vérifiant des sorties identiques à 1e-6. Commencer par Snare.
-6. **Retirer les 5 WAV de git** (sans réécrire l'historique : `git rm --cached`, mise à jour de `.gitignore` et de `ZED_WAV_DIRECTORY`) si l'utilisateur le décide.
-7. **Mesure K04** `diaphonie_db` (additive) pour objectiver le constat 3 de Kit / Phase.
-8. Ouvrir une branche de correctifs Kit / Phase **désactivés par défaut** (refus hors fenêtre, protection contre la diaphonie), sur le modèle de J3, si l'utilisateur le demande.
+### Sans écoute (sûr)
+3. **Registre de rôles, étape 2** : migrer les réglages propres aux profils (`Profiles/*.h`), les bandes de mesure par rôle (`DrumAnalysis::attackBodyGapDb`), le détecteur Kick de `DrumReplay`, puis l'interface ; le filet de 270 propositions doit rester vrai.
+4. **Seuil de 10 dB du compresseur du Kick** et autres constantes H : il faut des prises sparses (Kick joué par salves) ; aucun Kick du corpus n'est à moins de 7 dB du seuil.
+5. **Kit 4** : comprendre la cohérence de phase de 59 (détail des paires avec `--kit`).
 
 ### Plus lourd (à planifier, pas à improviser)
-9. **J4 / J4b** : détecteurs de frappes par rôle (corrige A08), analyse continue Overheads / Room avec entrée stéréo (débloque A12 et A13).
-10. **Sous-bus SB1-SB7** (doc 08) : prérequis = étendre le registre Kit (publier des mesures, relayer des trims) et ajouter les rôles Kick Sub / Hi-hat Bottom. Répondre d'abord aux trois questions de la section 12 du doc 08.
+6. **Constat 1** (biais du kick de +0,05 ms) : reprendre la corrélation du Kick (30-250 Hz).
+7. **J4b** : détecteurs de frappes par rôle, analyse continue Overheads / Room avec entrée stéréo (débloque A12 et A13).
+8. **Sous-bus SB1-SB7** (doc 08) : prérequis = étendre le registre Kit (publier des mesures, relayer des trims : les réponses aux questions de la section 12 du doc 08 sont **non**, **non**, **oui mais unique**) et ajouter les rôles Kick Sub / Hi-hat Bottom. Demande des décisions de conception (sélecteur « Piste / Sous-bus / Bus batterie », budget de traitement) et des essais dans Cubase.
 
 ---
 
