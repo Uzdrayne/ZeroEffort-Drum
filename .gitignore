@@ -1,5 +1,6 @@
 /build/
 /build-vs2022/
+/build-export/
 /out/
 /CMakeUserPresets.json
 *.user
