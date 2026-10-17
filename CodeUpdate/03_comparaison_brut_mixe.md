@@ -36,6 +36,8 @@ Conséquence : les cibles issues de cette méthode sont des **points de départ*
 
 Un mix complet ne convient pas : il contient les autres instruments, la compression du bus et le master, et l'effet d'une piste ne s'y isole plus.
 
+**3.1 bis. Le bus d'instrument (ajouté le 17/10/2026, à partir du premier corpus réel).** Dans les sessions réelles, on dispose souvent d'un **bus d'instrument** (Kick Bus = In + Out + Sub, Snare Bus = Top + Bottom + sample) et non d'un stem par micro. Le modèle de la section 5 (un seul filtre `H = Sxy / Sxx`) ne s'y applique pas : mesuré sur le kit 1, un seul micro n'explique que 0,34 à 0,68 de cohérence du bus (la méthode écarte la paire), alors que **la somme filtrée de tous les micros** l'explique à 0,90 (Kick Bus) et 0,82 (Snare Bus avec son sample), contre 0,77 sans le sample. Le bus est donc traité par une **régression multi-entrées** : `y = Σ Hᵢ xᵢ`, `Hᵢ` estimés par fréquence avec la matrice des spectres croisés (`H = (Sxx + λI)⁻¹ Sxy`, λ = 10⁻⁴ × la trace, pour les micros très corrélés), et on retient la **cohérence multiple** `γ²ₘ = Re(Sxyᴴ H) / Syy`. Un bus est utilisable si la cohérence multiple médiane (100 Hz à 8 kHz) atteint 0,8 : sinon, un micro, un sample ou une réverbe manque dans les entrées fournies. Ce qu'on en tire : le **gain par micro et par bande** dans le bus, et le **décalage de chaque micro** vu par le mixeur (voir 4). Outil : `ZeroEffortDrumTests.exe --bus`. Limite : si deux micros sont presque identiques (même contenu, mêmes instants), les `Hᵢ` individuels ne sont pas identifiables ; on ne garde que leur somme.
+
 ### 3.2 Méthode d'identification
 
 Chaque paire est décrite par un fichier `meta.json` : rôle, micro, style, mixeur (identifiant anonyme), source, **licence**, fréquence d'échantillonnage, remarques (samples de remplacement ajoutés, traitement parallèle, reverb sur la piste…).
@@ -54,7 +56,8 @@ La comparaison n'a de sens que si les deux signaux sont superposés. Tout écart
 | Aspect | Procédure | Contrôle |
 |---|---|---|
 | Fréquence d'échantillonnage | Même fréquence des deux côtés ; sinon rééchantillonner la plus basse vers la plus haute | Refuser une paire avec des fréquences différentes sans conversion documentée |
-| Temps | Corrélation croisée sur l'enveloppe, puis affinage sur le signal, pour trouver le décalage (latence des plug-ins) ; corriger par décalage d'un nombre entier d'échantillons | Décalage résiduel < 1 échantillon |
+| Temps | Corrélation croisée sur l'enveloppe (blocs de 1 ms, **sur tout le fichier** : les exports mixés commencent à des instants arbitraires, 12,25 s après le brut sur le corpus réel, ce qui dépasse largement la latence d'un plug-in), puis affinage sur le signal (±128 échantillons, sur la partie la plus forte) pour trouver le décalage ; corriger par décalage d'un nombre entier d'échantillons | Décalage résiduel < 1 échantillon ; **le décalage est mémorisé par micro** : brut / mixé = latence + alignement de phase fait par le mixeur (Kick In, Out et Sub : −540 221, −540 263 et −540 361 échantillons sur le kit 1, soit 1,0 et 3,2 ms d'écart entre micros) |
+| Voies | Un fichier stéréo est replié en mono par la **moyenne** des canaux (pas par le maximum de l'analyse ARA : la comparaison doit rester linéaire) ; l'analyse stéréo des overheads et de la room (L / R, mid / side, section 7.3) est à faire | Noter le repli dans la ligne de la paire |
 | Polarité | Signe du pic de corrélation ; mémoriser s'il y a inversion | Noter dans la ligne de la paire |
 | Longueur | Recouper les deux fichiers sur la même durée utile | Au moins 20 s de jeu |
 | Niveau | **Ne pas** égaliser avant d'estimer : on calcule d'abord le gain réel (section 5) | Le gain estimé doit être cohérent (voir 5.3) |
@@ -67,9 +70,10 @@ La comparaison n'a de sens que si les deux signaux sont superposés. Tout écart
 
 Pour chaque paire, avec x = brut, y = mixé, et des trames de 4096 points (mêmes que l'analyse) :
 
-- spectre croisé `Sxy`, spectre propre `Sxx`, moyennés sur les trames (méthode de Welch) ;
-- **réponse estimée** `H(f) = Sxy / Sxx` ; son module en dB est la courbe d'égalisation équivalente ;
-- **cohérence** `γ²(f) = |Sxy|² / (Sxx · Syy)`, entre 0 et 1.
+- spectre croisé `Sxy`, spectre propre `Sxx`, moyennés sur les trames (méthode de Welch, fenêtre de Hann, recouvrement 50 %), **sur les trames actives seulement** (niveau du brut au plus 40 dB sous le P95 : le silence ne porte aucune information et fausse la cohérence) ;
+- **réponse estimée** `H(f) = Sxy / Sxx` ; son module en dB est la courbe d'égalisation équivalente. **Dans une bande de 1/3 d'octave, on moyenne les modules** (`Σ|Sxy| / Σ Sxx`), jamais le complexe : la phase de `H` tourne dans la bande et une moyenne complexe s'annulerait ;
+- **cohérence** `γ²(f) = |Sxy|² / (Sxx · Syy)`, entre 0 et 1 ;
+- **vérifié sur paires synthétiques** (EQ de +6 dB à 3 kHz, gain, retard, inversion de polarité) : courbe retrouvée à 0,12 dB près, retard au échantillon près, cohérence 0,99999.
 
 La cohérence indique où le modèle « filtre linéaire » est fiable. Là où elle chute, le traitement n'est pas linéaire (compression, saturation, gate) ou du bruit domine.
 
@@ -128,7 +132,7 @@ Ces deux estimations sont **grossières** (vous mesurez un effet combiné de plu
 
 ### 7.1 Expansion / gate
 
-- Comparer le plancher de bruit (L05) du brut et du mixé : `delta_plancher_db`.
+- Comparer le plancher de bruit (L05) du brut et du mixé : `delta_plancher_db`, **après compensation du gain moyen de 5.2** (sans cela un simple changement de niveau se lit comme un gate ; corrigé le 17/10/2026).
 - Comparer le niveau des trames bleed : atténuation de la diaphonie et du bruit entre les frappes.
 - Repérer le **coupe-queue** : chute brutale de niveau après chaque frappe (gate), à partir de la décroissance H06 du mixé comparée à celle du brut.
 
@@ -151,8 +155,8 @@ Le fichier `paires.csv` (et un JSON complet par paire) contient, en suivant la c
 | Groupe | Colonnes |
 |---|---|
 | Identité | `paire_id`, `kit_id`, `role`, `style`, `mixeur`, `source`, `licence`, `analysisVersion` |
-| Alignement | `decalage_ech`, `polarite_inversee`, `coherence_med`, `valide` |
-| Égalisation | `eq_gain_moyen_db`, `eq_31bandes` (JSON), `eq_coherence_31` (JSON) |
+| Alignement | `decalage_ech`, `polarite_inversee`, `coherence_med`, `valide` ; pour un bus : un décalage et une polarité **par micro**, `coherence_multiple_med` |
+| Égalisation | `eq_gain_moyen_db`, `eq_31bandes` (JSON), `eq_coherence_31` (JSON) ; pour un bus : `gain_db` par micro et par bande |
 | Dynamique | `dyn_seuil_db`, `dyn_rapport`, `dyn_gr_p50`, `dyn_gr_p95`, `dyn_plafond_gr_db`, `dyn_attaque_ms`, `dyn_release_ms` |
 | Expansion | `exp_delta_plancher_db`, `exp_range_db` |
 | Couleur | `couleur_non_lineaire_db` |
@@ -175,6 +179,8 @@ Les valeurs peu fiables sont écrites `null` et jamais interpolées.
 Exemple de lecture (valeurs fictives) : « Kick / Rock, bande 60-120 Hz : médiane +3,2 dB, P25-P75 de +1,5 à +4,6, 14 paires, 5 mixeurs ». Une dispersion large dit que la correction est **peu déterminée** : le preset devra être prudent sur cette bande.
 
 ## 10. Procédure pas à pas
+
+**État de la procédure (17/10/2026)** : les étapes 2 et 3 sont **implémentées** (`ZeroEffortDrumTests.exe --pair`, `--bus` ; `Source/Drum/DrumPairAnalysis.h`) ainsi que les indices simples de 6.3 et 7.1 ; l'estimation de la compression (6.1), la stéréo (7.4), l'écriture de `paires.csv` (8) et l'agrégation (9) restent à faire.
 
 1. Rassembler les paires, remplir `meta.json`, vérifier les licences.
 2. Aligner en temps, polarité et durée (section 4) ; calculer la cohérence ; écarter ce qui est invalide.
@@ -201,10 +207,14 @@ Avant de faire confiance aux résultats sur de vraies paires, vérifier que la m
 
 Ces tests M sont à ajouter au programme de test (document 02) comme une famille `T-M`.
 
+**État (17/10/2026)** : `tests/PairTests.cpp` couvre sur signaux synthétiques : M01 (variante : cloche +6 dB à 3 kHz et −3 dB de gain, courbe retrouvée à 0,12 dB), M04 (saturation : couleur non linéaire en hausse de plus de 6 dB, crest en baisse), M05 (retard au échantillon près, polarité inversée, début tronqué, décalage de 12 s), le refus de deux prises différentes, des prises de moins de 20 s, la dérive de niveau, et le bus à deux micros (filtres retrouvés à 0,12 dB). Restent : M02 et M03 (dynamique équivalente, section 6), M06 (réverbe), M07 (compression parallèle).
+
 ## 12. Pièges fréquents
 
 - **Comparer à des volumes différents** donne l'impression d'un boost de timbre. Toujours retirer le gain moyen avant de lire une courbe.
-- **Un mixé qui contient des samples** de remplacement n'a plus de rapport linéaire avec le brut : cohérence basse, paire à écarter.
+- **Un mixé qui contient des samples** de remplacement n'a plus de rapport linéaire avec le brut : cohérence basse, paire à écarter. **Mais** si le sample est fourni comme entrée supplémentaire d'un bus, il fait partie de la somme linéaire : le bus Snare du kit 1 passe de 0,77 à 0,82 de cohérence multiple en ajoutant `SnareSample`.
+- **Un bus mesuré avec un seul micro** donne une cohérence trompeusement basse (0,34 à 0,68 sur le kit 1 contre 0,90 avec les trois micros du Kick Bus) : fournir tous les micros du bus (3.1 bis).
+- **Les exports mixés ne commencent pas au même instant que les bruts** (12,25 s de décalage sur le corpus réel) : chercher le décalage sur tout le fichier, pas seulement autour de zéro.
 - **Le master et le bus** contaminent la lecture si le stem est pris trop tard dans la chaîne.
 - **Les styles se mélangent** : une prise « Metal » mixée en « Naturel » est une paire mal étiquetée.
 - **Une période courte** (< 20 s) ou trop peu de frappes donne des spectres moyens instables.
@@ -212,8 +222,8 @@ Ces tests M sont à ajouter au programme de test (document 02) comme une famille
 
 ## 13. Questions ouvertes
 
-- **Q1** : seuil de cohérence (0,8) et nombre minimal de paires (8) : à calibrer sur les premières données.
-- **Q2** : faut-il exiger le stem *avant* le bus ou accepter une piste mixée avec insert de bus (à documenter par paire) ?
-- **Q3** : comment traiter les paires avec samples de remplacement : exclusion totale, ou analyse séparée « kit hybride » ?
+- **Q1** : seuil de cohérence (0,8) et nombre minimal de paires (8) : à calibrer sur les premières données. Premiers chiffres réels (kit 1, 217 s) : cohérence multiple médiane 0,90 (Kick Bus, 3 micros) et 0,82 (Snare Bus, 3 entrées) ; cohérence à une entrée 0,34 à 0,68. Le seuil de 0,8 sépare ces cas sans marge : à recalibrer sur plusieurs mixeurs. Remarque : une compression ou un gate **varient dans le temps** et font baisser la cohérence même sans bruit ; le seuil d'acceptation doit donc se lire avec `couleur_non_lineaire_db`.
+- **Q2** : faut-il exiger le stem *avant* le bus ou accepter une piste mixée avec insert de bus (à documenter par paire) ? Réponse partielle : le **bus d'instrument** est accepté (3.1 bis, régression multi-entrées) ; le bus de batterie complet et le master restent exclus.
+- **Q3** : comment traiter les paires avec samples de remplacement : exclusion totale, ou analyse séparée « kit hybride » ? Réponse partielle : si la piste du sample est disponible, l'ajouter comme entrée du bus (3.1 bis) ; sinon exclure.
 - **Q4** : méthode d'estimation des temps d'attaque et de release : suffisamment fiable pour entrer dans les presets, ou information seulement ?
 - **Q5** : stockage des paires brutes (poids, licence) : conserve-t-on le WAV ou seulement les mesures ?

@@ -1,0 +1,45 @@
+# Corpus : préparer, lancer, lire
+
+Le corpus reste **hors du dépôt** (aujourd'hui `C:\Users\robin\Desktop\Database_drum`). Un dossier de kits, un fichier `corpus.json` qui les décrit, un script qui lance toute la chaîne. Rien n'est joué, rien n'est écrit dans le dépôt.
+
+## 1. Organisation conseillée
+
+```
+Database_drum\
+  corpus.json            le manifeste (modèle : docs\corpus.example.json)
+  raw1\ raw2\ ...        un dossier par kit, pistes brutes
+  mix1\ mix2\ ...        les mêmes pistes mixées (stems) ou les bus d'instrument
+  out\                   sortie du script (snapshots, rapports, bus, paires, summary.md)
+```
+
+Règles pour que les mesures soient comparables :
+
+- **Même fréquence d'échantillonnage** des deux côtés d'une paire (sinon l'outil refuse : convertir d'abord).
+- **Un stem par piste** *après les inserts, avant le bus de batterie et le master* est idéal (paire). Un **bus d'instrument** est accepté si on fournit **tous ses micros** (et le sample, s'il y en a un) : l'outil `--bus` le traite par régression multi-entrées (doc 03, 3.1 bis).
+- Les fichiers mixés peuvent démarrer à un autre instant que les bruts (l'alignement cherche sur tout le fichier). Au moins **20 s de jeu**.
+- Noter dans le manifeste le **rôle** (0 Kick, 1 Snare, 2-4 Toms, 5 Tom basse, 6 Hi-hat, 7 Overheads, 8 Room, 9 Bus) et la **position** du micro (`kitMic` : 0 principal, 1 secondaire Out / Bottom, 2 gauche, 3 droite).
+- Ne pas mettre dans le manifeste ce qui n'a pas de rôle (Kick Sub, Ride, Cymbals) ni les pistes de sample : elles peuvent servir d'entrées d'un bus, pas de snapshot.
+
+## 2. Lancer
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\RunCorpus.ps1 -Corpus C:\Users\robin\Desktop\Database_drum
+# options : -Out <dossier>, -SkipSnapshots, -SkipBuses, -SkipPairs, -Exe <ZeroEffortDrumTests.exe>
+```
+
+Le script utilise le build Release de production (`build\ZeroEffortDrumTests_artefacts\Release\`). Il écrit `out\summary.md` : une ligne par piste, bus ou paire, avec le verdict.
+
+## 3. Lire les résultats
+
+| Sortie | Ce que c'est |
+|---|---|
+| `out\snapshots\<kit>\*.json` | une analyse par piste (mesures + proposition), rejouable |
+| `out\reports\replay.md` | rejeu de tous les snapshots : refus, réglages, prises à écouter |
+| `out\buses\*.md / .json` | bus : décalage de chaque micro, gain par micro et par bande, **cohérence multiple** (≥ 0,8 : le bus est expliqué par ses micros) |
+| `out\pairs\*.md / .json` | paire brut / stem : décalage, polarité, courbe d'égalisation équivalente (forme + gain moyen), cohérence, couleur non linéaire, deltas de crest et de plancher |
+
+Outils individuels : `ZeroEffortDrumTests.exe --pair <brut> <mixé> [préfixe]`, `--bus <mixé> <préfixe> nom=fichier ...`, `--export-wav`, `--replay`, `--compare`, `--kit` (voir `docs\REPRISE_PROCHAINE_SESSION.md`).
+
+## 4. Ce qui n'est pas encore fait
+
+Estimation de la compression équivalente (doc 03, 6.1), stéréo des overheads et de la room (7.4), `paires.csv` et agrégation par rôle × style (8 et 9). Les cibles des presets ne se calculent qu'à partir de **8 paires et 3 mixeurs** (doc 03, 9) : un bus ne compte pas pour une paire de stem sans l'étiquette de son mixeur.

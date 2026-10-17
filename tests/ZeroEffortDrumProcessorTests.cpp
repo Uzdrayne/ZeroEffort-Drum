@@ -22,6 +22,9 @@ void testRoleReference();
 void testSignals();
 int runReplayCommand(const juce::StringArray& arguments);
 int runKitCommand(const juce::StringArray& arguments);
+int runPairCommand(const juce::StringArray& arguments);
+int runBusCommand(const juce::StringArray& arguments);
+void testPair();
 void makeScreenshots(const juce::File& directory);
 void testEditor(ZeroEffortDrumProcessor& processor, const juce::File& imageFile);
 
@@ -1291,6 +1294,10 @@ int main(int argumentCount, char** arguments)
             return code;
         if (const auto code = runKitCommand(commandLine); code >= 0)
             return code;
+        if (const auto code = runPairCommand(commandLine); code >= 0)
+            return code;
+        if (const auto code = runBusCommand(commandLine); code >= 0)
+            return code;
         testKit();
         testSnapshot();
         testAnalysisProperties();
@@ -1298,6 +1305,7 @@ int main(int argumentCount, char** arguments)
         testMeasures();
         testKnownProblems();
         testRoleReference();
+        testPair();
         testSignals();
         testKickResponse();
         testDrumBus();

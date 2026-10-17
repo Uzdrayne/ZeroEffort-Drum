@@ -45,7 +45,8 @@ Ce que je veux faire : [à compléter, ou « propose-moi »]
 | T3, K04, garde-fous Kit / Phase | Mesure K04 (`crosstalkDb`), garde-fous `KitPolicy` (hors fenêtre, diaphonie) **désactivés par défaut**, commande `--kit`. |
 | Registre de rôles | Étape 1 faite : `Source/Drum/DrumRole.h` (table de 10 descripteurs), filet `tests/RoleReferenceTests.cpp` (270 propositions gelées). |
 | J4a | Détection des doubles frappes (`setDoubleHitDetection`, `--no-double-hits` pour l'ancien comportement), **activée par défaut** (17/10/2026). |
-| Corpus | 5 WAV retirés de git ; kits 1 à 4 exportés (38 snapshots), K04 mesuré sur 3 kits. |
+| Corpus | 5 WAV retirés de git ; kits 1 à 4 exportés, K04 mesuré sur 3 kits. `scripts/RunCorpus.ps1` + `corpus.json` (manifeste hors dépôt) lancent toute la chaîne ; voir `docs/Corpus.md`. |
+| Brut / mixé (doc 03) | `--pair` (paire à un filtre : alignement, courbe d'égalisation équivalente, cohérence, indices) et `--bus` (bus = somme filtrée de ses micros, régression multi-entrées) : `Source/Drum/DrumPairAnalysis.h`, `tests/PairTests.cpp`. Réel : Kick Bus expliqué à 0,90 par In + Out + Sub, Snare Bus à 0,82 avec son sample. Spec 03 corrigée (3.1 bis, 4, 5.1, 7.1, 12, 13). |
 
 État des tests : build VS 2019 sans avertissement, CTest 3/3 (`RegionCacheTests`, `ZeroEffortDrumTests` ≈ 70-100 s, `ARADiscoveryTests`).
 
@@ -87,6 +88,9 @@ Choisir selon ce qui est disponible.
 ### Avec Cubase (écoute)
 1. **Écouter J4a** (déjà activé) : le Kick Out du kit 1 est la seule prise du corpus dont un réglage change (< 9 Hz) ; retour arrière possible via `doubleHitsByDefault`.
 2. **Garde-fous Kit / Phase** : décider si on les active et les relier à l'interface (aujourd'hui seulement `KitPolicy` dans `KitSession`).
+
+### Quand le nouveau corpus arrive
+0. Déclarer les kits dans `corpus.json` (modèle : `docs/corpus.example.json`), lancer `scripts/RunCorpus.ps1`, lire `out/summary.md` ; terminer les étapes manquantes du doc 03 (compression équivalente 6.1, stéréo 7.4, `paires.csv`, agrégation).
 
 ### Sans écoute (sûr)
 3. **Registre de rôles, étape 2** : migrer les réglages propres aux profils (`Profiles/*.h`), les bandes de mesure par rôle (`DrumAnalysis::attackBodyGapDb`), le détecteur Kick de `DrumReplay`, puis l'interface ; le filet de 270 propositions doit rester vrai.

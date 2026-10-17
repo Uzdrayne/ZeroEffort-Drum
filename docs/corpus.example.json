@@ -1,0 +1,26 @@
+{
+  "style": "rock",
+  "intensity": 0.8,
+  "kits": [
+    {
+      "id": "kit1",
+      "tracks": [
+        { "file": "raw1/01_KickIn.wav",  "role": 0, "position": 0 },
+        { "file": "raw1/02_KickOut.wav", "role": 0, "position": 1 },
+        { "file": "raw1/04_SnareUp.wav", "role": 1, "position": 0 },
+        { "file": "raw1/05_SnareDown.wav", "role": 1, "position": 1 },
+        { "file": "raw1/12_OverheadsStereo.wav", "role": 7, "position": 0 }
+      ],
+      "buses": [
+        {
+          "name": "Kick Bus",
+          "mix": "mix1/01_Kick.wav",
+          "inputs": [ "raw1/01_KickIn.wav", "raw1/02_KickOut.wav", "raw1/03_KickSub.wav" ]
+        }
+      ],
+      "pairs": [
+        { "raw": "raw1/07_HiHat.wav", "mix": "mix1/07_HiHat_stem.wav" }
+      ]
+    }
+  ]
+}
