@@ -12,6 +12,24 @@ Database_drum\
   out\                   sortie du script (snapshots, rapports, bus, paires, summary.md)
 ```
 
+Pour plusieurs mixes du même kit (ou plusieurs ingés), un dossier de mix par ingé et par style : `mix1_ingeA_rock\`, `mix1_ingeB_metal\`, qui partagent le même `raw1\`.
+
+Un guide d'une page à donner à un ingé son qui prépare un kit : [`Guide_Ingenieur_Son.md`](Guide_Ingenieur_Son.md).
+
+### Ce qu'on attend d'un kit (liste de contrôle)
+
+| À fournir | Pourquoi |
+|---|---|
+| Pistes brutes **sans aucun insert** (ni EQ, ni compression, ni gate, ni sample) | c'est la source que le plug-in verra |
+| Les **mêmes pistes**, avec tous les inserts de piste, **avant** bus de batterie, master et envois d'effets | c'est le résultat de l'ingé, piste par piste |
+| Même **nom de fichier** des deux côtés, même **fréquence d'échantillonnage**, même **début** d'export, pas de normalisation | l'appariement et l'alignement restent fiables |
+| 20 s de jeu au minimum, avec des frappes variées (pas un seul coup répété) | les mesures (crest, bandes, décroissance) ont besoin de matière |
+| Un fichier `INFO.txt` par mix : ingé, style (`natural`, `rock`, `metal`), notes (sample, compression parallèle, polarité inversée, décalage manuel), morceau | le **style** et l'**ingé** décident à quoi une paire sert ; sans eux, on ne regroupe pas |
+| Priorité : Kick (In, Out), Snare (Top, Bottom), Overheads, puis Toms, Hi-hat, Room | les premiers rôles apportent le plus |
+| Bonus : le **même brut mixé par deux ingés**, ou dans **deux styles** | on sépare ce qui est commun de ce qui est personnel |
+
+Ce qui compte : **un stem par piste vaut mieux qu'un bus** (une paire exploitable ; un bus ne compte pas comme paire). Le style et l'ingé sont des étiquettes **par mix**, pas par kit : le manifeste actuel n'a qu'un style global, la prise en charge d'étiquettes par mix viendra avec les premiers dossiers réels.
+
 Règles pour que les mesures soient comparables :
 
 - **Même fréquence d'échantillonnage** des deux côtés d'une paire (sinon l'outil refuse : convertir d'abord).
@@ -42,4 +60,4 @@ Outils individuels : `ZeroEffortDrumTests.exe --pair <brut> <mixé> [préfixe]`,
 
 ## 4. Ce qui n'est pas encore fait
 
-Estimation de la compression équivalente (doc 03, 6.1), stéréo des overheads et de la room (7.4), `paires.csv` et agrégation par rôle × style (8 et 9). Les cibles des presets ne se calculent qu'à partir de **8 paires et 3 mixeurs** (doc 03, 9) : un bus ne compte pas pour une paire de stem sans l'étiquette de son mixeur.
+Étiquettes par mix (style, ingé, notes) lues par `RunCorpus.ps1` et regroupement des résultats par rôle × style × ingé (à faire avec les premiers dossiers réels), estimation de la compression équivalente (doc 03, 6.1), stéréo des overheads et de la room (7.4), `paires.csv` et agrégation par rôle × style (8 et 9). Les cibles des presets ne se calculent qu'à partir de **8 paires et 3 mixeurs** (doc 03, 9) : un bus ne compte pas pour une paire de stem sans l'étiquette de son mixeur.

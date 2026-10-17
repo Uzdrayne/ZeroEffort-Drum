@@ -142,6 +142,10 @@ Branche `main`. En insert, le plug-in ne voit l'audio que pendant la lecture : l
 - Test de l'éditeur : la phase 0 (analyse) est maintenant observée pendant la capture (`AutoRadar_phase0.png` montre la courbe à 60 %).
 - Texte de statut « capture 60.0667 % » corrigé (arrondi).
 - Reste : le panneau ne dit pas encore « lance la lecture ». Validé dans Cubase par l'utilisateur (« ça marche plutôt bien »).
+
+### Préparation des futurs kits (17/10/2026)
+
+Documentation seulement, aucun code : `docs/Corpus.md` reçoit une liste de contrôle de ce qu'on attend d'un kit (pistes brutes sans insert, stems avec inserts avant bus, mêmes noms, début et fréquence, `INFO.txt` avec ingé, style et notes, priorité Kick / Snare / Overheads), et `docs/Guide_Ingenieur_Son.md` est le guide d'une page à donner à l'ingé son. Décisions : le style et l'ingé sont des étiquettes **par mix**, pas par kit ; l'outil qui les lit (`RunCorpus.ps1`, regroupement par rôle × style × ingé) attend les premiers dossiers réels. Le seuil « 8 paires et 3 mixeurs » du doc 03 reste la règle pour les cibles de presets ; avec 2 ingés, seules des corrections cohérentes chez les deux et validées sur des données mises de côté seraient retenues, derrière l'intensité.
 ## Écarts avec les spécifications
 
 - **Emplacement des fonctions** : `toSnapshot` / `restoreSnapshot` / `measuresToVar` sont des fonctions statiques de `struct DrumAnalysisSnapshot` (ami de `DrumAnalysis`), pas des méthodes de `DrumAnalysis` : la classe de mesure reste inchangée. Le doc 07 disait « dans la classe DrumAnalysis ».
