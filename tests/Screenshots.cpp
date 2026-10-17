@@ -113,6 +113,10 @@ std::unique_ptr<ZeroEffortDrumProcessor> makeProcessor(const juce::String& track
 
 void makeScreenshots(const juce::File& directory)
 {
+#ifndef ZED_WAV_DIRECTORY
+    juce::ignoreUnused(directory);
+    throw std::runtime_error("Screenshots need real takes: configure with -DZED_WAV_DIRECTORY=<folder with Kick_12, Snare_12, OvH L_12, OvH R_12>");
+#else
     const juce::File wavs(ZED_WAV_DIRECTORY);
     ensure(directory.createDirectory(), "Screenshot directory must be writable");
     const auto kick = loadTrack(wavs.getChildFile("Kick_12.wav"), 40.0, 20.0);
@@ -267,4 +271,5 @@ void makeScreenshots(const juce::File& directory)
     juce::MessageManager::getInstance()->runDispatchLoopUntil(300);
     save(*editor, directory.getChildFile("13_Kit_Phase_Applique.png"));
     for (auto& track : tracks) track->releaseResources();
+#endif
 }

@@ -1,6 +1,7 @@
 /build/
 /build-vs2022/
 /build-export/
+*.wav
 /out/
 /CMakeUserPresets.json
 *.user

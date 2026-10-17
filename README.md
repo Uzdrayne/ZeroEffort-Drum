@@ -245,8 +245,8 @@ Le cahier des charges est dans [plan.md](plan.md).
 - [tests/ZeroEffortDrumProcessorTests.cpp](tests/ZeroEffortDrumProcessorTests.cpp) : tests DSP, processeur et etats.
 - [Source/Kit/](Source/Kit/) : registre multi-instances, capture horodatee, analyse de phase et alignement temps reel.
 - [Source/UI/](Source/UI/) : editeur, LookAndFeel et noms des reglages selon l'instrument.
-- [tests/KitTests.cpp](tests/KitTests.cpp) et [tests/EditorTests.cpp](tests/EditorTests.cpp) : kit (dont la prise `wav_test_file` si presente) et interface, dans la suite ZeroEffortDrumTests.
-- [tests/Screenshots.cpp](tests/Screenshots.cpp) : captures de presentation (2x) a partir de `wav_test_file`, hors CTest :
+- [tests/KitTests.cpp](tests/KitTests.cpp) et [tests/EditorTests.cpp](tests/EditorTests.cpp) : kit (dont les prises reelles Kick_12, Snare_12, OvH L_12, OvH R_12 si `ZED_WAV_DIRECTORY` est defini ; elles sont hors du depot) et interface, dans la suite ZeroEffortDrumTests.
+- [tests/Screenshots.cpp](tests/Screenshots.cpp) : captures de presentation (2x) a partir des memes prises (`ZED_WAV_DIRECTORY` requis), hors CTest :
   `build\ZeroEffortDrumTests_artefacts\Release\ZeroEffortDrumTests.exe --screenshots screenshot`.
 - [CMakePresets.json](CMakePresets.json) : Visual Studio 2019 x64, Release et Debug.
 

@@ -75,8 +75,17 @@ if(BUILD_TESTING)
     target_sources(ZeroEffortDrumTests PRIVATE tests/ZeroEffortDrumProcessorTests.cpp tests/KitTests.cpp tests/SnapshotTests.cpp tests/PropertyTests.cpp tests/ReplayTests.cpp tests/MeasureTests.cpp tests/KnownProblemTests.cpp tests/SignalTests.cpp tests/EditorTests.cpp tests/Screenshots.cpp
         "${juce_SOURCE_DIR}/modules/juce_audio_plugin_client/juce_audio_plugin_client_ARA.cpp")
     target_include_directories(ZeroEffortDrumTests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/Source")
-    target_compile_definitions(ZeroEffortDrumTests PRIVATE JucePlugin_Build_VST3=1 JUCE_MODAL_LOOPS_PERMITTED=1
-        ZED_WAV_DIRECTORY="${CMAKE_CURRENT_SOURCE_DIR}/wav_test_file")
+    target_compile_definitions(ZeroEffortDrumTests PRIVATE JucePlugin_Build_VST3=1 JUCE_MODAL_LOOPS_PERMITTED=1)
+    # Real multitrack takes (Kick_12, Snare_12, OvH L_12, OvH R_12) live outside the repository: pass the folder with
+    # -DZED_WAV_DIRECTORY=<folder> or the environment variable of the same name. Without it, the real-kit tests are skipped.
+    set(ZED_WAV_DIRECTORY "" CACHE PATH "Folder with the real multitrack takes used by the kit tests (optional)")
+    if(NOT ZED_WAV_DIRECTORY AND DEFINED ENV{ZED_WAV_DIRECTORY})
+        set(ZED_WAV_DIRECTORY "$ENV{ZED_WAV_DIRECTORY}")
+    endif()
+    if(ZED_WAV_DIRECTORY)
+        file(TO_CMAKE_PATH "${ZED_WAV_DIRECTORY}" ZED_WAV_DIRECTORY_CMAKE)
+        target_compile_definitions(ZeroEffortDrumTests PRIVATE ZED_WAV_DIRECTORY="${ZED_WAV_DIRECTORY_CMAKE}")
+    endif()
     target_link_libraries(ZeroEffortDrumTests PRIVATE ZeroEffortDrum juce::juce_audio_utils)
     add_test(NAME ZeroEffortDrumTests COMMAND ZeroEffortDrumTests)
 

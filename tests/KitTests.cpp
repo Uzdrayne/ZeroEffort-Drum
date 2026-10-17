@@ -217,7 +217,7 @@ void testRealMultitrack()
     for (const auto* name : names)
         if (!directory.getChildFile(name).existsAsFile())
         {
-            std::cout << "SKIP: real multitrack kit test (wav_test_file missing)\n";
+            std::cout << "SKIP: real multitrack kit test (set ZED_WAV_DIRECTORY to the folder with Kick_12, Snare_12, OvH L_12, OvH R_12)\n";
             return;
         }
     std::array<std::vector<float>, 4> audio;
@@ -784,7 +784,7 @@ void testRealFaults()
     double sampleRate = 0;
     if (!loadReferenceKit(audio, sampleRate))
     {
-        std::cout << "SKIP: real kit fault tests (wav_test_file missing)\n";
+        std::cout << "SKIP: real kit fault tests (set ZED_WAV_DIRECTORY to the folder with Kick_12, Snare_12, OvH L_12, OvH R_12)\n";
         return;
     }
     const auto run = [&](const std::vector<float>& kickTrack, const std::vector<float>& left, const std::vector<float>& right) {

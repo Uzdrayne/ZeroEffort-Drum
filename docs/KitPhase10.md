@@ -94,7 +94,7 @@ qui melange existant et souhaits) :
 
 ## Mesures Sur La Prise De Reference
 
-Fichiers `wav_test_file` (48 kHz / 24 bits, 165 s) : Kick, Snare, OH L, OH R.
+Prises de reference (48 kHz / 24 bits, 165 s, hors du depot : dossier `ZED_WAV_DIRECTORY`) : Kick, Snare, OH L, OH R.
 Teste dans `tests/KitTests.cpp` (fenetre 5 s - 35 s).
 
 | Paire | Resultat | Remarque |

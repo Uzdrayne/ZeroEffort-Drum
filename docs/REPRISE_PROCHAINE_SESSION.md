@@ -50,7 +50,7 @@ Ce que je veux faire : [à compléter, ou « propose-moi »]
 
 - L'export JSON réel depuis une session Auto dans Cubase.
 - L'écoute des deux correctifs J3.
-- Toute calibration des valeurs « H » (hypothèses à calibrer) : fenêtre active 40 dB / 12 dB, seuil de compresseur du Kick à 10 dB de crest, 400 ms de trame longue, cohérence 0,8, `k = 0,5`, etc. Seuls 5 WAV de test sont dans `wav_test_file/` (usage du test précédent, pas le corpus définitif).
+- Toute calibration des valeurs « H » (hypothèses à calibrer) : fenêtre active 40 dB / 12 dB, seuil de compresseur du Kick à 10 dB de crest, 400 ms de trame longue, cohérence 0,8, `k = 0,5`, etc. Seuls 5 WAV de test étaient dans `wav_test_file/` (retirés du dépôt le 17/10/2026, voir le suivi).
 
 ---
 
@@ -60,7 +60,7 @@ Ce que je veux faire : [à compléter, ou « propose-moi »]
 2. Export JSON : option CMake + variable d'environnement, désactivé par défaut, aucun contrôle dans l'interface.
 3. Les correctifs qui changent le son restent **désactivés par défaut** derrière une constante nommée, jusqu'à une écoute par l'utilisateur dans un hôte. Le test `LegacyDrumProposalReference` reste vrai tant qu'ils sont désactivés.
 4. L'intensité garde sa « dose » non linéaire (×1,75 à 100 %) : on n'y touche pas dans cette vague.
-5. Le vrai corpus de WAV reste **hors du dépôt**. Les 5 WAV de `wav_test_file/` servent aux tests actuels sans être le corpus définitif ; leur retrait de git reste à décider (sans réécrire l'historique).
+5. Le vrai corpus de WAV reste **hors du dépôt**. Les 5 WAV de `wav_test_file/` ont été **retirés de git et du projet le 17/10/2026** (sans réécrire l'historique) ; les tests de kit réel lisent le dossier `ZED_WAV_DIRECTORY` (option CMake ou variable d'environnement, ex. `Database_drum\raw3`) et sont ignorés s'il manque.
 6. Pas de cible `drumtest` séparée : les commandes sont des options de `ZeroEffortDrumTests.exe`.
 7. Ne jamais valider un « cas doré » à la place de l'utilisateur.
 
