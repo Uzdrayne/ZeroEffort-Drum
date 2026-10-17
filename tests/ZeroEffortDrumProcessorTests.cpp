@@ -1120,6 +1120,47 @@ void testTemporalAutoEQ()
     }
 }
 
+void testAutoLiveCapture()
+{
+    const auto makeBlock = [](juce::AudioBuffer<float>& audio, int block) {
+        for (int sample = 0; sample < 256; ++sample)
+        {
+            const auto time = static_cast<double>(block * 256 + sample) / 48000;
+            audio.setSample(0, sample, static_cast<float>(0.6 * std::exp(-std::fmod(time, 0.5) * 30)
+                * std::sin(juce::MathConstants<double>::twoPi * 65 * time)));
+        }
+    };
+    const auto run = [&](bool live, bool& sourceBeforeCaptureEnd) {
+        ZeroEffortDrumProcessor processor;
+        processor.setRateAndBufferSizeDetails(48000, 256);
+        processor.prepareToPlay(48000, 256);
+        processor.setAutoStyle(drum::DrumStyle::natural, 0.8f);
+        processor.startAutoPreset();
+        juce::MidiBuffer midi;
+        juce::AudioBuffer<float> audio(1, 256);
+        sourceBeforeCaptureEnd = false;
+        for (int block = 0; block < 1500; ++block)
+        {
+            makeBlock(audio, block);
+            processor.processBlock(audio, midi);
+            if (live && block % 20 == 0 && block < 1400)
+            {
+                processor.updateAutoPreset();
+                if (block > 400 && processor.getAutoRadar().source.any()) sourceBeforeCaptureEnd = true;
+            }
+        }
+        for (int step = 0; step < 200 && processor.autoPresetBusy(); ++step) processor.updateAutoPreset();
+        require(!processor.autoPresetBusy(), "Insert Auto must finish after the capture");
+        return processor.getSettings();
+    };
+    bool liveSource = false, lateSource = false;
+    const auto live = run(true, liveSource);
+    const auto late = run(false, lateSource);
+    require(liveSource && !lateSource, "Insert Auto must draw the source curve while the capture is still running");
+    for (size_t index = 0; index < live.size(); ++index)
+        require(live[index] == late[index], "Analysing during the capture must give exactly the same proposal");
+}
+
 void testAutoWorkflow()
 {
     ZeroEffortDrumProcessor processor;
@@ -1175,6 +1216,8 @@ void testAutoWorkflow()
     generation = capture.begin();
     for (int block = 0; block < 1500; ++block) capture.push(silence, 48000);
     require(capture.ready(generation) && capture.size() == 384000, "Restarted capture must discard the previous partial interval");
+    require(capture.available(generation) == 384000 && capture.available(generation + 1) == 0,
+        "Published length must follow the capture and ignore other generations");
     generation = capture.begin();
     capture.push(silence, 48000);
     capture.push(silence, 44100);
@@ -1316,6 +1359,7 @@ int main(int argumentCount, char** arguments)
         testAutoPreset();
         testAutoExpander();
         testTemporalAutoEQ();
+        testAutoLiveCapture();
         testAutoWorkflow();
         {
             ZeroEffortDrumProcessor stateSource, stateTarget;

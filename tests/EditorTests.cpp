@@ -131,7 +131,11 @@ void testAutoRadarFlow(const juce::File& imageFile)
                     + 0.25 * std::exp(-std::fmod(time + 0.25, 0.5) * 20) * std::sin(juce::MathConstants<double>::twoPi * 3100 * time)));
             }
             processor.processBlock(audio, midi);
-            if (block % 50 == 0) processor.updateAutoPreset();
+            if (block % 50 == 0)
+            {
+                processor.updateAutoPreset();
+                onTick(-1);
+            }
         }
         for (int step = 0; step < 200 && processor.autoPresetBusy(); ++step)
         {
@@ -151,7 +155,8 @@ void testAutoRadarFlow(const juce::File& imageFile)
         writeSnapshot(editor, imageFile.getSiblingFile("AutoRadar_" + name + ".png"));
         written.add(name);
     };
-    runAuto([&](int) {
+    runAuto([&](int step) {
+        if (step < 0) juce::MessageManager::getInstance()->runDispatchLoopUntil(30);   // let the editor timer feed the panel
         const auto radar = processor.getAutoRadar();
         if (phases.empty() || phases.back() != static_cast<int>(radar.phase)) phases.push_back(static_cast<int>(radar.phase));
         const auto name = juce::String("phase") + juce::String(static_cast<int>(radar.phase));

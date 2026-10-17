@@ -133,6 +133,15 @@ Branche `main`. Traduction de tout ce que le plug-in affiche : `Source/UI/*`, `D
 - Tests adaptés aux nouveaux textes (`LegacyDrumProposalReference.h`, Kit, Editor, Snapshot, Property, ZeroEffortDrumProcessorTests). La comparaison du bilan historique passe à `startsWith`.
 - Équivalence numérique : rejeu des 37 snapshots du corpus avant/après, aucun réglage modifié, déterminisme E08 OK. Filet de 270 propositions régénéré : seuls les hachages changent, car ils couvrent le texte du bilan.
 - Constat : `scripts/ExtractDrumProfiles.ps1` et `scripts/FreezeProposalReference.ps1` régénèrent encore la référence française : ils sont périmés (la référence est maintenant traduite à la main).
+
+### Radar en direct en insert (17/10/2026)
+
+Branche `main`. En insert, le plug-in ne voit l'audio que pendant la lecture : la capture de 8 s remplit un tampon, et l'analyse (donc la courbe « source » du radar) n'avançait qu'une fois la capture complète. Désormais `DrumAutoCapture::available(génération)` publie la longueur écrite (atomique, génération + longueur, lecture sans verrou) et `updateAutoPreset` pousse dans l'analyseur les échantillons au fur et à mesure ; la courbe se construit pendant la lecture.
+
+- **Aucun changement audible** : l'analyseur reçoit les mêmes échantillons dans le même ordre ; test `testAutoLiveCapture` : réglages identiques à l'analyse faite après la capture, et courbe de source déjà présente avant la fin de la capture.
+- Test de l'éditeur : la phase 0 (analyse) est maintenant observée pendant la capture (`AutoRadar_phase0.png` montre la courbe à 60 %).
+- Texte de statut « capture 60.0667 % » corrigé (arrondi).
+- Reste : le panneau ne dit pas encore « lance la lecture » ; non vérifié dans Cubase.
 ## Écarts avec les spécifications
 
 - **Emplacement des fonctions** : `toSnapshot` / `restoreSnapshot` / `measuresToVar` sont des fonctions statiques de `struct DrumAnalysisSnapshot` (ami de `DrumAnalysis`), pas des méthodes de `DrumAnalysis` : la classe de mesure reste inchangée. Le doc 07 disait « dans la classe DrumAnalysis ».

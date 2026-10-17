@@ -389,7 +389,7 @@ struct ZeroEffortDrumProcessor::AutoSession
     double rate = 0;
     juce::int64 offset = 0, total = 0;
     unsigned int generation = 0;
-    bool busy = false, ready = false, changed = false, applyWhenReady = true;
+    bool busy = false, ready = false, changed = false, applyWhenReady = true, capturePrepared = false;
     drum::AutoRadarView radar;
 };
 
@@ -596,6 +596,7 @@ void ZeroEffortDrumProcessor::startAutoPreset()
     {
         session.generation = autoCapture.begin();
         session.total = 0;
+        session.capturePrepared = false;
         session.text = "Auto / Playback : capture 8 s";
     }
     session.busy = true;
@@ -662,14 +663,32 @@ void ZeroEffortDrumProcessor::updateAutoPreset()
     {
         if (!autoCapture.ready(session.generation))
         {
-            session.text = "Auto / Playback : capture " + juce::String(autoCapture.progress() * 100, 0) + " %";
+            // Analyse the samples as they arrive so the radar builds up while the track plays.
+            const auto available = autoCapture.available(session.generation);
+            if (available > 0 && !session.capturePrepared)
+            {
+                session.analyser.prepare(autoCapture.sampleRate());
+                session.capturePrepared = true;
+            }
+            if (session.capturePrepared && available > session.offset)
+            {
+                const auto count = static_cast<int>(juce::jmin(juce::int64 { 32768 }, available - session.offset));
+                session.analyser.push(autoCapture.data() + session.offset, count);
+                session.offset += count;
+                session.radar.source = drum::DrumAutoRadar::measure(session.analyser.analysis());
+            }
+            session.text = "Auto / Playback : capture " + juce::String(juce::roundToInt(autoCapture.progress() * 100)) + " %";
             session.radar.progress = autoCapture.progress();
             return;
         }
         if (session.total == 0)
         {
             session.total = autoCapture.size();
-            session.analyser.prepare(autoCapture.sampleRate());
+            if (!session.capturePrepared)
+            {
+                session.analyser.prepare(autoCapture.sampleRate());
+                session.capturePrepared = true;
+            }
         }
         const auto count = static_cast<int>(juce::jmin(juce::int64 { 32768 }, session.total - session.offset));
         if (session.phase == 0)
