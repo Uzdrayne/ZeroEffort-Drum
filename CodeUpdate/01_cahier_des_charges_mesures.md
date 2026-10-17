@@ -70,7 +70,7 @@ Convention de nommage des colonnes de la base : `famille_mesure[_stat]`, avec `_
 | L08 | `lufs_integre`, `lufs_short_max` | pondération K, norme BS.1770 | Normalisation des spectres, comparaison entre pistes | P2 | À faire |
 | L09 | `dc_offset` | moyenne des échantillons | Alerte | P3 | À faire |
 
-**Règle de la fenêtre active (à calibrer, voir question Q1)** : fenêtre de 10 ms dont le pic est supérieur à `max(P95 − 40 dB, plancher de bruit + 12 dB)` (décision 01-Q1 du document 05). Les valeurs 40 et 12 dB sont des hypothèses de départ (`MeasureConstants`). Cas limite ajouté en J2 : le seuil ne dépasse jamais le P95 (un signal sans dynamique garde ses fenêtres les plus fortes) et les fenêtres de silence numérique (≤ −100 dBFS) ne sont jamais actives. Constat synthétique : le seuil relatif au P95 bouge un peu avec la densité du jeu (écart de crest actif ≈ 1,2 dB entre un kick isolé et un kick dense, contre 4,8 dB pour le crest global) : à régler avec la courbe de calibration du document 05.
+**Règle de la fenêtre active (décision 01-Q1 du document 05)** : fenêtre de 10 ms dont le pic est supérieur à `max(P95 − 55 dB, plancher de bruit + 12 dB)`. **Calibration du 17/10/2026** : le seuil relatif passe de 40 à **55 dB** (`MeasureConstants::activeBelowP95Db`, `analysisVersion` 5) ; le décalage de **12 dB** au-dessus du plancher reste une hypothèse (H). Cas limite ajouté en J2 : le seuil ne dépasse jamais le P95 (un signal sans dynamique garde ses fenêtres les plus fortes) et les fenêtres de silence numérique (≤ −100 dBFS) ne sont jamais actives. Constat synthétique : le seuil relatif au P95 bouge un peu avec la densité du jeu (écart de crest actif ≈ 1,2 dB entre un kick isolé et un kick dense, contre 4,8 dB pour le crest global). Calibration : 28 prises brutes de 3 kits (réglage : kits 1 et 3, validation : kit 2), écart de crest actif sur ± 10 dB de seuil : à 40 dB, 15 prises sur 28 sous 0,5 dB (écart max 3,0 dB) ; à 55 dB, 25 sur 28 sous 0,5 dB et 28 sur 28 sous 1,0 dB (écart max 0,9 dB). Reproductible avec `scripts/CalibrateActiveWindow.py`.
 
 ### 5.2 Dynamique (`dyn_`)
 
@@ -257,7 +257,7 @@ Un export CSV (une ligne par piste) est généré à partir de `measures` avec l
 
 ## 11. Questions ouvertes et à explorer
 
-- **Q1** : seuil de la fenêtre active (40 dB sous P95 est une hypothèse). À calibrer sur le corpus.
+- **Q1** : seuil de la fenêtre active : **40 dB calibré à 55 dB le 17/10/2026** (voir section 5.1). Reste à calibrer : le décalage de 12 dB au-dessus du plancher de bruit.
 - **Q2** : garde-t-on les WAV des prises de bêta (avec consentement) ou seulement les mesures ?
 - **Q3** : mesures par frappe (statistiques sur chaque frappe) ou seulement globales ? Le premier est plus riche mais le JSON grossit.
 - **Q4** : fréquence d'échantillonnage de la base : faut-il normaliser les analyses faites à 96 kHz (FFT de 8192) pour les comparer à celles à 48 kHz ?

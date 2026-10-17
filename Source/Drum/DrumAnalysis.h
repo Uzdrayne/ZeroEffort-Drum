@@ -12,12 +12,14 @@ inline constexpr std::array<float, 3> kickGateReleases { 160, 100, 80 };
 // Also bump when the snapshot gains analysis fields. Snapshots recorded with another version are not
 // comparable. Version 2: active-window energy and hit decay added (J2). Version 3: lead frame policy (J3).
 // Version 4: lead frames excluded from the bleed by default (J3 activated).
-inline constexpr int analysisVersion = 4;
+// Version 5: active window threshold P95 - 55 dB instead of P95 - 40 dB (01-Q1 calibrated).
+inline constexpr int analysisVersion = 5;
 
 // H: starting points to calibrate on a corpus (document 05, 01-Q1 and 01-Q5).
 struct MeasureConstants
 {
-    static constexpr float activeBelowP95Db = 40;     // a window is active above P95 minus this...
+    // 01-Q1 calibrated on 17 October 2026 (40 -> 55, see docs/SUIVI_IMPLEMENTATION.md): plateau of the active crest.
+    static constexpr float activeBelowP95Db = 55;     // a window is active above P95 minus this...
     static constexpr float activeAboveFloorDb = 12;   // ...and above the noise floor plus this
     static constexpr int decayReferenceWindows = 3;   // windows after a hit used to find its peak level
     static constexpr float decayDropDb = 20;          // the decay time is the time to fall this far
@@ -296,7 +298,7 @@ public:
     // L05: P10 of the window peak distribution.
     float noiseFloorDb() const { return windows > 0 ? percentile(0.10f) : unavailable(); }
 
-    // Active windows: peak above max(P95 - 40 dB, noise floor + 12 dB) (decision 01-Q1), never above P95 itself so that
+    // Active windows: peak above max(P95 - 55 dB, noise floor + 12 dB) (decision 01-Q1), never above P95 itself so that
     // a signal without dynamics (steady tone, constant noise) keeps its loudest windows instead of none.
     float activeThresholdDb() const
     {
