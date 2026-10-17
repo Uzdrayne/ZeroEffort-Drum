@@ -26,6 +26,7 @@ Un guide d'une page à donner à un ingé son qui prépare un kit : [`Guide_Inge
 | 20 s de jeu au minimum, avec des frappes variées (pas un seul coup répété) | les mesures (crest, bandes, décroissance) ont besoin de matière |
 | Un fichier `INFO.txt` par mix : ingé, style (`natural`, `rock`, `metal`), notes (sample, compression parallèle, polarité inversée, décalage manuel), morceau | le **style** et l'**ingé** décident à quoi une paire sert ; sans eux, on ne regroupe pas |
 | Priorité : Kick (In, Out), Snare (Top, Bottom), Overheads, puis Toms, Hi-hat, Room | les premiers rôles apportent le plus |
+| Bonus : le bus de batterie en deux fichiers, `BUS_IN` (inserts du bus désactivés) et `BUS_OUT` (actifs) | paire propre qui isole le traitement du bus (rôle 9, `--pair`) ; sépare micro → piste, piste → bus, bus → sortie |
 | Bonus : le **même brut mixé par deux ingés**, ou dans **deux styles** | on sépare ce qui est commun de ce qui est personnel |
 
 Ce qui compte : **un stem par piste vaut mieux qu'un bus** (une paire exploitable ; un bus ne compte pas comme paire). Le style et l'ingé sont des étiquettes **par mix**, pas par kit : le manifeste actuel n'a qu'un style global, la prise en charge d'étiquettes par mix viendra avec les premiers dossiers réels.

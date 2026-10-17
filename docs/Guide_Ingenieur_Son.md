@@ -59,7 +59,20 @@ Si c'est trop long, **Kick, Snare et Overheads suffisent déjà.**
 
 ---
 
-## Un bonus qui vaut de l'or
+## Bonus : le bus de batterie (très utile, 2 fichiers de plus)
+
+Si ta batterie passe par un **bus** (compression, EQ, saturation de bus), donne-moi :
+
+| Fichier | Contenu |
+|---|---|
+| `BUS_IN.wav` | le bus de batterie **avec tous ses inserts désactivés** (c'est la somme de tes pistes mixées) |
+| `BUS_OUT.wav` | le même bus **avec ses inserts actifs** (ce que tu envoies au master) |
+
+Même début, même longueur, même fréquence d'échantillonnage. Si tu utilises des reverbs ou des parallèles sur ce bus, désactive-les ou note-le dans `INFO.txt`. On voit ainsi **uniquement** ce que fait ton bus.
+
+---
+
+## Un autre bonus qui vaut de l'or
 
 Si tu as le **même morceau mixé dans un autre style** (par exemple une version rock et une version metal), garde le même `RAW` et donne deux dossiers `MIX_rock` et `MIX_metal`. On voit alors ce qui change quand le style change.
 
