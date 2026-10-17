@@ -1,11 +1,5 @@
 #pragma once
-#include "Profiles/KickProfile.h"
-#include "Profiles/SnareProfile.h"
-#include "Profiles/TomProfile.h"
-#include "Profiles/HiHatProfile.h"
-#include "Profiles/OverheadsProfile.h"
-#include "Profiles/RoomProfile.h"
-#include "Profiles/MasterBusProfile.h"
+#include "DrumRole.h"
 
 namespace drum
 {
@@ -33,9 +27,9 @@ public:
             result.settings[autoIntensityOption] = original[autoIntensityOption];
             const auto role = instrumentFromValue(original[instrument]);
             configureFinishing(result, role, style, intensity);
-            if (result.settings[autoMeasuredOn] > 0.5f && role >= DrumInstrument::snare && role <= DrumInstrument::floorTom)
+            if (result.settings[autoMeasuredOn] > 0.5f && roleDescriptor(role).measuredBody)
             {
-                const auto lower = role == DrumInstrument::snare ? 100.0f : 45.0f;
+                const auto lower = roleDescriptor(role).measuredBodyLowHz;
                 const auto total = measurements.bandEnergy(20, 16000);
                 if (total > 0 && measurements.bandEnergy(lower, 200) / total >= 0.12)
                 {
@@ -64,35 +58,35 @@ private:
         if (intensity <= 0) return;
         const auto dose = intensity <= 0.5f ? intensity : 0.5f + 2.5f * (intensity - 0.5f);
         const auto character = style == DrumStyle::natural ? 0.55f : style == DrumStyle::rock ? 0.85f : 1.0f;
-        const bool close = role >= DrumInstrument::kick && role <= DrumInstrument::floorTom;
-        const bool tom = role >= DrumInstrument::tom1 && role <= DrumInstrument::floorTom;
-        const bool cymbals = role == DrumInstrument::hiHat || role == DrumInstrument::overheads;
-        const bool room = role == DrumInstrument::room;
-        const bool bus = role == DrumInstrument::master;
+        const auto& descriptor = roleDescriptor(role);
+        const bool close = descriptor.closeMic;
+        const bool tom = descriptor.tom;
+        const bool cymbals = descriptor.cymbals;
+        const bool bus = descriptor.bus;
         const auto crest = measurements.crestDb();
         const auto total = measurements.bandEnergy(20, 16000);
         const auto fraction = [&](double lower, double upper) {
             return total > 0 ? measurements.bandEnergy(lower, upper) / total : 0.0;
         };
         settings[levelMatchOn] = 1;
-        settings[autoMeasuredOn] = role >= DrumInstrument::snare && role <= DrumInstrument::floorTom ? 1.0f : 0.0f;
+        settings[autoMeasuredOn] = descriptor.measuredBody ? 1.0f : 0.0f;
         const auto transientNeed = juce::jlimit(0.25f, 1.0f, (crest - 3) / 9);
-        settings[crushOn] = !cymbals && crest > (bus ? 7.0f : 5.0f) ? 1.0f : 0.0f;
-        settings[crushAmount] = (bus ? 10.0f : room ? 26.0f : tom ? 22.0f : 24.0f) * character * dose * transientNeed;
+        settings[crushOn] = !cymbals && crest > descriptor.crushCrestMinimum ? 1.0f : 0.0f;
+        settings[crushAmount] = descriptor.crushAmount * character * dose * transientNeed;
         settings[crushThreshold] = juce::jlimit(-60.0f, -8.0f,
             juce::jmax(measurements.rmsDb() + 3, measurements.percentile(0.85f)) - 6 - 8 * intensity);
-        settings[crushRatio] = room ? 10.0f : bus ? 4.0f : 8.0f;
-        settings[crushAttack] = bus ? 12.0f : role == DrumInstrument::kick ? 8.0f : 4.0f;
-        settings[crushRelease] = tom ? 220.0f : room ? 180.0f : 110.0f;
-        settings[crushHP] = role == DrumInstrument::kick ? 35.0f : bus ? 60.0f : 100.0f;
-        settings[crushLP] = room ? 6000.0f : 8000.0f;
+        settings[crushRatio] = descriptor.crushRatio;
+        settings[crushAttack] = descriptor.crushAttackMs;
+        settings[crushRelease] = descriptor.crushReleaseMs;
+        settings[crushHP] = descriptor.crushHighPassHz;
+        settings[crushLP] = descriptor.crushLowPassHz;
         const auto inputDrive = juce::jlimit(0.0f, 10.0f, -12 - measurements.peakDb());
         settings[colourOn] = !cymbals && fraction(40, 3500) > 0.12 ? 1.0f : 0.0f;
-        settings[colourDrive] = juce::jmin(24.0f, ((bus ? 5.0f : 9.0f) + inputDrive) * character * dose);
-        settings[colourMix] = (bus ? 14.0f : room ? 26.0f : 28.0f) * character * dose;
+        settings[colourDrive] = juce::jmin(24.0f, (descriptor.colourDrive + inputDrive) * character * dose);
+        settings[colourMix] = descriptor.colourMix * character * dose;
         settings[shapeOn] = close && crest > 5 ? 1.0f : 0.0f;
-        settings[shapeAttack] = (role == DrumInstrument::kick ? 2.4f : 3.0f) * character * dose * transientNeed;
-        settings[shapeSustain] = (tom ? 1.5f : role == DrumInstrument::snare ? 0.5f : -1.0f) * character * dose;
+        settings[shapeAttack] = descriptor.shapeAttackDb * character * dose * transientNeed;
+        settings[shapeSustain] = descriptor.shapeSustainDb * character * dose;
         const auto lowPeak = measurements.spectralPeak(220, 1600);
         const auto highPeak = measurements.spectralPeak(3500, 12000);
         const auto prominent = [&](float frequency) {
@@ -103,16 +97,16 @@ private:
         };
         const bool lowResonance = prominent(lowPeak);
         const bool highResonance = prominent(highPeak);
-        const bool lowRelevant = fraction(180, 1800) > (cymbals ? 0.15 : 0.035);
-        const bool highRelevant = fraction(3000, 16000) > (close ? 0.02 : 0.06);
-        settings[dynamicLowHz] = lowResonance ? lowPeak : role == DrumInstrument::kick ? 300.0f : tom ? 450.0f : 650.0f;
-        settings[dynamicHighHz] = highResonance ? highPeak : cymbals ? 8000.0f : 6500.0f;
+        const bool lowRelevant = fraction(180, 1800) > descriptor.lowRelevantFraction;
+        const bool highRelevant = fraction(3000, 16000) > descriptor.highRelevantFraction;
+        settings[dynamicLowHz] = lowResonance ? lowPeak : descriptor.dynamicLowHz;
+        settings[dynamicHighHz] = highResonance ? highPeak : descriptor.dynamicHighHz;
         settings[dynamicLowQ] = lowResonance ? 2.5f : 1.2f;
         settings[dynamicHighQ] = highResonance ? 2.0f : 1.0f;
         settings[dynamicLowRange] = lowResonance || lowRelevant
             ? juce::jmin(6.0f, (lowResonance ? 3.5f : 1.8f) * dose) : 0.0f;
         settings[dynamicHighRange] = highResonance || highRelevant
-            ? juce::jmin(6.0f, (highResonance ? 3.0f : cymbals ? 2.8f : 1.8f) * dose) : 0.0f;
+            ? juce::jmin(6.0f, (highResonance ? 3.0f : descriptor.dynamicHighRange) * dose) : 0.0f;
         settings[dynamicOn] = settings[dynamicLowRange] + settings[dynamicHighRange] > 0 ? 1.0f : 0.0f;
         const auto bandThreshold = [&](float frequency) {
             const auto bandFraction = juce::jlimit(0.002, 1.0, fraction(frequency / 1.5, frequency * 1.5));
@@ -123,33 +117,32 @@ private:
         settings[dynamicHighThreshold] = bandThreshold(settings[dynamicHighHz]);
         const auto clipDose = juce::jlimit(0.0f, 1.0f, (intensity - (style == DrumStyle::natural ? 0.65f : 0.35f))
             / (style == DrumStyle::natural ? 0.35f : 0.65f));
-        settings[clipOn] = !cymbals && clipDose > 0 && crest > (bus ? 9.0f : 6.0f) ? 1.0f : 0.0f;
+        settings[clipOn] = !cymbals && clipDose > 0 && crest > descriptor.clipCrestMinimum ? 1.0f : 0.0f;
         settings[clipCeiling] = juce::jlimit(-18.0f, -1.0f, measurements.peakDb() - 3 - 5 * clipDose);
-        settings[clipMix] = (bus ? 18.0f : 32.0f) * character * clipDose;
+        settings[clipMix] = descriptor.clipMix * character * clipDose;
         if (close)
         {
             const auto contrast = measurements.percentile(0.9f) - measurements.percentile(0.2f);
             const bool bleed = fraction(1600, 16000) > 0.015 && contrast > 8;
             settings[cleanupOn] = bleed ? 1.0f : 0.0f;
-            settings[cleanupDepth] = juce::jmin(tom ? 12.0f : 18.0f, (tom ? 7.0f : 10.0f) * character * dose);
-            if (bleed && role != DrumInstrument::kick)
+            settings[cleanupDepth] = juce::jmin(descriptor.cleanupMaximum, descriptor.cleanupBase * character * dose);
+            if (bleed && descriptor.family != RoleFamily::kick)
             {
-                settings[focusLow] = tom ? 40.0f : 70.0f;
-                settings[focusHigh] = tom ? 260.0f : 400.0f;
-                settings[gateHold] = tom ? 60.0f : 35.0f;
+                settings[focusLow] = descriptor.focusLowHz;
+                settings[focusHigh] = descriptor.focusHighHz;
+                settings[gateHold] = descriptor.gateHoldMs;
                 settings[gateHysteresis] = 6;
                 settings[gateThreshold] = juce::jmin(settings[gateThreshold], measurements.percentile(0.9f) - 15);
                 settings[gateRange] = juce::jmax(6.0f, settings[gateRange]);
                 settings[gateRatio] = juce::jmax(1.6f, settings[gateRatio]);
             }
         }
-        const bool ambience = (role == DrumInstrument::snare || tom || bus)
+        const bool ambience = descriptor.ambience
             && style != DrumStyle::metal && crest > 10 && fraction(5000, 16000) < 0.35;
         settings[ambienceOn] = ambience ? 1.0f : 0.0f;
-        settings[ambienceAmount] = juce::jmin(bus ? 4.0f : 100.0f,
-            (bus ? 3.0f : tom ? 5.0f : 7.0f) * character * dose);
-        settings[ambienceSize] = tom ? 35.0f : 22.0f;
-        settings[ambiencePredelay] = bus ? 8.0f : 16.0f;
+        settings[ambienceAmount] = juce::jmin(descriptor.ambienceMaximum, descriptor.ambienceBase * character * dose);
+        settings[ambienceSize] = descriptor.ambienceSize;
+        settings[ambiencePredelay] = descriptor.ambiencePredelayMs;
         settings[ambienceHighPass] = 180;
         settings[ambienceLowPass] = 6500;
         settings[ambienceCharacter] = 25 * character * dose;
@@ -165,20 +158,7 @@ private:
 
     DrumProposal proposeAtStrength(const Settings& original, DrumStyle style, float intensity) const
     {
-        switch (instrumentFromValue(original[instrument]))
-        {
-            case DrumInstrument::snare: return SnareProfile::propose(measurements, original, style, intensity);
-            case DrumInstrument::tom1:
-            case DrumInstrument::tom2:
-            case DrumInstrument::tom3:
-            case DrumInstrument::floorTom: return TomProfile::propose(measurements, original, style, intensity);
-            case DrumInstrument::hiHat: return HiHatProfile::propose(measurements, original, style, intensity);
-            case DrumInstrument::overheads: return OverheadsProfile::propose(measurements, original, style, intensity);
-            case DrumInstrument::room: return RoomProfile::propose(measurements, original, style, intensity);
-            case DrumInstrument::master: return MasterBusProfile::propose(measurements, original, style, intensity);
-            case DrumInstrument::kick: return KickProfile::propose(measurements, original, style, intensity, policy);
-        }
-        return KickProfile::propose(measurements, original, style, intensity, policy);
+        return roleDescriptor(instrumentFromValue(original[instrument])).propose(measurements, original, style, intensity, policy);
     }
 
     DrumAnalysis measurements;

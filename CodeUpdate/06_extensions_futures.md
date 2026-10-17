@@ -29,6 +29,8 @@ RoleDescriptor
 
 Mise en œuvre progressive : les profils existants (Kick, Snare, Tom) continuent à fonctionner pendant qu'on introduit le registre ; un **test de non-régression** (document 02, cas dorés) garantit que les résultats ne bougent pas pendant la migration.
 
+**État (17/10/2026, étape 1)** : `Source/Drum/DrumRole.h` contient la table `roleDescriptors` (un `RoleDescriptor` par `DrumInstrument` : famille, drapeaux proche / tom / cymbales / room / bus, corps mesuré, finitions Crush / Couleur / Impact, résonances dynamiques, Clip, Bleed Clean, Focus, Ambiance, et la fonction de proposition du profil). `DrumAnalyser` ne branche plus sur le rôle : ajouter un rôle = ajouter une ligne. Filet : `tests/RoleReferenceTests.cpp` (270 propositions gelées). Restent hors table : les réglages propres à chaque profil (`Profiles/*.h`), les bandes de mesure par rôle de `DrumAnalysis`, le détecteur Kick de `DrumReplay` et l'interface.
+
 **Sous-bus par instrument** (Kick Bus pour In / Out / Sub, Snare Bus pour Top / Bottom, HiHat Bus…) : voir le document `08_sous_bus.md`. Il s'appuie sur le registre de rôles décrit ci-dessous.
 
 ## 3. Éléments à ajouter
