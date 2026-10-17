@@ -90,32 +90,31 @@ void testDoubleKicksExpectedFailure()
     constexpr double rate = 48000;
     const auto audio = doubleKickTake(rate, 4, 60.0 / 180.0 / 4.0);    // sixteenth notes at 180 bpm: 83.3 ms
     const auto realHits = static_cast<int>(4.0 * 12.0);   // 12 hits per second for 4 s
+    check(drum::MeasureConstants::doubleHitsByDefault, "J4a double hit detection is active by default");
     const auto counted = analyse(audio, rate)->analysis().hitCount();
     std::cout << "  A08 double kicks at 180 bpm: " << counted << " hits counted for " << realHits << " played" << std::endl;
-    check(!drum::MeasureConstants::doubleHitsByDefault, "J4 double hit detection is off by default until it has been listened to");
-    check(std::abs(counted - realHits) > realHits / 10,
-        "A08 now counts the double kicks correctly (" + juce::String(counted) + " of " + juce::String(realHits)
-        + "): problem 3 is fixed by default, turn this expected failure into a plain test");
+    check(std::abs(counted - realHits) <= realHits / 10, "A08 the double kicks must be counted, got " + juce::String(counted) + " of " + juce::String(realHits));
 
-    auto corrected = std::make_unique<drum::DrumAnalyser>();
-    corrected->setDoubleHitDetection(true);
-    corrected->prepare(rate);
+    // The former detector stays reachable and still under-counts
+    auto legacy = std::make_unique<drum::DrumAnalyser>();
+    legacy->setDoubleHitDetection(false);
+    legacy->prepare(rate);
     for (size_t offset = 0; offset < audio.size(); offset += 4096)
-        corrected->push(audio.data() + offset, static_cast<int>(juce::jmin(size_t { 4096 }, audio.size() - offset)));
-    const auto fixed = corrected->analysis().hitCount();
-    std::cout << "  A08 with the J4 correction: " << fixed << " hits counted for " << realHits << " played" << std::endl;
-    check(std::abs(fixed - realHits) <= realHits / 10, "A08 with the correction the double kicks must be counted, got " + juce::String(fixed) + " of " + juce::String(realHits));
+        legacy->push(audio.data() + offset, static_cast<int>(juce::jmin(size_t { 4096 }, audio.size() - offset)));
+    const auto old = legacy->analysis().hitCount();
+    std::cout << "  A08 without the J4a correction: " << old << " hits counted for " << realHits << " played" << std::endl;
+    check(std::abs(old - realHits) > realHits / 10, "A08 the former detector under-counts double kicks, got " + juce::String(old));
 
     // Ordinary playing is not disturbed: the same count with and without the correction
     for (const auto period : { 0.5, 0.35, 0.25 })
     {
         const auto take = doubleKickTake(rate, 6, period);
-        auto plain = analyse(take, rate);
-        auto changed = std::make_unique<drum::DrumAnalyser>();
-        changed->setDoubleHitDetection(true);
-        changed->prepare(rate);
+        auto changed = analyse(take, rate);
+        auto plain = std::make_unique<drum::DrumAnalyser>();
+        plain->setDoubleHitDetection(false);
+        plain->prepare(rate);
         for (size_t offset = 0; offset < take.size(); offset += 4096)
-            changed->push(take.data() + offset, static_cast<int>(juce::jmin(size_t { 4096 }, take.size() - offset)));
+            plain->push(take.data() + offset, static_cast<int>(juce::jmin(size_t { 4096 }, take.size() - offset)));
         check(plain->analysis().hitCount() == changed->analysis().hitCount(), "The correction must not change the count at a period of "
             + juce::String(period) + " s: " + juce::String(plain->analysis().hitCount()) + " against " + juce::String(changed->analysis().hitCount()));
     }

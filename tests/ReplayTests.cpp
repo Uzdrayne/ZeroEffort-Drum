@@ -296,7 +296,7 @@ int runReplayCommand(const juce::StringArray& commandLine)
     if (command == "--export-wav")
     {
         if (arguments.size() < 4 || arguments.size() > 6)
-            return fail("usage: --export-wav <wav> <snapshot folder> <role 0-9> [natural|rock|metal] [intensity 0-1] [--position 0-3] [--no-exclude-lead-frames] [--no-active-crest]");
+            return fail("usage: --export-wav <wav> <snapshot folder> <role 0-9> [natural|rock|metal] [intensity 0-1] [--position 0-3] [--no-exclude-lead-frames] [--no-active-crest] [--no-double-hits]");
         const juce::File wav(arguments[1]), folder(arguments[2]);
         if (!arguments[3].containsOnly("0123456789") || arguments[3].isEmpty() || arguments[3].getIntValue() > 9)
             return fail("role must be an integer from 0 to 9");

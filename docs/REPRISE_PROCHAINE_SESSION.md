@@ -28,8 +28,8 @@ Ce que je veux faire : [à compléter, ou « propose-moi »]
 
 *(Mis à jour le 17 octobre 2026, fin de la session de travail sur `main`.)*
 
-- **Dépôt** : `Uzdrayne/ZeroEffort-Drum`. Version du plug-in : **0.10.0**. On travaille **directement sur `main`**, un commit par étape (décision du 17/10/2026).
-- **Versions d'analyse** : `analysisVersion` **5**, `profileVersion` **2**.
+- **Dépôt** : `Uzdrayne/ZeroEffort-Drum`. Version du plug-in : **0.11.0**. On travaille **directement sur `main`**, un commit par étape (décision du 17/10/2026).
+- **Versions d'analyse** : `analysisVersion` **6**, `profileVersion` **2**.
 - **Suivi détaillé** : `docs/SUIVI_IMPLEMENTATION.md` (jalons, journal chiffré, écarts, questions ouvertes). Plan : `docs/PLAN_IMPLEMENTATION.md`. Spécifications : `CodeUpdate/01` à `08`.
 - **Corpus (hors dépôt)** : `C:\Users\robin\Desktop\Database_drum` : `raw1` à `raw4`, `mix1`, `mix2`, `LISTING.md`, `snapshots\`, `reports\`. Variables d'environnement utilisateur : `ZED_WAV_DIRECTORY` (= `raw3`, pour les tests de kit réel) et `ZED_ANALYSIS_EXPORT_DIR`.
 
@@ -44,7 +44,7 @@ Ce que je veux faire : [à compléter, ou « propose-moi »]
 | Calibration 01-Q1 | Seuil de la fenêtre active 40 → **55 dB** (script `scripts/CalibrateActiveWindow.py`). Décalage de plancher 12 dB étudié et **conservé** (A09 ≤ 1 dB l'impose). |
 | T3, K04, garde-fous Kit / Phase | Mesure K04 (`crosstalkDb`), garde-fous `KitPolicy` (hors fenêtre, diaphonie) **désactivés par défaut**, commande `--kit`. |
 | Registre de rôles | Étape 1 faite : `Source/Drum/DrumRole.h` (table de 10 descripteurs), filet `tests/RoleReferenceTests.cpp` (270 propositions gelées). |
-| J4a | Détection des doubles frappes (`setDoubleHitDetection`, `--double-hits`), **désactivée par défaut**. |
+| J4a | Détection des doubles frappes (`setDoubleHitDetection`, `--no-double-hits` pour l'ancien comportement), **activée par défaut** (17/10/2026). |
 | Corpus | 5 WAV retirés de git ; kits 1 à 4 exportés (38 snapshots), K04 mesuré sur 3 kits. |
 
 État des tests : build VS 2019 sans avertissement, CTest 3/3 (`RegionCacheTests`, `ZeroEffortDrumTests` ≈ 70-100 s, `ARADiscoveryTests`).
@@ -77,7 +77,7 @@ Ce que je veux faire : [à compléter, ou « propose-moi »]
 **Analyse** :
 5. Le détecteur de frappes a un seuil absolu (niveau grave 0,0003, environ −70 dBFS) : un bruit de fond rose à −54 dBFS ajoute des frappes fantômes (risque R3).
 6. La puissance S01 absolue dépend de la taille de FFT (+6 dB à 96 kHz) : seules les mesures relatives (S02, S04) se comparent entre fréquences d'échantillonnage.
-7. Problème 3 (doubles pédales) : correctif J4a écrit et **désactivé par défaut** ; à activer après écoute (incrémenter `analysisVersion`, régénérer le corpus).
+7. Problème 3 (doubles pédales) : correctif J4a **activé par défaut**.
 8. Le Hi-hat est refusé par K04 (−1,4 dB) : sa mesure Kit / Phase par les frappes du kit est douteuse de toute façon.
 
 ## 5. Menu pour la prochaine session
@@ -85,7 +85,7 @@ Ce que je veux faire : [à compléter, ou « propose-moi »]
 Choisir selon ce qui est disponible.
 
 ### Avec Cubase (écoute)
-1. **Activer J4a** (doubles frappes) : exporter avec et sans `--double-hits`, écouter le Kick Out du kit 1 (seule prise dont un réglage change), puis passer `MeasureConstants::doubleHitsByDefault` à `true`, incrémenter `analysisVersion`, régénérer le corpus.
+1. **Écouter J4a** (déjà activé) : le Kick Out du kit 1 est la seule prise du corpus dont un réglage change (< 9 Hz) ; retour arrière possible via `doubleHitsByDefault`.
 2. **Garde-fous Kit / Phase** : décider si on les active et les relier à l'interface (aujourd'hui seulement `KitPolicy` dans `KitSession`).
 
 ### Sans écoute (sûr)

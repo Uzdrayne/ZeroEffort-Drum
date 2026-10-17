@@ -9,7 +9,7 @@ Légende : ⬜ à faire · 🔄 en cours · ✅ terminé · ⏸ en réserve
 
 | Élément | État |
 |---|---|
-| Version du plug-in | **0.10.0** inchangée (`CMakeLists.txt`) : rien d'audible n'a changé par défaut |
+| Version du plug-in | **0.11.0** (`CMakeLists.txt`, depuis le 17/10/2026) ; `analysisVersion` 6, `profileVersion` 2 |
 | `main` | vagues 1 et 2 fusionnées (pull requests #1 et #2, commit `b1dbabd`) : phase 0, build VS 2019 / 2022, J1, T1, T2, J2, J3, T3, T4 |
 | Branches de travail | aucune ouverte (`feature/t3-kit-phase` fusionnée) |
 | Passation | [REPRISE_PROCHAINE_SESSION.md](REPRISE_PROCHAINE_SESSION.md) : prompt à coller, état, décisions, menu des prochaines étapes, pièges |
@@ -35,7 +35,7 @@ Légende : ⬜ à faire · 🔄 en cours · ✅ terminé · ⏸ en réserve
 | Activation des correctifs J3 | `excludeLeadFramesByDefault`, `compressorUsesActiveCrest` | ✅ | voir `git log` de `feature/activate-j3` | Activés sur validation de l'utilisateur le 17/10/2026 (sans écoute dédiée : aucun réglage ne bouge sur 32 prises) ; versions 4 / 2 ; CTest 3/3 ; test du défaut (J3 actif) + test de la politique « off » ; référence figée `LegacyDrumProposalReference` non régénérée (elle ne contient pas la décision de crest, équivalence toujours vraie) |
 | Export enrichi | `meta.position` et `meta.channels`, `--position`, options `--no-...` pour l'ancien comportement, `ph_bleed_treble_ratio` exporté pour le Kick seulement | ✅ | `c0bd7ec` | CTest 3/3, 0 avertissement ; mutation (P03 pour tous les rôles) détectée ; aucun changement audible (schéma 1, `analysisVersion` 4 inchangée) ; corpus de 32 prises ré-exporté avec positions (Kick Out du kit 2, OvH L / R du kit 3, SnareDown) |
 | Calibration 01-Q1 | `activeBelowP95Db` 40 → 55 dB, `analysisVersion` 5, `scripts/CalibrateActiveWindow.py` | ✅ | voir `git log` de `feature/calibration-fenetre-active` | Critère du doc 05 (écart du crest actif < 0,5 dB sur ± 10 dB de seuil) : réglage sur kits 1 et 3 (17 prises), validation sur le kit 2 (11 prises) ; CTest 3/3, 0 avertissement ; corpus de 32 prises ré-exporté, rejeu déterministe, **aucun réglage ne change** ; script vérifié contre l'export (écart 0,00000 dB) |
-| J4a doubles frappes | `doubleHitMinimumWindows` / `doubleHitRise`, `setDoubleHitDetection`, `--double-hits` | ✅ (désactivé par défaut) | voir `git log` | CTest 3/3, 0 avertissement ; A08 : 48 frappes sur 48 avec le correctif, jeu ordinaire inchangé ; corpus : +1 à +16 % de frappes, 1 seul réglage modifié sur 37 (Kick Out kit 1, < 9 Hz) ; **à activer après écoute** (incrémenter `analysisVersion`, régénérer le corpus) |
+| J4a doubles frappes | `doubleHitMinimumWindows` / `doubleHitRise`, `setDoubleHitDetection`, `--double-hits` | ✅ **activé par défaut le 17/10/2026** (validé par l'utilisateur) | voir `git log` | CTest 3/3, 0 avertissement ; A08 : 48 frappes sur 48 avec le correctif, jeu ordinaire inchangé ; corpus : +1 à +16 % de frappes, 1 seul réglage modifié sur 37 (Kick Out kit 1, < 9 Hz) ; activé : `analysisVersion` 6, plug-in **0.11.0**, corpus de 37 prises ré-exporté (anciens snapshots dans `archive_v5/`) ; retour arrière : `doubleHitsByDefault = false` + version suivante |
 | J4 / J4b | détecteurs par rôle, analyse continue Overheads / Room | ⏸ | | change le son ; corpus réel |
 | Sous-bus SB1-SB7 | | ⏸ | | extension préalable du registre Kit (mesures, trims, rôles Kick Sub / Hi-hat Bottom) |
 
