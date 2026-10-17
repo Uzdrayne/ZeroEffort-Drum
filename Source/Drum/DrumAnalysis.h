@@ -20,7 +20,7 @@ struct MeasureConstants
 {
     // 01-Q1 calibrated on 17 October 2026 (40 -> 55, see docs/SUIVI_IMPLEMENTATION.md): plateau of the active crest.
     static constexpr float activeBelowP95Db = 55;     // a window is active above P95 minus this...
-    static constexpr float activeAboveFloorDb = 12;   // ...and above the noise floor plus this
+    static constexpr float activeAboveFloorDb = 12;   // ...and above the noise floor plus this (H: kept at 12, see 01-Q1 notes)
     static constexpr int decayReferenceWindows = 3;   // windows after a hit used to find its peak level
     static constexpr float decayDropDb = 20;          // the decay time is the time to fall this far
     static constexpr int decayMaxWindows = 100;       // give up after 1 s

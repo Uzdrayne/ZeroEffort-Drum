@@ -95,11 +95,16 @@ void testActiveLevel()
     const auto dense = analyse(kicks(48000, 6, 0.35, 30, 0.0001), 48000);
     const auto activeGap = std::abs(sparse->analysis().activeCrestDb() - dense->analysis().activeCrestDb());
     const auto globalGap = sparse->analysis().crestDb() - dense->analysis().crestDb();
-    // H: the P95 based threshold moves a little with the density (sparser playing lowers P95, so more quiet tail
-    // windows count as active). Document 02 asks for +-1 dB; the synthetic result is about 1.2 dB, still more than
-    // three times steadier than the global crest. To settle with the calibration of 01-Q1.
-    check(activeGap < 1.5f && activeGap * 3 < globalGap, "A09 active crest must be much steadier than the global crest, gap " + juce::String(activeGap));
+    // The P95 based threshold moves a little with the density. Document 02 asks for +-1 dB: met since the calibration of
+    // 01-Q1 (0.71 dB with 55 dB below P95, 1.18 dB with 40 dB).
+    check(activeGap < 1.0f && activeGap * 3 < globalGap, "A09 active crest must be much steadier than the global crest, gap " + juce::String(activeGap));
     check(globalGap > 3.0f, "A09 the global crest must grow with the silence (problem 2), gap " + juce::String(globalGap));
+
+    // Guard of the noise floor offset (01-Q1): a bed of noise must not count as active playing. Kicks last about 18 % of
+    // each second above the bed, the rest of the windows are noise only.
+    const auto noisy = analyse(kicks(48000, 8, 1.0, 30, 0.003), 48000);
+    const auto noisyShare = static_cast<double>(noisy->analysis().activeWindowCount()) / noisy->analysis().analysedWindows();
+    check(noisyShare < 0.35, "01-Q1 a bed of noise must not be active, share " + juce::String(noisyShare));
 
     const auto silence = analyse(std::vector<float>(48000 * 3), 48000);
     check(std::isnan(silence->analysis().activeRmsDb()) && std::isnan(silence->analysis().activeCrestDb()) && silence->analysis().activeWindowCount() == 0,
