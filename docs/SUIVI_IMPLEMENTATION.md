@@ -141,7 +141,7 @@ Branche `feature/t3-kit-phase`. Fichiers : `tests/KitTests.cpp` (`FaultKit`, `te
 
 ## Questions ouvertes
 
-- L'export réel (session Auto dans Cubase) n'a pas été exercé : à tester sur la machine avec Cubase, avec un build `-DZED_ANALYSIS_EXPORT=ON`.
+- 🔄 **Export réel** (branche `feature/export-reel`) : build d'export prêt (VS 2019, dossier `build-export/`, ignoré par git, VST3 + `ZeroEffortDrumTests.exe`). Reste à faire par l'utilisateur : installer ce VST3 (et le dossier ARA) à la main, définir `ZED_ANALYSIS_EXPORT_DIR`, lancer une analyse Auto dans Cubase, puis rejouer avec `--replay`. Résultat à noter ici une fois fait. Rappel : restaurer ensuite la version de production.
 - **Seuil de la fenêtre active** (40 dB, 12 dB, plafond P95) : à calibrer sur des prises réelles (courbe crest actif / seuil, plateau à ±0,5 dB pour ±10 dB). Le vrai corpus n'est pas sur cette machine.
 - **Activation par défaut** des deux correctifs J3 : à décider après une écoute dans un hôte (pas possible sur cette machine). Procédure : exporter les prises avec `--exclude-lead-frames --active-crest`, `--replay` / `--compare`, écouter les prises listées.
 - **Kit / Phase** : faut-il corriger les constats 1 à 3 de T3 (refus hors fenêtre, diaphonie, biais du kick) ? Ils changent le comportement de l'alignement : à décider, avec écoute dans un hôte.
