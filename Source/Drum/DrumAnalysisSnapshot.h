@@ -17,6 +17,7 @@ struct SnapshotContext
     float intensity = 1;
     ProposalPolicy policy;
     juce::String source { "unknown" }, licence { "private-dev" };
+    int channels = 0;   // channel count of the source audio; 0 when unknown (not written)
 };
 
 struct RestoredSnapshot
@@ -74,6 +75,20 @@ struct DrumAnalysisSnapshot
         return std::isfinite(value) ? juce::var(value) : juce::var();
     }
 
+    // Microphone position in clear, from the instrument and the kitMic choice (same names as the kit view). The position
+    // means nothing for the other instruments.
+    static juce::String positionLabel(const Settings& settings)
+    {
+        const auto role = instrumentFromValue(settings[instrument]);
+        const auto mic = juce::jlimit(0, 3, static_cast<int>(std::lround(settings[kitMic])));
+        const juce::String name = instrumentName(role);
+        if (role == DrumInstrument::kick) return mic == 1 ? "Kick Out" : "Kick In";
+        if (role == DrumInstrument::snare) return mic == 1 ? "Snare Bottom" : "Snare Top";
+        if (role == DrumInstrument::overheads || role == DrumInstrument::room)
+            return mic == 2 ? name + " L" : mic == 3 ? name + " R" : name + " (stereo)";
+        return name;
+    }
+
     static juce::var measuresToVar(const DrumAnalysis& analysis, DrumInstrument role = DrumInstrument::kick)
     {
         auto* object = new juce::DynamicObject();
@@ -100,7 +115,8 @@ struct DrumAnalysisSnapshot
         object->setProperty("ph_tail_frames", analysis.tailFrames);
         object->setProperty("ph_bleed_frames", analysis.bleedFrames);
         object->setProperty("ph_lead_frames", analysis.leadFrames);
-        object->setProperty("ph_bleed_treble_ratio", numberOrNull(analysis.bleedTrebleRatio()));
+        // P03 is defined for the Kick air cut only: on other roles the onset bass is tiny and the ratio blows up.
+        object->setProperty("ph_bleed_treble_ratio", numberOrNull(role == DrumInstrument::kick ? analysis.bleedTrebleRatio() : DrumAnalysis::unavailable()));
         object->setProperty("sp_slope_db_oct", numberOrNull(analysis.spectralSlopeDbPerOctave()));
         object->setProperty("ph_attack_body_gap_db", numberOrNull(analysis.attackBodyGapDb(role)));
         for (int band = 0; band < thirdOctaveCount; ++band)
@@ -237,6 +253,8 @@ struct DrumAnalysisSnapshot
         meta->setProperty("analysisVersion", analysisVersion);
         meta->setProperty("profileVersion", profileVersion);
         meta->setProperty("role", instrumentName(instrumentFromValue(context.original[instrument])));
+        meta->setProperty("position", positionLabel(context.original));
+        if (context.channels > 0) meta->setProperty("channels", context.channels);
         meta->setProperty("style", styleId(context.style));
         meta->setProperty("intensity", static_cast<double>(context.intensity));
         meta->setProperty("source", context.source);
@@ -294,6 +312,8 @@ struct DrumAnalysisSnapshot
         }
         context.source = meta->getProperty("source").toString();
         context.licence = meta->getProperty("licence").toString();
+        juce::int64 channels = 0;
+        if (readInteger(*meta, "channels", channels) && channels >= 1 && channels <= 2) context.channels = static_cast<int>(channels);
 
         auto* input = root->getProperty("input").getDynamicObject();
         if (input == nullptr) return juce::Result::fail("input block missing");

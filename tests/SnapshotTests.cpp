@@ -121,6 +121,36 @@ void testMeasuresAndFiles()
     check(static_cast<int>(meta->getProperty("analysisVersion")) == drum::analysisVersion, "analysisVersion recorded");
     check(meta->getProperty("role").toString() == "Kick", "role name recorded");
 
+    // The microphone position and the channel count are written in clear (the position is also in input.settings.kitMic).
+    check(meta->getProperty("position").toString() == "Kick In" && !meta->hasProperty("channels"), "Default position, no channel count when unknown");
+    const auto labelled = [&](int instrumentValue, int micValue, int channels)
+    {
+        auto copy = context;
+        copy.original[drum::instrument] = static_cast<float>(instrumentValue);
+        copy.original[drum::kitMic] = static_cast<float>(micValue);
+        copy.channels = channels;
+        return drum::DrumAnalysisSnapshot::toSnapshot(analyser->analysis(), copy, proposal)["meta"];
+    };
+    check(labelled(0, 1, 1)["position"].toString() == "Kick Out" && labelled(1, 0, 1)["position"].toString() == "Snare Top"
+        && labelled(1, 1, 1)["position"].toString() == "Snare Bottom", "Kick and Snare positions");
+    check(labelled(7, 0, 2)["position"].toString() == "Overheads (stereo)" && labelled(7, 2, 1)["position"].toString() == "Overheads L"
+        && labelled(7, 3, 1)["position"].toString() == "Overheads R" && labelled(8, 3, 1)["position"].toString() == "Room R",
+        "Overheads and Room positions");
+    check(labelled(6, 3, 1)["position"].toString() == "Hi-hat" && labelled(5, 1, 1)["position"].toString() == "Tom basse",
+        "The position means nothing for the other instruments");
+    check(static_cast<int>(labelled(7, 0, 2)["channels"]) == 2 && static_cast<int>(labelled(0, 0, 1)["channels"]) == 1, "Channel count recorded");
+    {
+        auto stereo = context;
+        stereo.channels = 2;
+        juce::var parsedStereo;
+        check(juce::JSON::parse(juce::JSON::toString(drum::DrumAnalysisSnapshot::toSnapshot(analyser->analysis(), stereo, proposal), false), parsedStereo).wasOk(),
+            "Snapshot with channels parses");
+        auto target = std::make_unique<drum::DrumAnalyser>();
+        drum::RestoredSnapshot stereoRestored;
+        check(drum::DrumAnalysisSnapshot::restoreSnapshot(target->editableAnalysis(), parsedStereo, stereoRestored).wasOk()
+            && stereoRestored.context.channels == 2, "The channel count must survive a restore");
+    }
+
     const auto measures = snapshot["measures"];
     check(std::abs(static_cast<double>(measures["lvl_peak_dbfs"]) - analyser->analysis().peakDb()) < 1.0e-4, "peak measure");
     check(std::abs(static_cast<double>(measures["dyn_crest_global_db"]) - analyser->analysis().crestDb()) < 1.0e-4, "crest measure");

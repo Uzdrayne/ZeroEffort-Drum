@@ -194,6 +194,12 @@ void testSnapshotCarriesMeasures()
 {
     const auto audio = kicks(48000, 6, 0.5, 28, 0.0005, 0.08);
     const auto analyser = analyse(audio, 48000);
+
+    // P03 compares the bleed treble with the onset bass of a Kick: it means nothing for the other roles (it blows up on a Hi-hat).
+    const auto kickRatio = drum::DrumAnalysisSnapshot::measuresToVar(analyser->analysis(), drum::DrumInstrument::kick)["ph_bleed_treble_ratio"];
+    check(!kickRatio.isVoid() && std::isfinite(static_cast<double>(kickRatio)), "P03 must be exported for a Kick");
+    for (const auto role : { drum::DrumInstrument::snare, drum::DrumInstrument::hiHat, drum::DrumInstrument::overheads, drum::DrumInstrument::tom1 })
+        check(drum::DrumAnalysisSnapshot::measuresToVar(analyser->analysis(), role)["ph_bleed_treble_ratio"].isVoid(), "P03 must be null outside the Kick");
     drum::SnapshotContext context;
     const auto snapshot = drum::DrumAnalysisSnapshot::toSnapshot(analyser->analysis(), context, analyser->propose(context.original));
     const auto text = juce::JSON::toString(snapshot, false);
