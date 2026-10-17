@@ -3,6 +3,7 @@
 #include <juce_core/juce_core.h>
 #include <array>
 #include <cmath>
+#include <limits>
 #include <vector>
 
 namespace kit
@@ -101,7 +102,27 @@ struct Recommendation
     float delayMs = 0;          // delay to apply on this track (close mics are delayed onto the overheads)
     float measuredMs = 0;       // raw arrival difference shown to the user
     float confidence = 0;       // |r| of the main measurement
+    float crosstalkDb = std::numeric_limits<float>::quiet_NaN();   // K04, NaN when unavailable
     juce::String note;
+};
+
+// Guards against wrong answers, found by the T3 fault tests. Both are OFF by default: they change what the tool proposes
+// (a refusal instead of a correction), so they wait for a listening session in a host.
+struct KitPolicy
+{
+    bool refuseOutsideWindow = false;   // refuse when the strongest correlation lies outside the search window (constat 2)
+    bool refuseCrosstalk = false;       // refuse a close mic that hears another instrument too loudly (constat 3)
+};
+
+// H: starting points to calibrate on a kit corpus.
+struct KitConstants
+{
+    static constexpr float outsideWindowRatio = 1.2f;       // outside / inside peak of the whitened envelope that triggers a refusal
+    static constexpr float crosstalkRefusalDb = -15.0f;     // K04 above this level refuses the close mic (synthetic kit: right at -16.0, wrong at -14.2)
+    static constexpr int minimumCrosstalkHits = 4;          // own and foreign hits needed before K04 is reported
+    static constexpr int maximumHitRows = 256;              // hits kept for K04
+    static constexpr double hitClusterMs = 40.0;            // events closer than this belong to the same hit
+    static constexpr double hitWindowMs = 30.0;             // length of the level window of a hit
 };
 
 struct Scores

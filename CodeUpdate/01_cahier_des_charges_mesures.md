@@ -70,7 +70,7 @@ Convention de nommage des colonnes de la base : `famille_mesure[_stat]`, avec `_
 | L08 | `lufs_integre`, `lufs_short_max` | pondération K, norme BS.1770 | Normalisation des spectres, comparaison entre pistes | P2 | À faire |
 | L09 | `dc_offset` | moyenne des échantillons | Alerte | P3 | À faire |
 
-**Règle de la fenêtre active (à calibrer, voir question Q1)** : fenêtre de 10 ms dont le pic est supérieur à `max(P95 − 40 dB, plancher de bruit + 12 dB)` (décision 01-Q1 du document 05). Les valeurs 40 et 12 dB sont des hypothèses de départ (`MeasureConstants`). Cas limite ajouté en J2 : le seuil ne dépasse jamais le P95 (un signal sans dynamique garde ses fenêtres les plus fortes) et les fenêtres de silence numérique (≤ −100 dBFS) ne sont jamais actives. Constat synthétique : le seuil relatif au P95 bouge un peu avec la densité du jeu (écart de crest actif ≈ 1,2 dB entre un kick isolé et un kick dense, contre 4,8 dB pour le crest global) : à régler avec la courbe de calibration du document 05.
+**Règle de la fenêtre active (décision 01-Q1 du document 05)** : fenêtre de 10 ms dont le pic est supérieur à `max(P95 − 55 dB, plancher de bruit + 12 dB)`. **Calibration du 17/10/2026** : le seuil relatif passe de 40 à **55 dB** (`MeasureConstants::activeBelowP95Db`, `analysisVersion` 5) ; le décalage de **12 dB** au-dessus du plancher a été étudié et conservé (le test A09 du doc 02 impose ≤ 1 dB : 0,71 dB à 12 dB, 1,19 dB à 6 dB ; voir le suivi). Cas limite ajouté en J2 : le seuil ne dépasse jamais le P95 (un signal sans dynamique garde ses fenêtres les plus fortes) et les fenêtres de silence numérique (≤ −100 dBFS) ne sont jamais actives. Constat synthétique : le seuil relatif au P95 bouge un peu avec la densité du jeu (écart de crest actif ≈ 1,2 dB entre un kick isolé et un kick dense, contre 4,8 dB pour le crest global). Calibration : 28 prises brutes de 3 kits (réglage : kits 1 et 3, validation : kit 2), écart de crest actif sur ± 10 dB de seuil : à 40 dB, 15 prises sur 28 sous 0,5 dB (écart max 3,0 dB) ; à 55 dB, 25 sur 28 sous 0,5 dB et 28 sur 28 sous 1,0 dB (écart max 0,9 dB). Reproductible avec `scripts/CalibrateActiveWindow.py`.
 
 ### 5.2 Dynamique (`dyn_`)
 
@@ -152,7 +152,7 @@ Ces mesures viennent du module Kit / Phase (`kit::KitSession`) et se rattachent 
 | K01 | `retard_vs_oh_ms`, `correlation_max` | corrélation croisée (enveloppe blanchie), première arrivée | Retard proposé | P1 | Existant |
 | K02 | `polarite_relative` | signe de la corrélation | Inversion de polarité proposée | P1 | Existant |
 | K03 | `coherence_phase_avant`, `coherence_phase_apres` | score 0-100 | Résultat affiché à l'utilisateur | P1 | Existant |
-| K04 | `diaphonie_db` | niveau de la piste pendant les frappes des *autres* instruments, moins son niveau pendant ses propres frappes | Réglage de l'expander, qualité de la prise | P2 | À faire |
+| K04 | `diaphonie_db` | niveau de la piste pendant les frappes des *autres* instruments, moins son niveau pendant ses propres frappes | Réglage de l'expander, qualité de la prise | P2 | **Fait (17/10/2026)** : `KitSession::crosstalkDb()`, champ `Recommendation::crosstalkDb` (NaN si indisponible), commande `--kit`. Une frappe appartient à l'instrument dont le micro est le plus fort par rapport à sa propre frappe la plus forte ; 4 frappes propres et 4 étrangères au moins. Inclut la queue du propre instrument (plancher vers −20 dB sur le kit synthétique). Valeurs réelles : Kick In −16 dB, Snare −21 dB (kit 1) ; kit de référence −19 / −24 dB |
 | K05 | `niveau_relatif_oh_db` | niveau actif de la piste moins celui des overheads | Équilibre du kit (information) | P3 | À faire |
 | K06 | `recouvrement_spectral` | part de l'énergie 60-300 Hz commune entre kick et caisse claire | Conseil d'EQ complémentaire | P3 | À faire |
 
@@ -257,7 +257,7 @@ Un export CSV (une ligne par piste) est généré à partir de `measures` avec l
 
 ## 11. Questions ouvertes et à explorer
 
-- **Q1** : seuil de la fenêtre active (40 dB sous P95 est une hypothèse). À calibrer sur le corpus.
+- **Q1** : seuil de la fenêtre active : **40 dB calibré à 55 dB le 17/10/2026** (voir section 5.1). Reste à calibrer : le décalage de 12 dB au-dessus du plancher de bruit.
 - **Q2** : garde-t-on les WAV des prises de bêta (avec consentement) ou seulement les mesures ?
 - **Q3** : mesures par frappe (statistiques sur chaque frappe) ou seulement globales ? Le premier est plus riche mais le JSON grossit.
 - **Q4** : fréquence d'échantillonnage de la base : faut-il normaliser les analyses faites à 96 kHz (FFT de 8192) pour les comparer à celles à 48 kHz ?

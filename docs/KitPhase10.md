@@ -258,6 +258,8 @@ Room : `0.35 polarite + 0.45 correlation + 0.2 retard plausible (0.3-25 ms)`.
 | aucune frappe franche | "sans mesure fiable" apres 45 s de lecture |
 | plug-in latent avant ZeroEffort | non detectable : documente (premier insert) |
 | ecart > 20 ms | retard borne a 20 ms et signale |
+| correlation la plus forte hors de la fenetre de recherche (par exemple snare 14 ms apres les OH, kick entendu 5 ms avant son micro) | par defaut : correction fausse possible (constat T3). **Garde-fou `KitPolicy::refuseOutsideWindow`, desactive par defaut** : mesure refusee avec une note |
+| un autre instrument couvre le micro (snare a -14 dB et plus dans le micro du kick) | par defaut : le retard du kick suit la snare (constat T3). **Garde-fou `KitPolicy::refuseCrosstalk`, desactive par defaut** : mesure refusee au-dessus de -15 dB de diaphonie K04 (hypothese H) |
 
 ### 14. Performance
 

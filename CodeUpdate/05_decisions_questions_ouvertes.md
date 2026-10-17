@@ -12,7 +12,7 @@ Légende du statut : **P** = proposé, à valider ; **H** = hypothèse chiffrée
 
 | # | Question | Décision proposée | Raison | Vérification | Statut |
 |---|---|---|---|---|---|
-| 01-Q1 | Seuil de la fenêtre active | Fenêtre active = pic > `max(P95 − 40 dB, plancher_bruit + 12 dB)`. Le 40 dB de départ est ensuite calibré en traçant `crest_actif` en fonction du seuil sur 20 prises : on retient le plateau où le crest varie de moins de 0,5 dB pour ± 10 dB de seuil | Un seuil purement relatif échoue sur les prises très bruitées ; le plancher de bruit le stabilise | Test A09 (document 02) ; courbe `crest_actif` / seuil | P, H |
+| 01-Q1 | Seuil de la fenêtre active | Fenêtre active = pic > `max(P95 − 55 dB, plancher_bruit + 12 dB)`. Le 40 dB de départ a été calibré à **55 dB le 17/10/2026** en traçant `crest_actif` en fonction du seuil sur 28 prises (3 kits) : plateau où le crest varie de moins de 0,5 dB pour ± 10 dB de seuil. Le 12 dB reste une hypothèse | Un seuil purement relatif échoue sur les prises très bruitées ; le plancher de bruit le stabilise | Test A09 (document 02) ; courbe `crest_actif` / seuil (`scripts/CalibrateActiveWindow.py`) | P, H (40 dB : calibré) |
 | 01-Q2 | Garder les WAV des bêta-testeurs | **Non par défaut** : on ne reçoit que les mesures (JSON). Un envoi d'extrait audio (30 s maximum) est possible uniquement sur demande explicite, avec consentement séparé et suppression sur demande | RGPD, confiance, poids ; les mesures suffisent au rejeu | Texte de consentement relu ; export testé sans audio | P |
 | 01-Q3 | Mesures par frappe ou globales | **Globales dans toutes les lignes**, plus des statistiques par frappe agrégées (moyenne, écart-type, P10, P90). Les valeurs par frappe elles-mêmes ne sont écrites que dans un fichier séparé `hits.csv`, en mode corpus de développement, limité à 200 frappes | Garde le JSON léger tout en conservant la dispersion utile | Taille du JSON < 300 Ko par analyse | P |
 | 01-Q4 | Comparer 44,1 / 48 / 96 kHz | Déjà quasi équivalent : la taille de FFT double au-dessus de 48 kHz, donc la résolution reste d'environ 11 Hz. Décision : bandes définies en Hz, bandes au-dessus de `0,45 × fréquence d'échantillonnage` ignorées, `rate` toujours stocké | Évite une normalisation compliquée | Test A11 (document 02) | P |
@@ -51,6 +51,6 @@ Légende du statut : **P** = proposé, à valider ; **H** = hypothèse chiffrée
 
 ## Récapitulatif des hypothèses chiffrées à calibrer
 
-`40 dB` (fenêtre active) | `400 ms` (trame longue) | `0,8` (cohérence) | `8 paires / 3 mixeurs` | `k = 0,5` | `1 dB` (zone morte) | `10 kits par jeu` | `2 × médiane CPU`.
+`55 dB` (fenêtre active, calibré le 17/10/2026 ; l'hypothèse de départ était 40 dB) | `400 ms` (trame longue) | `0,8` (cohérence) | `8 paires / 3 mixeurs` | `k = 0,5` | `1 dB` (zone morte) | `10 kits par jeu` | `2 × médiane CPU`.
 
-Aucune de ces valeurs ne vient d'une mesure : ce sont les points de départ de la première calibration.
+Hormis le seuil de la fenêtre active, aucune de ces valeurs ne vient d'une mesure : ce sont les points de départ de la première calibration.

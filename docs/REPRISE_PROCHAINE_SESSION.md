@@ -121,6 +121,7 @@ ZeroEffortDrumTests.exe --export-wav <wav> <dossier> <role 0-9> [natural|rock|me
 #   J3 est actif par defaut ; les deux options --no-... redonnent l'ancien comportement
 ZeroEffortDrumTests.exe --replay  <dossier> [prefixe] [--active-crest|--no-active-crest]
 ZeroEffortDrumTests.exe --compare <rapportA.json> <rapportB.json> [prefixe]
+ZeroEffortDrumTests.exe --kit [--guards] [--start s] [--seconds s] <role>=<wav mono> ...   # analyse Kit / Phase seule, avec K04
 #   rôles : 0 Kick, 1 Snare, 2-4 Toms, 5 Tom basse, 6 Hi-hat, 7 Overheads, 8 Room, 9 Bus
 
 # Export développeur (build avec l'option, jamais en production)

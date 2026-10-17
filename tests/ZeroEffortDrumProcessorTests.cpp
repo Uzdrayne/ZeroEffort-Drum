@@ -20,6 +20,7 @@ void testMeasures();
 void testKnownProblems();
 void testSignals();
 int runReplayCommand(const juce::StringArray& arguments);
+int runKitCommand(const juce::StringArray& arguments);
 void makeScreenshots(const juce::File& directory);
 void testEditor(ZeroEffortDrumProcessor& processor, const juce::File& imageFile);
 
@@ -1286,6 +1287,8 @@ int main(int argumentCount, char** arguments)
         juce::StringArray commandLine;
         for (int index = 1; index < argumentCount; ++index) commandLine.add(juce::String::fromUTF8(arguments[index]));
         if (const auto code = runReplayCommand(commandLine); code >= 0)
+            return code;
+        if (const auto code = runKitCommand(commandLine); code >= 0)
             return code;
         testKit();
         testSnapshot();

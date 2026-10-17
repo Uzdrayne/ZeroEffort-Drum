@@ -66,9 +66,10 @@ struct SyntheticKit
 };
 
 kit::Report analyseOffline(const std::vector<kit::TrackInput>& inputs, const std::vector<const std::vector<float>*>& audio,
-                           double sampleRate, juce::int64 start, juce::int64 end)
+                           double sampleRate, juce::int64 start, juce::int64 end, const kit::KitPolicy& policy = {})
 {
     kit::KitSession session;
+    session.setPolicy(policy);
     check(session.reset(inputs, sampleRate), "Kit session must build analysable pairs");
     const auto read = [&audio](int track, int, juce::int64 first, int count, float* destination) {
         const auto& source = *audio[static_cast<size_t>(track)];
@@ -470,7 +471,7 @@ struct FaultKit
 
 enum class Layout { kitWithSnare, threeTracks, kickOutOnly };
 
-kit::Report analyseFaultKit(const FaultKit& audio, Layout layout = Layout::kitWithSnare)
+kit::Report analyseFaultKit(const FaultKit& audio, Layout layout = Layout::kitWithSnare, const kit::KitPolicy& policy = {})
 {
     std::vector<kit::TrackInput> inputs;
     std::vector<const std::vector<float>*> tracks;
@@ -492,7 +493,7 @@ kit::Report analyseFaultKit(const FaultKit& audio, Layout layout = Layout::kitWi
             { 3, kit::Role::overhead, kit::positionLeft, 1, "OH L" }, { 4, kit::Role::overhead, kit::positionRight, 1, "OH R" } };
         tracks = { &audio.kick, &audio.snare, &audio.overheadLeft, &audio.overheadRight };
     }
-    return analyseOffline(inputs, tracks, rate, 0, static_cast<juce::int64>(audio.kick.size()));
+    return analyseOffline(inputs, tracks, rate, 0, static_cast<juce::int64>(audio.kick.size()), policy);
 }
 
 // Document 02 (section 7.2) asks for +-1 sample (0.021 ms at 48 kHz) on a pure signal. Measured on the current algorithm:
@@ -816,6 +817,137 @@ void testRealFaults()
     std::cout << "PASS: D01-D04 on the real reference kit (baseline kick +" << base << " ms, worst error " << log.worst << " ms)" << std::endl;
 }
 
+// K04 (document 01): level of a close mic during the hits of the other instruments against its own hits. Additive: it is
+// reported, whatever the policy. It must follow the snare bleed in the kick mic at 20 log10 of the bleed.
+void testCrosstalkMeasure()
+{
+    std::vector<float> kickCrosstalk;
+    for (const auto bleed : { 0.1, 0.15, 0.2, 0.25, 0.5 })
+    {
+        FaultParams p;
+        p.kickToOhMs = 5.0;
+        p.snareBleedInKick = bleed;
+        const auto report = analyseFaultKit(FaultKit(p));
+        const auto* kick = report.find(1);
+        const auto* snare = report.find(2);
+        const auto* overhead = report.find(3);
+        check(kick != nullptr && std::isfinite(kick->crosstalkDb), "K04 the kick must report its crosstalk, bleed " + juce::String(bleed));
+        check(snare != nullptr && std::isfinite(snare->crosstalkDb), "K04 the snare must report its crosstalk");
+        check(overhead != nullptr && std::isnan(overhead->crosstalkDb), "K04 is not defined for overheads");
+        check(kick->crosstalkDb < 0.0f && snare->crosstalkDb < 0.0f, "K04 the own hits dominate in a clean kit");
+        kickCrosstalk.push_back(kick->crosstalkDb);
+        if (verbose()) std::cout << "  K04 bleed " << bleed << ": kick " << kick->crosstalkDb << " dB, snare " << snare->crosstalkDb << " dB" << std::endl;
+    }
+    for (size_t index = 1; index < kickCrosstalk.size(); ++index)
+        check(kickCrosstalk[index] > kickCrosstalk[index - 1] + 0.5f, "K04 must grow with the bleed level");
+    // 0.25 -> 0.5 is a factor 2 in amplitude: 6.02 dB. At low bleed the kick's own decay under the snare hit (about 0.07 of its
+    // peak 150 ms later) sets a floor, which is why the check does not start lower.
+    check(std::abs((kickCrosstalk[4] - kickCrosstalk[3]) - 6.02f) < 1.5f, "K04 must scale as 20 log10 of the bleed, got "
+        + juce::String(kickCrosstalk[4] - kickCrosstalk[3]) + " dB");
+
+    FaultParams p;
+    p.kickToOhMs = 3.0;
+    const FaultKit audio(p);
+    check(std::isnan(analyseFaultKit(audio, Layout::kickOutOnly).find(1)->crosstalkDb), "K04 needs another instrument: unavailable with the kick alone");
+    std::cout << "PASS: K04 crosstalk (kick " << kickCrosstalk.front() << " to " << kickCrosstalk.back() << " dB for 0.1 to 0.5 of snare bleed)" << std::endl;
+}
+
+// Both guards are opt-in. With them on, every wrong answer reported by T3 must become a refusal, and nothing that was
+// right may be lost.
+void testGuards()
+{
+    kit::KitPolicy guarded;
+    guarded.refuseOutsideWindow = true;
+    guarded.refuseCrosstalk = true;
+    FaultLog log;
+
+    // Constat 2: beyond the search window
+    for (const auto delay : { 11.0, 14.0, 18.0 })
+    {
+        FaultParams p;
+        p.snareToOhMs = delay;
+        const auto* snare = analyseFaultKit(FaultKit(p), Layout::kitWithSnare, guarded).find(2);
+        check(classify(snare, delay, false, 0.3f, "guard D02") == Outcome::refused, "Guard: a snare " + juce::String(delay) + " ms behind must be refused, got " + describe(snare));
+        check(snare->note.isNotEmpty(), "A refusal must say why");
+    }
+    for (const auto early : { 2.0, 5.0 })
+    {
+        FaultParams p;
+        p.kickToOhMs = -early;
+        const auto* kick = analyseFaultKit(FaultKit(p), Layout::kitWithSnare, guarded).find(1);
+        check(classify(kick, 0.0, false, 0.05f, "guard kick ahead") != Outcome::wrong, "Guard: a kick " + juce::String(early) + " ms ahead must not get a delay, got " + describe(kick));
+    }
+    // The window edge itself, and ordinary faults, are untouched
+    for (const auto delay : { 0.5, 3.0, 10.0 })
+    {
+        FaultParams p;
+        p.kickToOhMs = delay;
+        p.snareToOhMs = delay;
+        const auto report = analyseFaultKit(FaultKit(p), Layout::kitWithSnare, guarded);
+        expectCorrection(report.find(1), delay, false, kickToleranceMs, "guard D01 kick " + juce::String(delay) + " ms", log);
+        expectCorrection(report.find(2), delay, false, snareToleranceMs, "guard D02 snare " + juce::String(delay) + " ms", log);
+    }
+    for (const auto delay : { 0.0, 4.0, 7.0 })
+    {
+        FaultParams p;
+        p.kickToOhMs = delay;
+        p.kickInverted = true;
+        expectCorrection(analyseFaultKit(FaultKit(p), Layout::kitWithSnare, guarded).find(1), delay, true, kickToleranceMs, "guard D03 inverted kick " + juce::String(delay) + " ms", log);
+    }
+
+    // Constat 3: snare bleed in the kick mic, from -22 to -6 dB against the kick peak
+    for (const auto bleed : { 0.1, 0.15, 0.2, 0.25, 0.5 })
+    {
+        FaultParams p;
+        p.kickToOhMs = 5.0;
+        p.snareBleedInKick = bleed;
+        const auto* kick = analyseFaultKit(FaultKit(p), Layout::kitWithSnare, guarded).find(1);
+        check(classify(kick, 5.0, false, kickToleranceMs, "guard D05") != Outcome::wrong, "Guard: snare bleed " + juce::String(bleed) + " must not fool the kick, got " + describe(kick));
+    }
+    FaultParams quietBleed;
+    quietBleed.kickToOhMs = 5.0;
+    quietBleed.snareBleedInKick = 0.1;
+    expectCorrection(analyseFaultKit(FaultKit(quietBleed), Layout::kitWithSnare, guarded).find(1), 5.0, false, kickToleranceMs, "guard D05 light bleed is still corrected", log);
+
+    // Reduced kits and noise
+    FaultParams reduced;
+    reduced.kickToOhMs = 4.0;
+    reduced.snareToOhMs = 2.0;
+    const FaultKit reducedAudio(reduced);
+    expectCorrection(analyseFaultKit(reducedAudio, Layout::threeTracks, guarded).find(1), 4.0, false, kickToleranceMs, "guard D09 kick", log);
+    for (const auto noise : { -50.0, -40.0 })
+    {
+        FaultParams p;
+        p.kickToOhMs = 5.0;
+        p.noiseRmsDb = noise;
+        expectCorrection(analyseFaultKit(FaultKit(p), Layout::kitWithSnare, guarded).find(1), 5.0, false, realToleranceMs, "guard D06 noise " + juce::String(noise), log);
+    }
+
+    // The real reference kit must give the same corrections with and without the guards
+    std::array<std::vector<float>, 4> audio;
+    double sampleRate = 0;
+    if (loadReferenceKit(audio, sampleRate))
+    {
+        std::vector<kit::TrackInput> inputs { { 1, kit::Role::kickIn, 0, 1, "Kick" }, { 2, kit::Role::snareTop, 0, 1, "Snare" },
+            { 3, kit::Role::overhead, kit::positionLeft, 1, "OH L" }, { 4, kit::Role::overhead, kit::positionRight, 1, "OH R" } };
+        const std::vector<const std::vector<float>*> tracks { &audio[0], &audio[1], &audio[2], &audio[3] };
+        const auto length = static_cast<juce::int64>(audio[0].size());
+        const auto plain = analyseOffline(inputs, tracks, sampleRate, 0, length);
+        const auto safe = analyseOffline(inputs, tracks, sampleRate, 0, length, guarded);
+        for (const auto id : { 1u, 2u })
+            check(plain.find(id)->measured == safe.find(id)->measured && std::abs(plain.find(id)->delayMs - safe.find(id)->delayMs) < 1.0e-6f
+                && plain.find(id)->invert == safe.find(id)->invert, "Guards must not change the corrections of the real reference kit, track " + juce::String(id));
+        if (verbose())
+            std::cout << "  real kit crosstalk: kick " << plain.find(1)->crosstalkDb << " dB, snare " << plain.find(2)->crosstalkDb << " dB" << std::endl;
+    }
+
+    // Off by default: the T3 expected failures stay reproducible
+    FaultParams beyond;
+    beyond.snareToOhMs = 14.0;
+    check(analyseFaultKit(FaultKit(beyond)).find(2)->measured, "The guards are off by default");
+    std::cout << "PASS: guards (outside window, crosstalk): no wrong answer left, ordinary faults unchanged (worst error " << log.worst << " ms)" << std::endl;
+}
+
 void testKitFaults()
 {
     testFaultDelays();
@@ -825,6 +957,8 @@ void testKitFaults()
     testFaultLevel();
     testFaultReducedKits();
     testRealFaults();
+    testCrosstalkMeasure();
+    testGuards();
 }
 
 void testRoleNames()
@@ -850,4 +984,75 @@ void testKit()
     testKitFaults();
     testRegistryWithInstances();
     std::cout << "PASS: kit alignment, polarity, capture and multi-instance registry\n";
+}
+
+// Developer command: ZeroEffortDrumTests.exe --kit [--guards] [--start <s>] [--seconds <s>] <role>=<mono wav> ...
+// Roles: kickin, kickout, snare, snarebottom, tom, floortom, hihat, oh, ohl, ohr, room. Analysis only, no playback.
+int runKitCommand(const juce::StringArray& commandLine)
+{
+    if (commandLine.isEmpty() || commandLine[0] != "--kit") return -1;
+    const auto fail = [](const juce::String& message) { std::cerr << "ERROR: " << message << std::endl; return 1; };
+    kit::KitPolicy policy;
+    double startSeconds = 0, seconds = 60;
+    struct Entry { juce::String name; kit::Role role; int position; juce::File file; };
+    std::vector<Entry> entries;
+    for (int index = 1; index < commandLine.size(); ++index)
+    {
+        const auto& item = commandLine[index];
+        if (item == "--guards") policy.refuseOutsideWindow = policy.refuseCrosstalk = true;
+        else if ((item == "--start" || item == "--seconds") && index + 1 < commandLine.size())
+            (item == "--start" ? startSeconds : seconds) = commandLine[++index].getDoubleValue();
+        else
+        {
+            const auto name = item.upToFirstOccurrenceOf("=", false, false).toLowerCase();
+            const juce::File file(item.fromFirstOccurrenceOf("=", false, false));
+            kit::Role role = kit::Role::none;
+            int position = 0;
+            if (name == "kickin") role = kit::Role::kickIn;
+            else if (name == "kickout") { role = kit::Role::kickOut; position = kit::positionSecondary; }
+            else if (name == "snare") role = kit::Role::snareTop;
+            else if (name == "snarebottom") { role = kit::Role::snareBottom; position = kit::positionSecondary; }
+            else if (name == "tom") role = kit::Role::tom;
+            else if (name == "floortom") role = kit::Role::floorTom;
+            else if (name == "hihat") role = kit::Role::hiHat;
+            else if (name == "oh") role = kit::Role::overhead;
+            else if (name == "ohl") { role = kit::Role::overhead; position = kit::positionLeft; }
+            else if (name == "ohr") { role = kit::Role::overhead; position = kit::positionRight; }
+            else if (name == "room") role = kit::Role::room;
+            else return fail("unknown role '" + name + "'");
+            entries.push_back({ name, role, position, file });
+        }
+    }
+    if (entries.size() < 2) return fail("usage: --kit [--guards] [--start s] [--seconds s] <role>=<mono wav> ... (at least a close mic and an overhead)");
+    std::vector<std::vector<float>> audio(entries.size());
+    std::vector<kit::TrackInput> inputs;
+    double sampleRate = 0;
+    for (size_t index = 0; index < entries.size(); ++index)
+    {
+        double fileRate = 0;
+        juce::AudioFormatManager formats;
+        formats.registerBasicFormats();
+        std::unique_ptr<juce::AudioFormatReader> reader(formats.createReaderFor(entries[index].file));
+        if (reader == nullptr) return fail("cannot read " + entries[index].file.getFullPathName());
+        fileRate = reader->sampleRate;
+        if (reader->numChannels != 1) return fail(entries[index].file.getFileName() + " must be mono");
+        if (index > 0 && fileRate != sampleRate) return fail("all files must share the sample rate");
+        sampleRate = fileRate;
+        const auto start = static_cast<juce::int64>(startSeconds * fileRate);
+        if (!loadWav(entries[index].file, audio[index], fileRate, start, static_cast<juce::int64>(seconds * fileRate))) return fail("read failure");
+        inputs.push_back({ static_cast<juce::uint32>(index + 1), entries[index].role, entries[index].position, 1, entries[index].name });
+    }
+    std::vector<const std::vector<float>*> pointers;
+    size_t shortest = audio[0].size();
+    for (const auto& track : audio) { pointers.push_back(&track); shortest = std::min(shortest, track.size()); }
+    const auto report = analyseOffline(inputs, pointers, sampleRate, 0, static_cast<juce::int64>(shortest), policy);
+    std::cout << "# Kit : " << entries.size() << " pistes, " << sampleRate << " Hz, garde-fous " << (policy.refuseOutsideWindow ? "actifs" : "inactifs") << "\n\n";
+    std::cout << "| Piste | Mesure | Retard (ms) | Polarite | r | Diaphonie K04 (dB) | Note |\n|---|---|---|---|---|---|---|\n";
+    for (const auto& recommendation : report.recommendations)
+        std::cout << "| " << recommendation.label << " | " << (recommendation.measured ? "oui" : "non") << " | " << juce::String(recommendation.delayMs, 2)
+                  << " | " << (recommendation.invert ? "inversee" : "normale") << " | " << juce::String(recommendation.confidence, 2) << " | "
+                  << (std::isfinite(recommendation.crosstalkDb) ? juce::String(recommendation.crosstalkDb, 1) : juce::String("-")) << " | "
+                  << recommendation.note << " |\n";
+    std::cout << "\nCoherence de phase " << report.scores.phaseBefore << " -> " << report.scores.phaseAfter << ", frappes " << report.events << std::endl;
+    return 0;
 }
