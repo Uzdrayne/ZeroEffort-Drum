@@ -9,7 +9,7 @@ Légende : ⬜ à faire · 🔄 en cours · ✅ terminé · ⏸ en réserve
 
 | Élément | État |
 |---|---|
-| Version du plug-in | **0.11.0** (`CMakeLists.txt`, depuis le 17/10/2026) ; `analysisVersion` 6, `profileVersion` 2 |
+| Version du plug-in | **0.11.1** (`CMakeLists.txt`, depuis le 18/10/2026) ; `analysisVersion` 6, `profileVersion` 2 |
 | `main` | vagues 1 et 2 fusionnées (pull requests #1 et #2, commit `b1dbabd`) : phase 0, build VS 2019 / 2022, J1, T1, T2, J2, J3, T3, T4 |
 | Branches de travail | aucune ouverte (`feature/t3-kit-phase` fusionnée) |
 | Passation | [REPRISE_PROCHAINE_SESSION.md](REPRISE_PROCHAINE_SESSION.md) : prompt à coller, état, décisions, menu des prochaines étapes, pièges |
@@ -40,6 +40,7 @@ Légende : ⬜ à faire · 🔄 en cours · ✅ terminé · ⏸ en réserve
 | Calibration 01-Q1 | `activeBelowP95Db` 40 → 55 dB, `analysisVersion` 5, `scripts/CalibrateActiveWindow.py` | ✅ | voir `git log` de `feature/calibration-fenetre-active` | Critère du doc 05 (écart du crest actif < 0,5 dB sur ± 10 dB de seuil) : réglage sur kits 1 et 3 (17 prises), validation sur le kit 2 (11 prises) ; CTest 3/3, 0 avertissement ; corpus de 32 prises ré-exporté, rejeu déterministe, **aucun réglage ne change** ; script vérifié contre l'export (écart 0,00000 dB) |
 | J4a doubles frappes | `doubleHitMinimumWindows` / `doubleHitRise`, `setDoubleHitDetection`, `--double-hits` | ✅ **activé par défaut le 17/10/2026** (validé par l'utilisateur) | voir `git log` | CTest 3/3, 0 avertissement ; A08 : 48 frappes sur 48 avec le correctif, jeu ordinaire inchangé ; corpus : +1 à +16 % de frappes, 1 seul réglage modifié sur 37 (Kick Out kit 1, < 9 Hz) ; activé : `analysisVersion` 6, plug-in **0.11.0**, corpus de 37 prises ré-exporté (anciens snapshots dans `archive_v5/`) ; retour arrière : `doubleHitsByDefault = false` + version suivante |
 | Interface en anglais | tous les textes affichés par le plug-in (éditeur, infobulles, noms de réglages et de bandes, kit, radar, bilan Auto) | ✅ | voir `git log` | CTest 3/3, 0 avertissement ; **changement visible, pas audible** : identifiants (paramètres, composants, clés JSON, codes) inchangés ; rejeu des 37 snapshots : « Réglages modifiés : Aucun » ; `tests/RoleReferenceHashes.h` régénéré (les hachages incluent le bilan, donc le texte) ; rapports des outils développeur (`--replay`, `--kit`, `--pair`, `--bus`) et documents laissés en français ; état global dans `docs/ETAT_ACTUEL.md` |
+| Presets utilisateur (0.11.1) | bouton Presets : enregistrer et charger ses réglages par instrument (4 toms partagés), fichiers `.zedpreset`, chargement annulable par Revert | ✅ | voir `git log` | CTest 3/3, 0 avertissement ; `tests/PresetTests.cpp` ; aucun changement audible ni des propositions ; **non essayé dans Cubase** |
 | J4 / J4b | détecteurs par rôle, analyse continue Overheads / Room | ⏸ | | change le son ; corpus réel |
 | Sous-bus SB1-SB7 | | ⏸ | | extension préalable du registre Kit (mesures, trims, rôles Kick Sub / Hi-hat Bottom) |
 
@@ -154,6 +155,14 @@ Aucun code modifié (banc d'essai temporaire retiré). Sur deux vrais Kicks en R
 ### Style Auto par défaut : Rock 75 % (18/10/2026)
 
 Demandé par l'utilisateur. Une nouvelle instance démarre en **Rock, 75 %** au lieu de Natural, 100 % : valeurs initiales de `autoStyleOption` (1) et `autoIntensityOption` (75) dans `controlSpecs`, et de `AutoSession` (`style`, `intensity`). Identifiants inchangés ; les projets enregistrés restent comme ils étaient (l'état stocke les valeurs) ; le repli d'un état sans propriétés `autoStyle` / `autoIntensity` reste Natural / 100 %. **Changement audible au prochain Analyze d'une nouvelle instance** (la proposition est plus marquée) mais aucune proposition ne change pour un style et une intensité donnés : les 270 hachages du filet de rôles sont inchangés (le test fixe maintenant les options d'origine à Natural / 100 %, car la proposition les recopie). Test ajouté : une instance neuve est en Rock 75 %. Version du plug-in non incrémentée (0.11.0).
+
+### Presets utilisateur, version 0.11.1 (18/10/2026)
+
+Demandé par l'utilisateur : un bouton pour enregistrer et charger ses presets, proposés selon l'instrument sélectionné. **Décisions** : les 4 toms partagent leurs presets (choix de l'utilisateur), les autres instruments ont chacun les leurs ; un preset contient le son (tous les réglages sauf le rôle, le bypass, le Kit / Phase, les options Auto et le Mono) ; fichiers JSON `.zedpreset` par identifiant de paramètre dans `%APPDATA%\ZeroEffort Drum\Presets\<famille>\` (un identifiant inconnu est ignoré, un manquant prend la valeur par défaut, une valeur hors plage est bornée, un fichier plus récent, d'une autre famille, cassé ou de plus de 256 Ko est refusé) ; nom nettoyé pour Windows (caractères interdits, noms de périphériques, points de tête, 48 caractères), donc aucun nom ne sort de son dossier ; écriture par fichier temporaire ; suppression vers la corbeille ; charger un preset réutilise le retour arrière de l'Auto (Revert).
+
+- Code : `Source/Drum/DrumPresetLibrary.h` (logique pure), API `saveUserPreset` / `loadUserPreset` / `deleteUserPreset` / `listUserPresets` du processeur, bouton et menu dans l'éditeur (`presetsMenu`).
+- Tests : `tests/PresetTests.cpp` (noms, aller-retour, valeurs hors plage, fichiers refusés, nom hostile, tri, suppression, familles, toms partagés, Revert) et bouton visible sans recouvrir les commandes Auto dans `EditorTests.cpp`. CTest 3/3.
+- **Changement de comportement : aucun** sur l'audio ni sur les propositions ; version 0.11.1. Non essayé dans Cubase (menu et fenêtre de nom).
 ## Écarts avec les spécifications
 
 - **Emplacement des fonctions** : `toSnapshot` / `restoreSnapshot` / `measuresToVar` sont des fonctions statiques de `struct DrumAnalysisSnapshot` (ami de `DrumAnalysis`), pas des méthodes de `DrumAnalysis` : la classe de mesure reste inchangée. Le doc 07 disait « dans la classe DrumAnalysis ».

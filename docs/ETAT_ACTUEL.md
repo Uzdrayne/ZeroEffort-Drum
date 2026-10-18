@@ -6,13 +6,13 @@ Document de situation : **où on en est, ce qui est fait, ce qui manque**. Il r�
 
 | | |
 |---|---|
-| Version du plug-in | **0.11.0** (VST3 + ARA, Windows x64, JUCE 8.0.6) |
+| Version du plug-in | **0.11.1** (VST3 + ARA, Windows x64, JUCE 8.0.6) |
 | Versions d'analyse | `analysisVersion` **6**, `profileVersion` **2** |
 | Branche de travail | `main` directement, un commit par étape (depuis le 17/10) |
 | Tests | 3 suites CTest, **toutes vertes** : `RegionCacheTests`, `ZeroEffortDrumTests` (≈ 80-120 s), `ARADiscoveryTests` ; build VS 2019 sans avertissement |
 | Corpus (hors dépôt) | `Database_drum` : 4 kits bruts ; mixés : kit 1 (bus Kick, Snare et batterie) et kit 2 (bus de batterie seul), manifeste `corpus.json` |
 | Vérifié dans Cubase | l'**export JSON** d'une analyse Auto (Kick, région ARA). **Rien d'autre n'a été écouté** (voir 5) |
-| Dernier chantier | interface passée en **anglais** (voir 6) ; avant : radar Auto |
+| Dernier chantier | **presets utilisateur** (Presets : enregistrer / charger par instrument, voir 2) ; avant : interface en anglais (6), radar Auto |
 
 ## 2. Ce qui est fait
 
@@ -25,6 +25,9 @@ Document de situation : **où on en est, ce qui est fait, ce qui manque**. Il r�
 | Calibration de la fenêtre active (01-Q1) : seuil relatif 40 → **55 dB** ; décalage de plancher 12 dB étudié et **conservé** | ✅ |
 | Registre de rôles : filet de 270 propositions gelées + table `RoleDescriptor` (`DrumRole.h`), `DrumAnalyser` sans branchement sur le rôle | ✅ étape 1 sur 2 |
 | Export enrichi : `meta.position`, `meta.channels`, `--position` | ✅ |
+
+### Presets utilisateur (0.11.1, 18/10/2026)
+Bouton **Presets** en bas de l'éditeur (à droite de Report) : *Save current settings as…* (petite fenêtre de nom, le bouton devient « Overwrite » si le nom existe), liste des presets de l'instrument en cours (un clic charge), *Delete* (vers la corbeille), *Open the presets folder*. Un Kick ne voit que les presets Kick ; les **4 toms partagent** les leurs. Fichiers JSON `.zedpreset` dans `%APPDATA%\ZeroEffort Drum\Presets\<famille>\`, réglages enregistrés par identifiant de paramètre. Un preset contient le **son** (tous les réglages de traitement) ; il ne contient pas le rôle, le bypass, le Kit / Phase (retard, polarité), les options Auto (style, intensité) ni le Mono. **Charger est annulable** avec Revert. Logique dans `Source/Drum/DrumPresetLibrary.h`, tests dans `tests/PresetTests.cpp`. Non essayé dans Cubase.
 
 ### Correctifs actifs par défaut (validés par l'utilisateur, sans écoute dédiée)
 | Correctif | Effet |

@@ -805,6 +805,67 @@ bool ZeroEffortDrumProcessor::canRevertAutoPreset() const
 }
 juce::String ZeroEffortDrumProcessor::getAutoPresetText() const { return autoSession->text; }
 
+juce::Result ZeroEffortDrumProcessor::failPreset(const juce::String& message)
+{
+    if (!autoSession->busy) autoSession->text = "Preset / " + message;
+    return juce::Result::fail(message);
+}
+
+drum::PresetFamily ZeroEffortDrumProcessor::getUserPresetFamily() const
+{
+    return drum::presetFamilyOf(drum::instrumentFromValue(getSettings()[drum::instrument]));
+}
+std::vector<juce::String> ZeroEffortDrumProcessor::listUserPresets() const
+{
+    return presetLibrary.list(getUserPresetFamily());
+}
+bool ZeroEffortDrumProcessor::userPresetExists(const juce::String& name) const
+{
+    return presetLibrary.exists(getUserPresetFamily(), name);
+}
+juce::File ZeroEffortDrumProcessor::getUserPresetFolder() const { return presetLibrary.folderFor(getUserPresetFamily()); }
+void ZeroEffortDrumProcessor::setUserPresetRoot(const juce::File& folder) { presetLibrary.setRoot(folder); }
+
+juce::Result ZeroEffortDrumProcessor::saveUserPreset(const juce::String& name)
+{
+    if (!canEditSettings()) return failPreset("Select an ARA region first");
+    const auto settings = getSettings();
+    const auto role = drum::instrumentFromValue(settings[drum::instrument]);
+    const auto clean = drum::DrumPresetLibrary::cleanName(name);
+    const auto result = presetLibrary.save(drum::presetFamilyOf(role), name, settings, role, JucePlugin_VersionString);
+    if (result.failed()) return failPreset(result.getErrorMessage());
+    if (!autoSession->busy) autoSession->text = "Preset / " + clean + " saved";
+    return result;
+}
+
+juce::Result ZeroEffortDrumProcessor::loadUserPreset(const juce::String& name)
+{
+    if (!canEditSettings()) return failPreset("Select an ARA region first");
+    const auto current = getSettings();
+    drum::Settings loaded {};
+    const auto result = presetLibrary.load(drum::presetFamilyOf(drum::instrumentFromValue(current[drum::instrument])), name,
+        current, loaded);
+    if (result.failed()) return failPreset(result.getErrorMessage());
+    cancelAutoPreset();
+    auto& session = *autoSession;
+    session.before = current;
+    session.key = autoTargetKey();
+    writeSettings(loaded);
+    session.applied = getSettings();
+    session.ready = false;
+    session.changed = true;
+    session.text = "Preset / " + drum::DrumPresetLibrary::cleanName(name) + " loaded";
+    return result;
+}
+
+juce::Result ZeroEffortDrumProcessor::deleteUserPreset(const juce::String& name)
+{
+    const auto result = presetLibrary.remove(getUserPresetFamily(), name);
+    if (result.failed()) return failPreset(result.getErrorMessage());
+    if (!autoSession->busy) autoSession->text = "Preset / " + drum::DrumPresetLibrary::cleanName(name) + " deleted";
+    return result;
+}
+
 void ZeroEffortDrumProcessor::setAutoStyle(drum::DrumStyle style, float intensity)
 {
     if (style != drum::DrumStyle::natural && style != drum::DrumStyle::rock && style != drum::DrumStyle::metal) return;

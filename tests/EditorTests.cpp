@@ -245,6 +245,12 @@ void testEditor(ZeroEffortDrumProcessor& processor, const juce::File& imageFile)
             if (juce::String(id) != "autoAnalyse") require(!button->isEnabled(), "Apply and rollback must start disabled");
         }
         auto* intensity = child<juce::Slider>(editor, "autoIntensity");
+        auto* presetsButton = child<juce::TextButton>(editor, "presetsMenu");
+        require(presetsButton != nullptr && presetsButton->isVisible() && presetsButton->isEnabled()
+            && editor.getLocalBounds().contains(presetsButton->getBounds()), "The Presets button must be visible and usable");
+        for (const auto* id : { "autoAnalyse", "autoApply", "autoRevert", "autoDetails" })
+            require(!presetsButton->getBounds().intersects(child<juce::TextButton>(editor, id)->getBounds()),
+                "The Presets button must not overlap the Auto commands");
         require(intensity != nullptr, "Intensity control must be visible");
         intensity->setValue(60, juce::sendNotificationSync);
         require(std::abs(processor.getAutoIntensity() - 0.6f) < 0.0001f, "Intensity slider must reach Auto options");

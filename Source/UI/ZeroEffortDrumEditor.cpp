@@ -196,6 +196,64 @@ private:
         resetButton { "Reset kit to zero" };
 };
 
+// Small name field shown under the Presets button; the button reads "Overwrite" when the name is already taken.
+class PresetSavePanel final : public juce::Component
+{
+public:
+    PresetSavePanel(const juce::String& family, std::function<bool(const juce::String&)> exists,
+                    std::function<void(const juce::String&)> save)
+        : nameExists(std::move(exists)), onSave(std::move(save))
+    {
+        setSize(270, 98);
+        title.setText("Save " + family + " preset as", juce::dontSendNotification);
+        title.setFont(uiFont(12.5f, true));
+        title.setColour(juce::Label::textColourId, palette::textDim);
+        name.setComponentID("presetName");
+        name.setFont(uiFont(14.0f));
+        name.setTextToShowWhenEmpty("Preset name", palette::textFaint);
+        name.setInputRestrictions(drum::DrumPresetLibrary::maximumNameLength);
+        name.onTextChange = [this] { refresh(); };
+        name.onReturnKey = [this] { commit(); };
+        saveButton.setComponentID("presetSave");
+        saveButton.onClick = [this] { commit(); };
+        for (juce::Component* child : { static_cast<juce::Component*>(&title), static_cast<juce::Component*>(&name),
+                                        static_cast<juce::Component*>(&saveButton) })
+            addAndMakeVisible(*child);
+        refresh();
+    }
+
+    void resized() override
+    {
+        auto area = getLocalBounds().reduced(12, 10);
+        title.setBounds(area.removeFromTop(20));
+        name.setBounds(area.removeFromTop(28).withTrimmedTop(2));
+        saveButton.setBounds(area.removeFromBottom(26).removeFromRight(110));
+    }
+    void parentHierarchyChanged() override { if (isShowing()) name.grabKeyboardFocus(); }
+
+private:
+    void refresh()
+    {
+        const auto clean = drum::DrumPresetLibrary::cleanName(name.getText());
+        saveButton.setEnabled(clean.isNotEmpty());
+        saveButton.setButtonText(clean.isNotEmpty() && nameExists(clean) ? "Overwrite" : "Save");
+    }
+    void commit()
+    {
+        const auto clean = drum::DrumPresetLibrary::cleanName(name.getText());
+        if (clean.isEmpty()) return;
+        auto* box = findParentComponentOfClass<juce::CallOutBox>();
+        onSave(clean);
+        if (box != nullptr) box->dismiss();
+    }
+
+    std::function<bool(const juce::String&)> nameExists;
+    std::function<void(const juce::String&)> onSave;
+    juce::Label title;
+    juce::TextEditor name;
+    juce::TextButton saveButton { "Save" };
+};
+
 class DrumEditor final : public juce::AudioProcessorEditor,
                          public juce::AudioProcessorEditorARAExtension,
                          private juce::Timer
@@ -224,6 +282,8 @@ private:
     void paintPage(juce::Graphics& graphics, const drum::Settings& settings);
     void paintKitReport(juce::Graphics& graphics, juce::Rectangle<int> area);
     void showText(const juce::String& title, const juce::String& text);
+    void showPresetMenu();
+    void showPresetSave();
     void rotary(juce::Slider& slider);
     void horizontal(juce::Slider& slider);
     int instrument() const { return currentInstrument; }
@@ -233,7 +293,8 @@ private:
     juce::TooltipWindow tooltip { this, 650 };
     juce::Label status, context, autoReport, intensityLabel;
     juce::ComboBox instrumentMenu, positionMenu, kitGroupMenu;
-    juce::TextButton diagnostic, analyse, apply, revert, details;
+    juce::TextButton diagnostic, analyse, apply, revert, details, presets;
+    juce::Component::SafePointer<juce::Component> presetCallOut;
     juce::TextButton kitAnalyse, kitApply, kitReport, kitDelayDown, kitDelayUp;
     KitPreview preview;
     AutoRadarPanel radarPanel;
@@ -376,7 +437,7 @@ DrumEditor::DrumEditor(ZeroEffortDrumProcessor& processor)
     analyse.getProperties().set("primary", true);
     analyse.setTooltip("ARA: one event. Insert: capture 8 seconds of incoming audio.");
     apply.setTooltip("Replace the settings with the careful proposal");
-    revert.setTooltip("Restore the settings from before the last Auto apply");
+    revert.setTooltip("Restore the settings from before the last Auto apply or preset load");
     details.setTooltip("Show the proposal and the full render measurements");
     analyse.onClick = [this] {
         if (owner.autoPresetBusy()) owner.cancelAutoPreset(); else owner.startAutoPreset();
@@ -385,6 +446,11 @@ DrumEditor::DrumEditor(ZeroEffortDrumProcessor& processor)
     apply.onClick = [this] { owner.applyAutoPreset(); timerCallback(); };
     revert.onClick = [this] { owner.revertAutoPreset(); timerCallback(); };
     details.onClick = [this] { showText("Auto / Report", owner.getAutoPresetText()); };
+    presets.setButtonText("Presets");
+    presets.setComponentID("presetsMenu");
+    presets.setTooltip("Save the current settings as your own preset, or load one saved for this instrument");
+    presets.onClick = [this] { showPresetMenu(); };
+    addAndMakeVisible(presets);
     autoReport.setFont(uiFont(12.0f));
     autoReport.setColour(juce::Label::textColourId, palette::textDim);
     addAndMakeVisible(autoReport);
@@ -571,6 +637,7 @@ DrumEditor::DrumEditor(ZeroEffortDrumProcessor& processor)
 
 DrumEditor::~DrumEditor()
 {
+    if (auto* box = presetCallOut.getComponent()) box->exitModalState(0);
     if (spectrumSwitch.getToggleState()) owner.getSpectrumMailbox().subscribers.fetch_sub(1);
     owner.cancelAutoPreset();
     owner.setAutoApplyWhenReady(true);
@@ -590,6 +657,49 @@ void DrumEditor::horizontal(juce::Slider& slider)
     if (slider.getSliderStyle() == juce::Slider::LinearHorizontal) return;
     slider.setSliderStyle(juce::Slider::LinearHorizontal);
     slider.setTextBoxStyle(juce::Slider::TextBoxRight, false, 66, 20);
+}
+
+void DrumEditor::showPresetSave()
+{
+    const auto family = juce::String(drum::presetFamilyName(owner.getUserPresetFamily()));
+    auto panel = std::make_unique<PresetSavePanel>(family,
+        [this](const juce::String& name) { return owner.userPresetExists(name); },
+        [this](const juce::String& name) { owner.saveUserPreset(name); timerCallback(); });
+    auto& box = juce::CallOutBox::launchAsynchronously(std::move(panel), presets.getScreenBounds(), nullptr);
+    presetCallOut = &box;
+}
+
+void DrumEditor::showPresetMenu()
+{
+    const auto names = owner.listUserPresets();
+    juce::PopupMenu menu, remove;
+    menu.addItem(1, "Save current settings as...", owner.canEditSettings());
+    menu.addSeparator();
+    menu.addSectionHeader(juce::String(drum::presetFamilyName(owner.getUserPresetFamily())) + " presets");
+    if (names.empty()) menu.addItem(2, "(none saved yet)", false);
+    for (size_t index = 0; index < names.size(); ++index)
+    {
+        menu.addItem(100 + static_cast<int>(index), names[index]);
+        remove.addItem(1000 + static_cast<int>(index), names[index]);
+    }
+    menu.addSeparator();
+    menu.addSubMenu("Delete", remove, !names.empty());
+    menu.addItem(3, "Open the presets folder");
+    juce::Component::SafePointer<DrumEditor> safe(this);
+    menu.showMenuAsync(juce::PopupMenu::Options().withTargetComponent(presets), [safe, names](int choice) {
+        if (safe == nullptr || choice == 0) return;
+        if (choice == 1) safe->showPresetSave();
+        else if (choice == 3)
+        {
+            const auto folder = safe->owner.getUserPresetFolder();
+            if (folder.createDirectory()) folder.startAsProcess();
+        }
+        else if (choice >= 1000 && static_cast<size_t>(choice - 1000) < names.size())
+            safe->owner.deleteUserPreset(names[static_cast<size_t>(choice - 1000)]);
+        else if (choice >= 100 && static_cast<size_t>(choice - 100) < names.size())
+            safe->owner.loadUserPreset(names[static_cast<size_t>(choice - 100)]);
+        safe->timerCallback();
+    });
 }
 
 void DrumEditor::showText(const juce::String& title, const juce::String& text)
@@ -697,7 +807,8 @@ void DrumEditor::resized()
     apply.setBounds(126, 722, 104, 28);
     revert.setBounds(236, 722, 96, 28);
     details.setBounds(338, 722, 72, 28);
-    autoReport.setBounds(420, 720, 560, 32);
+    presets.setBounds(416, 722, 92, 28);
+    autoReport.setBounds(518, 720, 462, 32);
     layoutTabs();
     if (!tabs[static_cast<size_t>(activePage)].isVisible())
     {
@@ -1494,6 +1605,7 @@ void DrumEditor::timerCallback()
     analyse.setEnabled(owner.autoPresetBusy() || owner.canEditSettings());
     apply.setEnabled(owner.canApplyAutoPreset());
     revert.setEnabled(owner.canRevertAutoPreset());
+    presets.setEnabled(owner.canEditSettings());
     const auto reportText = owner.getAutoPresetText();
     const auto detail = reportText.indexOf(7, " / ");
     autoReport.setText((detail >= 0 ? reportText.substring(0, detail) : reportText.upToFirstOccurrenceOf("\n", false, false)).substring(0, 80),

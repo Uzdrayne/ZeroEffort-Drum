@@ -28,7 +28,7 @@ Ce que je veux faire : [à compléter, ou « propose-moi »]
 
 *(Mis à jour le 17 octobre 2026, fin de la session de travail sur `main`.)*
 
-- **Dépôt** : `Uzdrayne/ZeroEffort-Drum`. Version du plug-in : **0.11.0**. On travaille **directement sur `main`**, un commit par étape (décision du 17/10/2026).
+- **Dépôt** : `Uzdrayne/ZeroEffort-Drum`. Version du plug-in : **0.11.1**. On travaille **directement sur `main`**, un commit par étape (décision du 17/10/2026).
 - **Versions d'analyse** : `analysisVersion` **6**, `profileVersion` **2**.
 - **Suivi détaillé** : `docs/SUIVI_IMPLEMENTATION.md` (jalons, journal chiffré, écarts, questions ouvertes). Plan : `docs/PLAN_IMPLEMENTATION.md`. Spécifications : `CodeUpdate/01` à `08`.
 - **Corpus (hors dépôt)** : `C:\Users\robin\Desktop\Database_drum` : `raw1` à `raw4`, `mix1`, `mix2`, `LISTING.md`, `snapshots\`, `reports\`. Variables d'environnement utilisateur : `ZED_WAV_DIRECTORY` (= `raw3`, pour les tests de kit réel) et `ZED_ANALYSIS_EXPORT_DIR`.

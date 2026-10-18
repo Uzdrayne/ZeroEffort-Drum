@@ -6,6 +6,7 @@
 #include "../Drum/DrumAutoCapture.h"
 #include "../Drum/DrumAutoPreset.h"
 #include "../Drum/DrumAutoRadar.h"
+#include "../Drum/DrumPresetLibrary.h"
 #include "../Drum/DrumSpectrum.h"
 #include "../Kit/KitRegistry.h"
 
@@ -59,6 +60,15 @@ public:
     bool canApplyAutoPreset() const;
     bool canRevertAutoPreset() const;
     juce::String getAutoPresetText() const;
+    // User presets: the sound of this instrument, stored per family (the four toms share theirs). Loading can be undone with revertAutoPreset().
+    drum::PresetFamily getUserPresetFamily() const;
+    std::vector<juce::String> listUserPresets() const;
+    bool userPresetExists(const juce::String& name) const;
+    juce::Result saveUserPreset(const juce::String& name);
+    juce::Result loadUserPreset(const juce::String& name);
+    juce::Result deleteUserPreset(const juce::String& name);
+    juce::File getUserPresetFolder() const;
+    void setUserPresetRoot(const juce::File& folder);
     void setAutoStyle(drum::DrumStyle style, float intensity);
     drum::DrumStyle getAutoStyle() const;
     float getAutoIntensity() const;
@@ -109,7 +119,9 @@ private:
     struct AutoSession;
     std::unique_ptr<AutoSession> autoSession;
     drum::DrumAutoCapture autoCapture;
+    drum::DrumPresetLibrary presetLibrary { drum::DrumPresetLibrary::defaultRoot() };
     juce::String autoTargetKey() const;
+    juce::Result failPreset(const juce::String& message);
     void writeSettings(const drum::Settings& settings);
     static juce::AudioProcessorValueTreeState::ParameterLayout createParameters();
     drum::DrumEngine engine;
