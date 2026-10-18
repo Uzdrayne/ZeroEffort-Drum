@@ -146,6 +146,10 @@ Branche `main`. En insert, le plug-in ne voit l'audio que pendant la lecture : l
 ### Préparation des futurs kits (17/10/2026)
 
 Documentation seulement, aucun code : `docs/Corpus.md` reçoit une liste de contrôle de ce qu'on attend d'un kit (pistes brutes sans insert, stems avec inserts avant bus, mêmes noms, début et fréquence, `INFO.txt` avec ingé, style et notes, priorité Kick / Snare / Overheads), et `docs/Guide_Ingenieur_Son.md` est le guide d'une page à donner à l'ingé son. Décisions : le style et l'ingé sont des étiquettes **par mix**, pas par kit ; l'outil qui les lit (`RunCorpus.ps1`, regroupement par rôle × style × ingé) attend les premiers dossiers réels. Le seuil « 8 paires et 3 mixeurs » du doc 03 reste la règle pour les cibles de presets ; avec 2 ingés, seules des corrections cohérentes chez les deux et validées sur des données mises de côté seraient retenues, derrière l'intensité.
+
+### Constat : axe Attack du radar (18/10/2026)
+
+Aucun code modifié (banc d'essai temporaire retiré). Sur deux vrais Kicks en Rock 80 %, l'attaque mesurée baisse de 5 dB (9,8 → 4,8 et 11,1 → 2,6) alors que la cible annonce +3,6 dB : la cible ajoute le réglage nominal de l'Impact (effet réel d'environ +0,3 dB) et ignore le compresseur multibande (−2,5 à −6 dB) et le Crush (−1 à −2,5 dB). Décision de l'utilisateur : on attend le nouveau corpus avant de modifier. Détail et pistes dans `docs/ETAT_ACTUEL.md`.
 ## Écarts avec les spécifications
 
 - **Emplacement des fonctions** : `toSnapshot` / `restoreSnapshot` / `measuresToVar` sont des fonctions statiques de `struct DrumAnalysisSnapshot` (ami de `DrumAnalysis`), pas des méthodes de `DrumAnalysis` : la classe de mesure reste inchangée. Le doc 07 disait « dans la classe DrumAnalysis ».

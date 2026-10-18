@@ -80,6 +80,9 @@ Build VS 2019 / 2022 (`scripts/Build.ps1`), build d'export pour Cubase (`build-e
 | Cibles des presets | exigent **8 paires et 3 mixeurs** (doc 03, 9) ; un bus sans étiquette de mixeur ne compte pas |
 | Constantes H à calibrer | 400 ms de trame longue, cohérence 0,8 (premiers chiffres réels : 0,82 à 0,90 pour les bus), `k = 0,5`, zone morte 1 dB, seuils K04 et hors fenêtre, constantes de J4a (60 ms, facteur 4), tolérance de 1,5 ms de `reconcileOverheads`, plages des axes du radar |
 | Tests M02, M03, M06, M07 | dynamique équivalente, gate, réverbe, compression parallèle |
+| **Axe Attack du radar et attaque du Kick** (constat du 18/10/2026, en attente du nouveau corpus) | voir ci-dessous |
+
+**Constat Attack (18/10/2026, rien modifié).** Kick Rock 80 %, deux vrais Kicks (`raw1\01_KickIn`, `raw3\Kick_12`) : source 9,8 / 11,1 dB, cible 13,4 / 14,7, résultat mesuré 4,8 / 2,6. (1) La cible ajoute le réglage nominal de l'Impact (+3,6 dB) alors que son effet réel sur cet axe est d'environ +0,3 dB (le détecteur ne voit la transitoire que quelques ms par frappe). (2) La cible ignore la compression : le compresseur multibande retire 2,5 à 6 dB, le Crush 1 à 2,5 dB. L'axe mesure un rapport d'énergie (0-70 ms contre 70-230 ms), pas le pic : le clic peut passer (attaque de 8 ms) alors que le corps des 70 premières ms est écrasé. À décider avec le nouveau corpus et à l'écoute : (a) marquer la cible Attack « non modélisée » quand compression ou Crush sont actifs (sans effet sur le son) ; (b) revoir le compresseur ou le Crush du Kick (change le son, désactivé par défaut tant que non écouté).
 
 ## 5. Ce qui n'a pas été vérifié
 
