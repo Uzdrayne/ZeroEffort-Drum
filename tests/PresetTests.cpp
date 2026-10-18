@@ -61,7 +61,9 @@ void testLibrary()
     sound[drum::bypass] = 1;
     sound[drum::autoStyleOption] = 2;
     sound[drum::kitDelay] = 7;
-    check(library.save(kick, "Tight kick", sound, drum::DrumInstrument::kick, "0.11.1").wasOk(), "A preset must be saved");
+    check(library.save(kick, "Tight kick", sound, drum::DrumInstrument::kick, "0.11.1", "Rock", 75).wasOk(), "A preset must be saved");
+    check(library.hint(kick, "Tight kick") == "Rock 75 %", "A preset remembers the Auto style it was saved with");
+    check(library.hint(kick, "Missing").isEmpty(), "A missing preset has no hint");
     check(library.exists(kick, "Tight kick") && !library.exists(drum::PresetFamily::snare, "Tight kick"),
         "A preset exists in its own family only");
 
@@ -96,6 +98,9 @@ void testLibrary()
     check(loaded[drum::highPass] == drum::controlSpecs[drum::highPass].initial, "Unusable values fall back to the default");
     check(loaded[drum::lowPass] == drum::controlSpecs[drum::lowPass].initial, "Missing controls fall back to the default");
 
+    check(library.hint(kick, "Hand made").isEmpty(), "A preset saved without a style has no hint");
+    write("Odd hint", R"({"format":1,"family":"Kick","style":"<b>Rock!</b>","intensity":250,"controls":{}})");
+    check(library.hint(kick, "Odd hint") == "bRockb 100 %", "The hint is sanitised and bounded");
     write("Newer", R"({"format":2,"family":"Kick","controls":{}})");
     check(library.load(kick, "Newer", current, loaded).failed(), "A preset from a newer format must be refused");
     write("Broken", "{ not json");
@@ -110,12 +115,12 @@ void testLibrary()
         "A hostile name must stay inside the family folder");
 
     const auto names = library.list(kick);
-    check(names.size() == 7, "Every preset file must be listed");
+    check(names.size() == 8, "Every preset file must be listed");
     check(names.front() == "Broken" && names.back() == "Tight kick", "Presets are listed in name order");
     check(library.list(drum::PresetFamily::room).empty(), "A family without presets lists nothing");
 
     check(library.save(kick, "Tight kick", current, drum::DrumInstrument::kick, "0.11.1").wasOk(), "Saving again must overwrite");
-    check(library.list(kick).size() == 7, "Overwriting must not add a file");
+    check(library.list(kick).size() == 8, "Overwriting must not add a file");
     check(library.remove(kick, "Tight kick").wasOk() && !library.exists(kick, "Tight kick"), "A preset can be deleted");
     check(library.remove(kick, "Tight kick").failed(), "Deleting twice must fail cleanly");
 }
@@ -131,7 +136,9 @@ void testProcessor()
     processor.setControl(drum::instrument, static_cast<float>(drum::DrumInstrument::snare));
     processor.setControl(drum::bodyGain, 3.5f);
     processor.setControl(drum::ratio, 5.0f);
+    processor.setAutoStyle(drum::DrumStyle::metal, 0.6f);
     check(processor.saveUserPreset("Crack").wasOk() && processor.listUserPresets().size() == 1, "The current settings must be saved");
+    check(processor.getUserPresetHint("Crack") == "Metal 60 %", "The hint shows the Auto style selected when saving");
     check(processor.getAutoPresetText().contains("Crack"), "The status must name the saved preset");
     check(processor.saveUserPreset("???").failed(), "An unusable name must be refused");
 
@@ -149,11 +156,14 @@ void testProcessor()
     processor.setControl(drum::bodyGain, -4.0f);
     processor.setControl(drum::ratio, 2.0f);
     processor.setControl(drum::bypass, 1.0f);
+    processor.setAutoStyle(drum::DrumStyle::natural, 0.3f);
     const auto before = processor.getSettings();
     check(processor.loadUserPreset("Crack").wasOk(), "A preset must load");
     const auto after = processor.getSettings();
     check(std::abs(after[drum::bodyGain] - 3.5f) < 0.01f && std::abs(after[drum::ratio] - 5.0f) < 0.05f,
         "Loading must apply the stored sound");
+    check(processor.getAutoStyle() == drum::DrumStyle::natural && std::abs(processor.getAutoIntensity() - 0.3f) < 0.001f,
+        "Loading must not apply the remembered Auto style");
     check(after[drum::instrument] == before[drum::instrument] && after[drum::bypass] == before[drum::bypass],
         "Loading must keep the role and the bypass of the track");
     check(processor.canRevertAutoPreset() && !processor.canApplyAutoPreset(), "A loaded preset can be reverted");
