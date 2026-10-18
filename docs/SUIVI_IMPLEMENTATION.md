@@ -150,6 +150,10 @@ Documentation seulement, aucun code : `docs/Corpus.md` reçoit une liste de cont
 ### Constat : axe Attack du radar (18/10/2026)
 
 Aucun code modifié (banc d'essai temporaire retiré). Sur deux vrais Kicks en Rock 80 %, l'attaque mesurée baisse de 5 dB (9,8 → 4,8 et 11,1 → 2,6) alors que la cible annonce +3,6 dB : la cible ajoute le réglage nominal de l'Impact (effet réel d'environ +0,3 dB) et ignore le compresseur multibande (−2,5 à −6 dB) et le Crush (−1 à −2,5 dB). Décision de l'utilisateur : on attend le nouveau corpus avant de modifier. Détail et pistes dans `docs/ETAT_ACTUEL.md`.
+
+### Style Auto par défaut : Rock 75 % (18/10/2026)
+
+Demandé par l'utilisateur. Une nouvelle instance démarre en **Rock, 75 %** au lieu de Natural, 100 % : valeurs initiales de `autoStyleOption` (1) et `autoIntensityOption` (75) dans `controlSpecs`, et de `AutoSession` (`style`, `intensity`). Identifiants inchangés ; les projets enregistrés restent comme ils étaient (l'état stocke les valeurs) ; le repli d'un état sans propriétés `autoStyle` / `autoIntensity` reste Natural / 100 %. **Changement audible au prochain Analyze d'une nouvelle instance** (la proposition est plus marquée) mais aucune proposition ne change pour un style et une intensité donnés : les 270 hachages du filet de rôles sont inchangés (le test fixe maintenant les options d'origine à Natural / 100 %, car la proposition les recopie). Test ajouté : une instance neuve est en Rock 75 %. Version du plug-in non incrémentée (0.11.0).
 ## Écarts avec les spécifications
 
 - **Emplacement des fonctions** : `toSnapshot` / `restoreSnapshot` / `measuresToVar` sont des fonctions statiques de `struct DrumAnalysisSnapshot` (ami de `DrumAnalysis`), pas des méthodes de `DrumAnalysis` : la classe de mesure reste inchangée. Le doc 07 disait « dans la classe DrumAnalysis ».

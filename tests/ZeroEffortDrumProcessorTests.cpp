@@ -1163,6 +1163,13 @@ void testAutoLiveCapture()
 
 void testAutoWorkflow()
 {
+    {
+        ZeroEffortDrumProcessor fresh;
+        require(fresh.getAutoStyle() == drum::DrumStyle::rock && std::abs(fresh.getAutoIntensity() - 0.75f) < 0.00001f,
+            "A new instance must start on Rock at 75 %");
+        require(fresh.getSettings()[drum::autoStyleOption] == 1 && fresh.getSettings()[drum::autoIntensityOption] == 75,
+            "The Auto options must agree with the session defaults");
+    }
     ZeroEffortDrumProcessor processor;
     processor.setRateAndBufferSizeDetails(48000, 256);
     processor.prepareToPlay(48000, 256);

@@ -106,6 +106,9 @@ void testRoleReference()
                 {
                     auto original = drum::defaultSettings();
                     original[drum::instrument] = static_cast<float>(role);
+                    // The net was frozen with the options of the time (Natural, 100 %); they are copied into the proposal.
+                    original[drum::autoStyleOption] = 0;
+                    original[drum::autoIntensityOption] = 100;
                     const auto hash = hashProposal(analyser.propose(original, style, intensity));
                     if (printTo.isNotEmpty())
                         table << "    0x" << juce::String::toHexString(static_cast<juce::int64>(hash)) << "ULL, // take " << static_cast<int>(take)

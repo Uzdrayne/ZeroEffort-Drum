@@ -33,6 +33,7 @@ Document de situation : **où on en est, ce qui est fait, ce qui manque**. Il r�
 | J3 problème 2 : crest **actif** pour le compresseur du Kick | `compressorUsesActiveCrest = true` |
 | J4a : détection des doubles frappes (60 ms au lieu de 120 ms si l'attaque est 4 × plus forte) | `doubleHitsByDefault = true` ; un seul réglage change sur le corpus (Kick Out du kit 1, < 9 Hz) |
 | Kit / Phase : saut de cycle du Kick sur les overheads (kit 4 : cohérence 59,5 → 96,6) | `KitPolicy::reconcileOverheads = true` |
+| Style et intensité Auto d'une nouvelle instance : **Rock, 75 %** (avant : Natural, 100 %), demandé par l'utilisateur le 18/10/2026 | `controlSpecs` (`autoStyleOption` 1, `autoIntensityOption` 75) et valeurs initiales de `AutoSession` ; les projets déjà enregistrés gardent leur valeur ; les 270 propositions du filet de rôles sont identiques |
 
 ### Kit / Phase
 Mesure **K04** (diaphonie) ; garde-fous « hors fenêtre » et « diaphonie » écrits mais **désactivés** (et non reliés à l'interface) ; commande `--kit` (`--detail`, `--guards`, `--no-reconcile`).

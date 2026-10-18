@@ -380,8 +380,8 @@ struct ZeroEffortDrumProcessor::AutoSession
     drum::DrumAnalyser analyser;
     drum::DrumProposal proposal;
     drum::DrumPresetPreview preview;
-    drum::DrumStyle style = drum::DrumStyle::natural;
-    float intensity = 1;
+    drum::DrumStyle style = drum::DrumStyle::rock;
+    float intensity = 0.75f;
     int phase = 0;
     drum::Settings before {}, applied {};
     juce::AudioBuffer<float> scratch { 2, 32768 };
