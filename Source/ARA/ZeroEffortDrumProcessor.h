@@ -64,6 +64,7 @@ public:
     drum::PresetFamily getUserPresetFamily() const;
     std::vector<juce::String> listUserPresets() const;
     bool userPresetExists(const juce::String& name) const;
+    juce::String getUserPresetHint(const juce::String& name) const;
     juce::Result saveUserPreset(const juce::String& name);
     juce::Result loadUserPreset(const juce::String& name);
     juce::Result deleteUserPreset(const juce::String& name);

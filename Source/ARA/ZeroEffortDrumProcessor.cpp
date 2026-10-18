@@ -823,6 +823,10 @@ bool ZeroEffortDrumProcessor::userPresetExists(const juce::String& name) const
 {
     return presetLibrary.exists(getUserPresetFamily(), name);
 }
+juce::String ZeroEffortDrumProcessor::getUserPresetHint(const juce::String& name) const
+{
+    return presetLibrary.hint(getUserPresetFamily(), name);
+}
 juce::File ZeroEffortDrumProcessor::getUserPresetFolder() const { return presetLibrary.folderFor(getUserPresetFamily()); }
 void ZeroEffortDrumProcessor::setUserPresetRoot(const juce::File& folder) { presetLibrary.setRoot(folder); }
 
@@ -832,7 +836,8 @@ juce::Result ZeroEffortDrumProcessor::saveUserPreset(const juce::String& name)
     const auto settings = getSettings();
     const auto role = drum::instrumentFromValue(settings[drum::instrument]);
     const auto clean = drum::DrumPresetLibrary::cleanName(name);
-    const auto result = presetLibrary.save(drum::presetFamilyOf(role), name, settings, role, JucePlugin_VersionString);
+    const auto result = presetLibrary.save(drum::presetFamilyOf(role), name, settings, role, JucePlugin_VersionString,
+        drum::drumStyleName(getAutoStyle()), juce::roundToInt(getAutoIntensity() * 100));
     if (result.failed()) return failPreset(result.getErrorMessage());
     if (!autoSession->busy) autoSession->text = "Preset / " + clean + " saved";
     return result;

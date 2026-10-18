@@ -679,7 +679,8 @@ void DrumEditor::showPresetMenu()
     if (names.empty()) menu.addItem(2, "(none saved yet)", false);
     for (size_t index = 0; index < names.size(); ++index)
     {
-        menu.addItem(100 + static_cast<int>(index), names[index]);
+        const auto hint = owner.getUserPresetHint(names[index]);
+        menu.addItem(100 + static_cast<int>(index), hint.isEmpty() ? names[index] : names[index] + "   (" + hint + ")");
         remove.addItem(1000 + static_cast<int>(index), names[index]);
     }
     menu.addSeparator();

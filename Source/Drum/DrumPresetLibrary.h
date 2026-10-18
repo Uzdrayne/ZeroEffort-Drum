@@ -105,8 +105,10 @@ public:
         return names;
     }
 
+    // The style and intensity selected in Auto when the preset was saved are kept as a hint only: loading never applies them.
     juce::Result save(PresetFamily family, const juce::String& name, const Settings& settings,
-                      DrumInstrument origin, const juce::String& pluginVersion) const
+                      DrumInstrument origin, const juce::String& pluginVersion,
+                      const juce::String& autoStyle = {}, int autoIntensityPercent = -1) const
     {
         const auto clean = cleanName(name);
         if (clean.isEmpty()) return juce::Result::fail("This name cannot be used for a preset");
@@ -122,6 +124,11 @@ public:
         object->setProperty("name", clean);
         object->setProperty("family", presetFamilyName(family));
         object->setProperty("instrument", instrumentName(origin));
+        if (autoStyle.isNotEmpty() && autoIntensityPercent >= 0)
+        {
+            object->setProperty("style", autoStyle);
+            object->setProperty("intensity", autoIntensityPercent);
+        }
         object->setProperty("controls", juce::var(controls.release()));
         const auto target = fileFor(family, clean);
         juce::TemporaryFile temporary(target);
@@ -129,6 +136,20 @@ public:
             || !temporary.overwriteTargetFileWithTemporary())
             return juce::Result::fail("Cannot write " + target.getFullPathName());
         return juce::Result::ok();
+    }
+
+    // "Rock 75 %" when the preset remembers the Auto style it was saved with, otherwise empty.
+    juce::String hint(PresetFamily family, const juce::String& name) const
+    {
+        const auto file = fileFor(family, name);
+        if (cleanName(name).isEmpty() || !file.existsAsFile() || file.getSize() > maximumFileBytes) return {};
+        const auto parsed = juce::JSON::parse(file.loadFileAsString());
+        const auto* object = parsed.getDynamicObject();
+        if (object == nullptr) return {};
+        const auto style = object->getProperty("style").toString().substring(0, 16).retainCharacters("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz");
+        const auto intensity = object->getProperty("intensity");
+        if (style.isEmpty() || !(intensity.isInt() || intensity.isDouble())) return {};
+        return style + " " + juce::String(juce::jlimit(0, 100, juce::roundToInt(static_cast<double>(intensity)))) + " %";
     }
 
     // `result` starts from the defaults, takes the stored controls, then the track-level controls of `current`.
