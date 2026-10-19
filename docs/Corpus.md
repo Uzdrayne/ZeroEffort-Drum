@@ -63,7 +63,7 @@ Le script utilise le build Release de production (`build\ZeroEffortDrumTests_art
 
 Lecture en tableaux : `python scripts\CorpusTables.py pairs|versus|shapes|buses <dossier out>`. Premier passage commenté : [`ANALYSE_CORPUS_19OCT.md`](ANALYSE_CORPUS_19OCT.md).
 
-Outils individuels : `ZeroEffortDrumTests.exe --vs-plugin <brut> <rôle> <style> <intensité> <mixé> [préfixe]`, `--pair <brut> <mixé> [préfixe]`, `--bus <mixé> <préfixe> nom=fichier ...`, `--export-wav`, `--replay`, `--compare`, `--kit` (voir `docs\REPRISE_PROCHAINE_SESSION.md`).
+Outils individuels : `ZeroEffortDrumTests.exe --vs-plugin <brut> <rôle> <style> <intensité> <mixé> [préfixe] [--reference] [--off id,...] [--set id=valeur,...]`, `--pair <brut> <mixé> [préfixe]`, `--bus <mixé> <préfixe> nom=fichier ...`, `--export-wav`, `--replay`, `--compare`, `--kit` (voir `docs\REPRISE_PROCHAINE_SESSION.md`).
 
 ## 4. Ce qui n'est pas encore fait
 

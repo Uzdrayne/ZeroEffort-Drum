@@ -14,12 +14,15 @@ inline constexpr int profileVersion = 2;
 struct ProposalDefaults
 {
     static constexpr bool compressorUsesActiveCrest = true;
+    // Reference EQ for Hi-hat and Overheads, read on one engineer and one song (docs/ANALYSE_CORPUS_19OCT.md). NOT activated.
+    static constexpr bool cymbalReference = false;
 };
 
 // Choices that change a proposal without changing the analysis. Recorded in the snapshots.
 struct ProposalPolicy
 {
     bool compressorUsesActiveCrest = ProposalDefaults::compressorUsesActiveCrest;
+    bool cymbalReference = ProposalDefaults::cymbalReference;   // not recorded in the snapshots
 };
 
 inline const char* drumStyleName(DrumStyle style)

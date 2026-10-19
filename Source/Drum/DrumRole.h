@@ -46,10 +46,10 @@ struct RoleProposers
     { return SnareProfile::propose(a, s, style, intensity); }
     static DrumProposal tom(const DrumAnalysis& a, const Settings& s, DrumStyle style, float intensity, const ProposalPolicy&)
     { return TomProfile::propose(a, s, style, intensity); }
-    static DrumProposal hiHat(const DrumAnalysis& a, const Settings& s, DrumStyle style, float intensity, const ProposalPolicy&)
-    { return HiHatProfile::propose(a, s, style, intensity); }
-    static DrumProposal overheads(const DrumAnalysis& a, const Settings& s, DrumStyle style, float intensity, const ProposalPolicy&)
-    { return OverheadsProfile::propose(a, s, style, intensity); }
+    static DrumProposal hiHat(const DrumAnalysis& a, const Settings& s, DrumStyle style, float intensity, const ProposalPolicy& policy)
+    { return HiHatProfile::propose(a, s, style, intensity, policy); }
+    static DrumProposal overheads(const DrumAnalysis& a, const Settings& s, DrumStyle style, float intensity, const ProposalPolicy& policy)
+    { return OverheadsProfile::propose(a, s, style, intensity, policy); }
     static DrumProposal room(const DrumAnalysis& a, const Settings& s, DrumStyle style, float intensity, const ProposalPolicy&)
     { return RoomProfile::propose(a, s, style, intensity); }
     static DrumProposal bus(const DrumAnalysis& a, const Settings& s, DrumStyle style, float intensity, const ProposalPolicy&)

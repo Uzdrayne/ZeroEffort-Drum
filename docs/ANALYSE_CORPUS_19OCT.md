@@ -28,7 +28,7 @@ Sorties : `Database_drum\out_v6\` (`pairs\`, `buses\`, `versus\`, `snapshots\`, 
 | Snare Top+Bottom | oui | 16 | 2,9 | 3,0 | 8 / 13 | Neutre |
 | Snare Bottom (Snare) | oui | 18 | 8,4 | 8,3 | 8 / 17 | Neutre : l'ingénieur monte les aigus de +8 dB, le plug-in non |
 | Overheads | oui | 20 | 5,1 | 5,2 | **6 / 17** | **Le plug-in est presque plat, l'ingénieur coupe les graves et monte les aigus** |
-| Room | oui | 17 | **2,4** | 1,0 | 0 / 3 | **Pire que ne rien faire** : l'ingénieur ne touche presque pas la Room, le plug-in la creuse |
+| Room | oui | 17 | **2,4** | 1,0 | 0 / 3 | **Pire que ne rien faire, mais pour une raison identifiée** : tout vient du module **Crush** (compression parallèle filtrée). Sans lui l'écart tombe à 1,5 dB et la courbe est plate. C'est un effet voulu, que cet ingénieur n'a pas utilisé |
 | Kick Out, Kick In+Out, Toms | non | | | | | Paires écartées : valeurs indicatives seulement |
 | Track 1 (tout) | non | 0 à 6 | n/a | n/a | | Non évalué (moins de 6 bandes fiables) |
 
@@ -71,16 +71,29 @@ Un gate profond est un choix de style (post punk, « agressif et crado » selon 
 
 | # | Piste | Étayée par | Risque |
 |---|---|---|---|
-| 1 | **Room** : ne plus creuser les graves et les aigus (l'ingénieur ne touche presque pas la Room ; notre profil est pire que ne rien faire) | Track 2 seul, mais la direction « moins de traitement » est prudente | faible |
-| 2 | **Overheads** : coupe des graves plus haute (150-250 Hz au lieu de 100) et petite montée des aigus | Track 2 seul ; en accord avec la pratique courante | moyen : change le son des OH par défaut |
-| 3 | **Hi-hat** : coupe des graves plus haute (300-400 Hz au lieu de 250) | Track 2 seul | faible |
+| 1 | **Room** : retirer le Crush ? | Mesuré : le creux vient du Crush seul. Mais un « room crush » est un choix de style courant : **non fait**, à décider à l'écoute | choix de style |
+| 2 | **Overheads** : passe-haut 180 Hz et montée d'aigus (+3,6 dB × force à 6 kHz) en Rock et Metal | Track 2 seul ; **FAIT, option désactivée** (section 7) | moyen : change le son des OH si activé |
+| 3 | **Hi-hat** : coupe des graves plus forte | Track 2 seul ; le passe-haut est déjà à son maximum (250 Hz, plage du contrôle), la coupe passe donc par la bande Corps (−7,1 dB × force à 200 Hz) ; **FAIT, option désactivée** (section 7) | faible |
 | 4 | **Snare Bottom** : traiter la position « Bottom » autrement (coupe des graves plus haute, montée d'aigus) | Track 2 seul (Track 3 : Snare Down ambiguë) | moyen : demande de lire la position du micro dans la proposition |
 | 5 | **Gate plus profond** en Rock / Metal | Track 2 seul, style très marqué | élevé : change fortement le son, dépend du morceau |
 | – | Kick : EQ | deux sources | rien à changer |
 
 Quand de nouvelles données arriveront (autre ingénieur, autre morceau), `--vs-plugin` donne immédiatement la même table : si la tendance se répète, la piste passe de « un ingénieur » à « deux », et on la propose derrière une option désactivée par défaut, à écouter.
 
-## 7. Questions ouvertes
+## 7. Ce qui a été implémenté : option `cymbalReference` (désactivée par défaut)
+
+`ProposalPolicy::cymbalReference` (`ProposalDefaults::cymbalReference = false`) donne aux profils **Overheads** et **Hi-hat** une EQ de référence, **en Rock et Metal seulement** (Natural reste sans coloration imposée) et proportionnelle à la force (intensité nulle : rien). Aucun changement tant que l'option est à `false` : le filet de 270 propositions est identique et un test le vérifie.
+
+| | Réglage | Écart plug-in / ingénieur (Rock 75 %) | Même sens | Corrélation des formes |
+|---|---|---|---|---|
+| Overheads, défaut | passe-haut 100 Hz, EQ neutre | 5,1 dB (ing 5,2) | 6 / 17 | 0,26 |
+| Overheads, option | passe-haut 180 Hz, air +4,0 dB à 6 kHz | **2,8 dB** | **14 / 17** | **0,91** |
+| Hi-hat, défaut | passe-haut 250 Hz, EQ neutre | 5,9 dB (ing 7,9) | 10 / 11 | 0,97 |
+| Hi-hat, option | corps −8,0 dB à 200 Hz | **3,4 dB** | **11 / 11** | **0,99** |
+
+**Ces chiffres sont mesurés sur les données qui ont servi à choisir les réglages (un ingénieur, une chanson) : ils montrent que le réglage reproduit cette courbe, pas qu'il est meilleur pour d'autres sources.** Les valeurs sont volontairement plus douces que l'ingénieur (−12 dB sur le corps du Hi-hat irait encore plus près : 2,3 dB, mais ce serait épouser un style agressif). Pour l'activer : `ProposalDefaults::cymbalReference = true`, incrémenter `profileVersion`, et **écouter d'abord**. Mesure : `ZeroEffortDrumTests.exe --vs-plugin <brut> <rôle> <style> <intensité> <mixé> --reference` ; `--set id=valeur` et `--off id` testent d'autres valeurs sans recompiler. L'option n'est pas enregistrée dans les snapshots.
+
+## 8. Questions ouvertes
 
 - **Ingénieur et style des Tracks 3 et 4** : pas de `INFO.txt`. Le manifeste les note « inconnu » en Rock.
 - **Toms du Track 4** : 6 toms et un ride. Seuls Tom 1 à 3 sont pris comme snapshots (rôles 2, 3, 4) ; Tom 4 à 6 et Ride attendent ta confirmation (Tom 6 = tom basse ?).

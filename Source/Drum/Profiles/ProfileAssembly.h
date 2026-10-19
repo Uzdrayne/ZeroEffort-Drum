@@ -10,6 +10,8 @@ struct ProfileParameters
     float targetReduction, maximumReduction;
     bool closeMic, stereoCaution, busGlue;
     float (*bodyFrequency)(const DrumAnalysis&) = nullptr;
+    // Reference EQ (ProposalPolicy::cymbalReference), applied to Rock and Metal only; gains scale with the strength.
+    float referenceHighPassHz = 0, referenceBodyHz = 0, referenceBodyDb = 0, referenceAirHz = 0, referenceAirDb = 0;
 };
 
 class ProfileAssembly
@@ -57,6 +59,23 @@ public:
             settings[attackQ] = 1.0f;
             settings[eqOn] = intensity > 0 ? 1.0f : 0.0f;
         }
+        const bool reference = style != DrumStyle::natural && intensity > 0
+            && (profile.referenceBodyDb != 0 || profile.referenceAirDb != 0 || profile.referenceHighPassHz > 0);
+        if (reference)
+        {
+            if (profile.referenceHighPassHz > 0) settings[highPass] = profile.referenceHighPassHz;
+            if (profile.referenceBodyDb != 0)
+            {
+                settings[bodyFrequency] = profile.referenceBodyHz;
+                settings[bodyGain] = profile.referenceBodyDb * intensity;
+            }
+            if (profile.referenceAirDb != 0)
+            {
+                settings[airFrequency] = profile.referenceAirHz;
+                settings[airGain] = profile.referenceAirDb * intensity;
+            }
+            settings[eqOn] = 1;
+        }
         const auto quiet = analysis.percentileOf(analysis.envelopeHistograms[3], 0.2f);
         const auto loud = analysis.percentileOf(analysis.envelopeHistograms[3], 0.9f);
         settings[gateOn] = profile.closeMic && loud - quiet >= 18 && intensity > 0 ? 1.0f : 0.0f;
@@ -83,6 +102,7 @@ public:
             + (profile.busGlue ? " / Bus Glue target P75 " : " / COMP broadband target P75 ") + juce::String(result.targetReduction, 1)
             + " dB / calibration ceiling " + juce::String(result.maximumReduction, 1)
             + " dB / Kick Focus and reinforcement OFF / EXP " + (settings[gateOn] > 0 ? "ON cautious" : "OFF");
+        if (reference) result.summary += " / reference EQ (beta, one engineer)";
         if (profile.stereoCaution)
             result.summary += " / check stereo image and decays by ear";
         return result;
