@@ -36,6 +36,8 @@ Règles pour que les mesures soient comparables :
 - **Même fréquence d'échantillonnage** des deux côtés d'une paire (sinon l'outil refuse : convertir d'abord).
 - **Un stem par piste** *après les inserts, avant le bus de batterie et le master* est idéal (paire). Un **bus d'instrument** est accepté si on fournit **tous ses micros** (et le sample, s'il y en a un) : l'outil `--bus` le traite par régression multi-entrées (doc 03, 3.1 bis).
 - Les fichiers mixés peuvent démarrer à un autre instant que les bruts (l'alignement cherche sur tout le fichier). Au moins **20 s de jeu**.
+- **Au moins 20 s de jeu réel** par piste : une prise de 43 s avec quelques frappes de snare ou de toms (12 et 10 s de jeu au Track 1 et 2) est refusée. Préférer 1 à 2 minutes de batterie qui joue partout.
+- Manifeste : par kit, `style`, `mixer`, `genre`, `samples` et `notes` facultatifs (écrits dans `summary.md`) ; par paire, `role` facultatif (déclenche `--vs-plugin`).
 - Noter dans le manifeste le **rôle** (0 Kick, 1 Snare, 2-4 Toms, 5 Tom basse, 6 Hi-hat, 7 Overheads, 8 Room, 9 Bus) et la **position** du micro (`kitMic` : 0 principal, 1 secondaire Out / Bottom, 2 gauche, 3 droite).
 - Ne pas mettre dans le manifeste ce qui n'a pas de rôle (Kick Sub, Ride, Cymbals) ni les pistes de sample : elles peuvent servir d'entrées d'un bus, pas de snapshot.
 
@@ -57,7 +59,11 @@ Le script utilise le build Release de production (`build\ZeroEffortDrumTests_art
 | `out\buses\*.md / .json` | bus : décalage de chaque micro, gain par micro et par bande, **cohérence multiple** (≥ 0,8 : le bus est expliqué par ses micros) |
 | `out\pairs\*.md / .json` | paire brut / stem : décalage, polarité, courbe d'égalisation équivalente (forme + gain moyen), cohérence, couleur non linéaire, deltas de crest et de plancher |
 
-Outils individuels : `ZeroEffortDrumTests.exe --pair <brut> <mixé> [préfixe]`, `--bus <mixé> <préfixe> nom=fichier ...`, `--export-wav`, `--replay`, `--compare`, `--kit` (voir `docs\REPRISE_PROCHAINE_SESSION.md`).
+| `out\versus\*.md / .json` | **plug-in contre ingénieur** : la même piste brute passée dans la proposition Auto du plug-in, comparée à la courbe de l'ingénieur (écart, corrélation, accord de sens, dynamique). Demande un `"role"` sur la paire dans le manifeste ; le style et l'intensité sont ceux du kit et du manifeste |
+
+Lecture en tableaux : `python scripts\CorpusTables.py pairs|versus|shapes|buses <dossier out>`. Premier passage commenté : [`ANALYSE_CORPUS_19OCT.md`](ANALYSE_CORPUS_19OCT.md).
+
+Outils individuels : `ZeroEffortDrumTests.exe --vs-plugin <brut> <rôle> <style> <intensité> <mixé> [préfixe]`, `--pair <brut> <mixé> [préfixe]`, `--bus <mixé> <préfixe> nom=fichier ...`, `--export-wav`, `--replay`, `--compare`, `--kit` (voir `docs\REPRISE_PROCHAINE_SESSION.md`).
 
 ## 4. Ce qui n'est pas encore fait
 

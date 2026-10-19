@@ -10,7 +10,7 @@ Document de situation : **où on en est, ce qui est fait, ce qui manque**. Il r�
 | Versions d'analyse | `analysisVersion` **6**, `profileVersion` **2** |
 | Branche de travail | `main` directement, un commit par étape (depuis le 17/10) |
 | Tests | 3 suites CTest, **toutes vertes** : `RegionCacheTests`, `ZeroEffortDrumTests` (≈ 80-120 s), `ARADiscoveryTests` ; build VS 2019 sans avertissement |
-| Corpus (hors dépôt) | `Database_drum` : 4 kits bruts ; mixés : kit 1 (bus Kick, Snare et batterie) et kit 2 (bus de batterie seul), manifeste `corpus.json` |
+| Corpus (hors dépôt) | `Database_drum` : 4 tracks (`Track_1`, `Track_2`, `track_3`, `track_4`) ; Track 2 = 8 paires brut / mixé acceptées (ingé A.H., post punk) ; Track 1 inexploitable en paires (samples) ; Tracks 3 et 4 = bus ; manifeste `corpus.json` (ancien dans `archive_v6`). **`raw2`, `raw3`, `raw4` ont disparu** (voir 5) |
 | Vérifié dans Cubase | l'**export JSON** d'une analyse Auto (Kick, région ARA). **Rien d'autre n'a été écouté** (voir 5) |
 | Dernier chantier | **presets utilisateur** (Presets : enregistrer / charger par instrument, voir 2) ; avant : interface en anglais (6), radar Auto |
 
@@ -77,6 +77,9 @@ Build VS 2019 / 2022 (`scripts/Build.ps1`), build d'export pour Cubase (`build-e
 | **J4b** | détecteurs de frappes par rôle, analyse continue Overheads / Room avec entrée stéréo (débloque A12 et A13) |
 | Activer / relier les garde-fous Kit / Phase | voir 3 |
 
+### Corpus du 19/10/2026 : analysé, rien appliqué
+`--vs-plugin` compare ce que fait la proposition Auto à ce qu'a fait l'ingénieur sur la même piste. Bon accord sur le **Kick In** (même sens sur 16 bandes sur 17, confirmé par une 2e source), le plug-in est trop doux sur le **Hi-hat**, neutre sur la **Snare**, presque plat sur les **Overheads** (l'ingénieur coupe les graves, monte les aigus), et **pire que ne rien faire sur la Room**. L'ingénieur gate beaucoup plus fort. **Un seul ingénieur, un seul morceau** : pistes de changement et leur force de preuve dans [ANALYSE_CORPUS_19OCT.md](ANALYSE_CORPUS_19OCT.md), aucune appliquée.
+
 ### Dépend du nouveau corpus (raw vs mix, plusieurs kits)
 | Chantier | Détail |
 |---|---|
@@ -91,6 +94,7 @@ Build VS 2019 / 2022 (`scripts/Build.ps1`), build d'export pour Cubase (`build-e
 ## 5. Ce qui n'a pas été vérifié
 
 - **Aucune écoute dans Cubase** des correctifs activés (J3, J4a, seuil à 55 dB, saut de cycle) : ils sont validés par les tests et sur le corpus, pas à l'oreille. Sur les 38 prises du corpus, seul un réglage change (Kick Out du kit 1, J4a).
+- **Tests de kit réel ignorés** : `raw3` (`Kick_12`, `Snare_12`, `OvH L_12`, `OvH R_12`) n'existe plus ; D01-D04 sur le kit réel et le test des garde-fous affichent « SKIP ». Les 3 suites passent quand même, mais ces deux contrôles ne tournent plus. À retrouver ou à remplacer.
 - **Le radar Auto** n'a été jugé que sur des captures d'écran produites par les tests, pas dans l'hôte (rythme de l'animation, lisibilité, comportement avec ARA réel). En insert, la source se dessine maintenant pendant la capture de 8 s (lecture nécessaire) ; **validé dans Cubase par l'utilisateur le 17/10/2026**.
 - **L'interface en anglais** : vérifiée par les tests et des captures ; les textes longs peuvent déborder dans l'hôte.
 - Le build installé dans Cubase est peut-être encore le **build d'export** : recopier le build Release de production (`build\ZeroEffortDrum_artefacts\Release\VST3\`).

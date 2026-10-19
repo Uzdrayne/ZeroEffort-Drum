@@ -24,6 +24,8 @@ int runReplayCommand(const juce::StringArray& arguments);
 int runKitCommand(const juce::StringArray& arguments);
 int runPairCommand(const juce::StringArray& arguments);
 int runBusCommand(const juce::StringArray& arguments);
+int runVersusCommand(const juce::StringArray& arguments);
+void testVersus();
 void testPair();
 void testAutoRadar();
 void testPresets();
@@ -1350,6 +1352,8 @@ int main(int argumentCount, char** arguments)
             return code;
         if (const auto code = runBusCommand(commandLine); code >= 0)
             return code;
+        if (const auto code = runVersusCommand(commandLine); code >= 0)
+            return code;
         testKit();
         testSnapshot();
         testAnalysisProperties();
@@ -1360,6 +1364,7 @@ int main(int argumentCount, char** arguments)
         testPair();
         testAutoRadar();
         testPresets();
+        testVersus();
         testSignals();
         testKickResponse();
         testDrumBus();
