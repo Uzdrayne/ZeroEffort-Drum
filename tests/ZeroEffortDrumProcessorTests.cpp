@@ -460,6 +460,12 @@ void testProposalEquivalence()
     for (const auto rate : { 44100.0, 48000.0, 96000.0 })
     {
         auto analyser = std::make_unique<drum::DrumAnalyser>();
+        {
+            // The legacy reference is the arithmetic of profileVersion 2 (before the cymbal reference EQ).
+            auto frozen = analyser->getPolicy();
+            frozen.cymbalReference = false;
+            analyser->setPolicy(frozen);
+        }
         std::vector<float> audio(static_cast<size_t>(rate * 4));
         const auto compare = [&](const drum::Settings& original, drum::DrumStyle style, float dose)
         {
@@ -951,8 +957,12 @@ void testAutoPreset()
         require(analyser.propose(snare).valid, "Explicit Snare must analyse percussion without kick-band energy");
         snare[drum::instrument] = static_cast<float>(drum::DrumInstrument::overheads);
         const auto overhead = analyser.propose(snare, drum::DrumStyle::rock);
-        require(overhead.valid && overhead.settings[drum::gateOn] == 0 && overhead.settings[drum::eqOn] == 0,
-            "Overheads must analyse cymbals without imposing kick gating or preset boosts");
+        const auto overheadNatural = analyser.propose(snare, drum::DrumStyle::natural);
+        require(overhead.valid && overhead.settings[drum::gateOn] == 0 && overheadNatural.valid
+            && overheadNatural.settings[drum::gateOn] == 0 && overheadNatural.settings[drum::eqOn] == 0,
+            "Overheads must analyse cymbals without imposing kick gating, and Natural without preset boosts");
+        require(overhead.settings[drum::eqOn] == 1 && overhead.settings[drum::highPass] == 180,
+            "Rock Overheads carry the reference EQ (profileVersion 3)");
         audio[123] = std::numeric_limits<float>::quiet_NaN();
         analyser.prepare(rate);
         analyser.push(audio.data(), static_cast<int>(audio.size()));
@@ -1492,7 +1502,7 @@ int main(int argumentCount, char** arguments)
             "ARA plugin name must match ZeroEffort Drum");
         require(factory->manufacturerName != nullptr && juce::String(factory->manufacturerName).isNotEmpty(),
             "ARA manufacturer must be present");
-        require(factory->version != nullptr && juce::String(factory->version) == "0.11.1",
+        require(factory->version != nullptr && juce::String(factory->version) == "0.11.2",
             "ARA factory version must match the corrected prototype");
         require(juce::String(factory->factoryID) == "com.robin.zeroeffortdrum.factory.1",
             "ARA identity must identify ZeroEffort Drum separately from the prototype and gain plugin");

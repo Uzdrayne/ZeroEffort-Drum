@@ -8,14 +8,16 @@ enum class DrumStyle { natural, rock, metal };
 
 // Bump when a rule that shapes the proposals changes (profiles, style tables).
 // Version 2: the Kick compressor reads the active crest by default (J3 activated).
-inline constexpr int profileVersion = 2;
+// Version 3: reference EQ on Hi-hat and Overheads in Rock and Metal (cymbalReference activated).
+inline constexpr int profileVersion = 3;
 
 // J3, problem 2. Activated on 17 October 2026 (validated by the user): it changes when the Kick compressor switches on.
 struct ProposalDefaults
 {
     static constexpr bool compressorUsesActiveCrest = true;
-    // Reference EQ for Hi-hat and Overheads, read on one engineer and one song (docs/ANALYSE_CORPUS_19OCT.md). NOT activated.
-    static constexpr bool cymbalReference = false;
+    // Reference EQ for Hi-hat and Overheads in Rock and Metal, read on one engineer and one song (docs/ANALYSE_CORPUS_19OCT.md).
+    // Activated on 19 October 2026 for the user to try; set to false to return to the previous profiles (profileVersion 2).
+    static constexpr bool cymbalReference = true;
 };
 
 // Choices that change a proposal without changing the analysis. Recorded in the snapshots.

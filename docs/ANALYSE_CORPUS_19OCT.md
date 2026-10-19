@@ -13,7 +13,7 @@ Sorties : `Database_drum\out_v6\` (`pairs\`, `buses\`, `versus\`, `snapshots\`, 
 | **3** (ancien kit 1, sans `INFO.txt`) | `raw1` + 3 bus mixés (Kick, Snare, Drums), 44,1 kHz, sample sur la Snare | Bus Kick (0,90) et Snare (0,82) expliqués par leurs micros, comme le 17/10 |
 | **4** (nouveau kit, sans `INFO.txt`) | `raw` + 3 bus mixés, 44,1 kHz, 18 pistes (6 toms, ride) | Bus Kick (0,63) et Snare (0,61) **non expliqués** : le bus contient autre chose que les micros fournis (sample ou déclencheur non fourni, réverbe, autre micro). Pas de courbe fiable |
 
-**Le seul ingénieur connu est A.H. pour les deux seuls dossiers étiquetés** ; Track 1 étant inexploitable, **tout ce qui suit repose sur un ingénieur, une chanson, un kit** (sauf le Kick In, voir 3).
+**Deux ingénieurs** : A.H. (Tracks 1 et 2) et un autre (Tracks 3 et 4, précisé par l'utilisateur le 19/10). Mais les paires brut / stem ne viennent que d'A.H. (Track 2) ; l'autre ingénieur n'apporte que des bus, utiles pour le Kick et la Snare. **Les réglages d'EQ des Overheads et du Hi-hat reposent donc sur un seul ingénieur, une chanson, un kit.**
 
 ## 2. Plug-in contre ingénieur (Rock 75 %, Metal 75 % pour le Track 1)
 
@@ -80,9 +80,9 @@ Un gate profond est un choix de style (post punk, « agressif et crado » selon 
 
 Quand de nouvelles données arriveront (autre ingénieur, autre morceau), `--vs-plugin` donne immédiatement la même table : si la tendance se répète, la piste passe de « un ingénieur » à « deux », et on la propose derrière une option désactivée par défaut, à écouter.
 
-## 7. Ce qui a été implémenté : option `cymbalReference` (désactivée par défaut)
+## 7. Ce qui a été implémenté : option `cymbalReference` (**activée le 19/10/2026**, `profileVersion` 3, plug-in 0.11.2)
 
-`ProposalPolicy::cymbalReference` (`ProposalDefaults::cymbalReference = false`) donne aux profils **Overheads** et **Hi-hat** une EQ de référence, **en Rock et Metal seulement** (Natural reste sans coloration imposée) et proportionnelle à la force (intensité nulle : rien). Aucun changement tant que l'option est à `false` : le filet de 270 propositions est identique et un test le vérifie.
+`ProposalPolicy::cymbalReference` (`ProposalDefaults::cymbalReference = false`) donne aux profils **Overheads** et **Hi-hat** une EQ de référence, **en Rock et Metal seulement** (Natural reste sans coloration imposée) et proportionnelle à la force (intensité nulle : rien). L'utilisateur a demandé de l'activer pour l'essayer en vrai (« si ce n'est pas bien on reviendra en arrière »). Retour arrière : `ProposalDefaults::cymbalReference = false` (et `profileVersion` 2) ; le filet de 270 propositions et le test d'équivalence historique tournent avec l'option coupée et restent identiques.
 
 | | Réglage | Écart plug-in / ingénieur (Rock 75 %) | Même sens | Corrélation des formes |
 |---|---|---|---|---|
@@ -91,11 +91,15 @@ Quand de nouvelles données arriveront (autre ingénieur, autre morceau), `--vs-
 | Hi-hat, défaut | passe-haut 250 Hz, EQ neutre | 5,9 dB (ing 7,9) | 10 / 11 | 0,97 |
 | Hi-hat, option | corps −8,0 dB à 200 Hz | **3,4 dB** | **11 / 11** | **0,99** |
 
-**Ces chiffres sont mesurés sur les données qui ont servi à choisir les réglages (un ingénieur, une chanson) : ils montrent que le réglage reproduit cette courbe, pas qu'il est meilleur pour d'autres sources.** Les valeurs sont volontairement plus douces que l'ingénieur (−12 dB sur le corps du Hi-hat irait encore plus près : 2,3 dB, mais ce serait épouser un style agressif). Pour l'activer : `ProposalDefaults::cymbalReference = true`, incrémenter `profileVersion`, et **écouter d'abord**. Mesure : `ZeroEffortDrumTests.exe --vs-plugin <brut> <rôle> <style> <intensité> <mixé> --reference` ; `--set id=valeur` et `--off id` testent d'autres valeurs sans recompiler. L'option n'est pas enregistrée dans les snapshots.
+**Ces chiffres sont mesurés sur les données qui ont servi à choisir les réglages (un ingénieur, une chanson) : ils montrent que le réglage reproduit cette courbe, pas qu'il est meilleur pour d'autres sources.** Les valeurs sont volontairement plus douces que l'ingénieur (−12 dB sur le corps du Hi-hat irait encore plus près : 2,3 dB, mais ce serait épouser un style agressif). Mesure : `ZeroEffortDrumTests.exe --vs-plugin <brut> <rôle> <style> <intensité> <mixé> [--no-reference]` ; `--set id=valeur` et `--off id` testent d'autres valeurs sans recompiler. L'option n'est pas enregistrée dans les snapshots.
 
-## 8. Questions ouvertes
+## 8. Double pédale (Track 1)
 
-- **Ingénieur et style des Tracks 3 et 4** : pas de `INFO.txt`. Le manifeste les note « inconnu » en Rock.
+Le Kick du Track 1 sert surtout à vérifier la détection des doubles frappes (J4a, active depuis le 17/10). Avec J4a, le Kick compte **263 frappes** contre 179 sans (+47 %), contre +5 à +14 % sur les trois autres Kicks : la double pédale est mieux suivie. **Aucun réglage proposé ne change** sur cette prise (0 réglage différent, Metal 75 %) : c'est sans risque.
+
+## 9. Questions ouvertes
+
+- **Style et nom de l'ingénieur des Tracks 3 et 4** : autre ingénieur que A.H. (confirmé), mais pas de `INFO.txt` ; le manifeste les note « B » en Rock.
 - **Toms du Track 4** : 6 toms et un ride. Seuls Tom 1 à 3 sont pris comme snapshots (rôles 2, 3, 4) ; Tom 4 à 6 et Ride attendent ta confirmation (Tom 6 = tom basse ?).
 - **Track 4, bus non expliqués** : y a-t-il un sample ou un autre micro dans les bus Kick et Snare ?
 - **Dossiers `raw2`, `raw3`, `raw4` introuvables** (voir `ETAT_ACTUEL.md`) : les tests de kit réel du plug-in sont **ignorés** tant que `Kick_12`, `Snare_12`, `OvH L_12` et `OvH R_12` ne sont pas retrouvés.

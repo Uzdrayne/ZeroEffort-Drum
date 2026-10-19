@@ -53,7 +53,7 @@ juce::String number(float value, int decimals = 1)
 }
 }
 
-// Developer command: ZeroEffortDrumTests.exe --vs-plugin <raw.wav> <role 0-9> <natural|rock|metal> <intensity 0-1> <mix.wav> [output prefix] [--off id,id,...] [--set id=value,...] [--reference]
+// Developer command: ZeroEffortDrumTests.exe --vs-plugin <raw.wav> <role 0-9> <natural|rock|metal> <intensity 0-1> <mix.wav> [output prefix] [--off id,id,...] [--set id=value,...] [--no-reference]
 // Runs the raw take through the Auto proposal of the plug-in (nothing is played) and compares the equivalent EQ curve of
 // that processing with the one the mixer obtained (document 03). Analysis only: writes <prefix>.json and <prefix>.md.
 int runVersusCommand(const juce::StringArray& arguments)
@@ -63,8 +63,8 @@ int runVersusCommand(const juce::StringArray& arguments)
     // which module is responsible for a part of the curve, or what a different value would do.
     auto commandLine = arguments;
     juce::StringArray overrides;
-    const bool reference = commandLine.contains("--reference");   // ProposalPolicy::cymbalReference
-    commandLine.removeString("--reference");
+    const bool noReference = commandLine.contains("--no-reference");   // ProposalPolicy::cymbalReference = false
+    commandLine.removeString("--no-reference");
     for (const auto* option : { "--off", "--set" })
         if (const auto index = commandLine.indexOf(option); index >= 0 && index + 1 < commandLine.size())
         {
@@ -97,7 +97,7 @@ int runVersusCommand(const juce::StringArray& arguments)
     const auto folded = loudestOf(raw);
     for (size_t offset = 0; offset < folded.size(); offset += 32768)
         analyser.push(folded.data() + offset, static_cast<int>(juce::jmin<size_t>(32768, folded.size() - offset)));
-    if (reference) { auto policy = analyser.getPolicy(); policy.cymbalReference = true; analyser.setPolicy(policy); }
+    if (noReference) { auto policy = analyser.getPolicy(); policy.cymbalReference = false; analyser.setPolicy(policy); }
     auto original = drum::defaultSettings();
     original[drum::instrument] = static_cast<float>(role);
     auto proposal = analyser.propose(original, style, intensity);
@@ -301,10 +301,10 @@ void testCymbalReference()
         plain.push(take.data() + offset, count);
         referenced.push(take.data() + offset, count);
     }
-    auto policy = referenced.getPolicy();
-    expect(!policy.cymbalReference && !drum::ProposalDefaults::cymbalReference, "The reference EQ must be off by default");
-    policy.cymbalReference = true;
-    referenced.setPolicy(policy);
+    expect(referenced.getPolicy().cymbalReference && drum::ProposalDefaults::cymbalReference, "The reference EQ is on by default (profileVersion 3)");
+    auto policy = plain.getPolicy();
+    policy.cymbalReference = false;
+    plain.setPolicy(policy);
 
     const auto propose = [&](const drum::DrumAnalyser& analyser, drum::DrumInstrument role, drum::DrumStyle style, float intensity) {
         auto original = drum::defaultSettings();
@@ -330,11 +330,11 @@ void testCymbalReference()
     const auto overheadsOff = propose(plain, DrumInstrument::overheads, DrumStyle::rock, 0.75f);
     const auto overheadsOn = propose(referenced, DrumInstrument::overheads, DrumStyle::rock, 0.75f);
     expect(overheadsOff.valid && overheadsOn.valid && overheadsOff.settings[drum::eqOn] == 0 && overheadsOff.settings[drum::highPass] == 100,
-        "Without the option the Overheads keep their neutral EQ and 100 Hz high-pass");
+        "With the option off the Overheads keep their neutral EQ and 100 Hz high-pass");
     expect(overheadsOn.settings[drum::eqOn] == 1 && overheadsOn.settings[drum::highPass] == 180
         && overheadsOn.settings[drum::airFrequency] == 6000 && overheadsOn.settings[drum::airGain] > 3.0f
         && overheadsOn.settings[drum::airGain] < 6.0f && overheadsOn.summary.contains("reference EQ"),
-        "With the option the Overheads get a 180 Hz high-pass and a gentle air lift");
+        "By default the Overheads get a 180 Hz high-pass and a gentle air lift");
     const auto louder = propose(referenced, DrumInstrument::overheads, DrumStyle::rock, 1.0f);
     expect(louder.settings[drum::airGain] > overheadsOn.settings[drum::airGain], "The air lift grows with the intensity");
 
@@ -342,7 +342,7 @@ void testCymbalReference()
     const auto hatOn = propose(referenced, DrumInstrument::hiHat, DrumStyle::metal, 0.75f);
     expect(hatOff.settings[drum::eqOn] == 0 && hatOn.settings[drum::eqOn] == 1 && hatOn.settings[drum::highPass] == 250
         && hatOn.settings[drum::bodyFrequency] == 200 && hatOn.settings[drum::bodyGain] < -6.0f && hatOn.settings[drum::bodyGain] >= -12.0f,
-        "With the option the Hi-hat gets a body cut at 200 Hz, within the control range");
+        "By default the Hi-hat gets a body cut at 200 Hz, within the control range");
 }
 
 void testVersus()
@@ -387,5 +387,5 @@ void testVersus()
     expect(runVersusCommand({ "--other" }) == -1, "Other commands must pass through");
     std::cout << "PASS: --vs-plugin (level -6 dB and +6 dB shelf recovered, bad arguments refused)" << std::endl;
     testCymbalReference();
-    std::cout << "PASS: cymbal reference EQ (off by default, Hi-hat and Overheads in Rock / Metal only)" << std::endl;
+    std::cout << "PASS: cymbal reference EQ (on by default, Hi-hat and Overheads in Rock / Metal only, can be switched off)" << std::endl;
 }

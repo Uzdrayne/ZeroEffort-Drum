@@ -6,8 +6,8 @@ Document de situation : **où on en est, ce qui est fait, ce qui manque**. Il r�
 
 | | |
 |---|---|
-| Version du plug-in | **0.11.1** (VST3 + ARA, Windows x64, JUCE 8.0.6) |
-| Versions d'analyse | `analysisVersion` **6**, `profileVersion` **2** |
+| Version du plug-in | **0.11.2** (VST3 + ARA, Windows x64, JUCE 8.0.6) |
+| Versions d'analyse | `analysisVersion` **6**, `profileVersion` **3** |
 | Branche de travail | `main` directement, un commit par étape (depuis le 17/10) |
 | Tests | 3 suites CTest, **toutes vertes** : `RegionCacheTests`, `ZeroEffortDrumTests` (≈ 80-120 s), `ARADiscoveryTests` ; build VS 2019 sans avertissement |
 | Corpus (hors dépôt) | `Database_drum` : 4 tracks (`Track_1`, `Track_2`, `track_3`, `track_4`) ; Track 2 = 8 paires brut / mixé acceptées (ingé A.H., post punk) ; Track 1 inexploitable en paires (samples) ; Tracks 3 et 4 = bus ; manifeste `corpus.json` (ancien dans `archive_v6`). **`raw2`, `raw3`, `raw4` ont disparu** (voir 5) |
@@ -78,7 +78,7 @@ Build VS 2019 / 2022 (`scripts/Build.ps1`), build d'export pour Cubase (`build-e
 | Activer / relier les garde-fous Kit / Phase | voir 3 |
 
 ### Corpus du 19/10/2026 : analysé, rien appliqué
-`--vs-plugin` compare ce que fait la proposition Auto à ce qu'a fait l'ingénieur sur la même piste. Bon accord sur le **Kick In** (même sens sur 16 bandes sur 17, confirmé par une 2e source), le plug-in est trop doux sur le **Hi-hat**, neutre sur la **Snare**, presque plat sur les **Overheads** (l'ingénieur coupe les graves, monte les aigus), et **pire que ne rien faire sur la Room**. L'ingénieur gate beaucoup plus fort. **Un seul ingénieur, un seul morceau** : pistes de changement et leur force de preuve dans [ANALYSE_CORPUS_19OCT.md](ANALYSE_CORPUS_19OCT.md). **Une seule est implémentée, désactivée par défaut** : `ProposalDefaults::cymbalReference` (EQ de référence Overheads et Hi-hat en Rock et Metal : accord 6 → 14 bandes sur 17 aux Overheads, 10 → 11 sur 11 au Hi-hat). Pour l'activer : le passer à `true`, incrémenter `profileVersion`, écouter. La Room vient du module Crush (choix de style, non touché).
+`--vs-plugin` compare ce que fait la proposition Auto à ce qu'a fait l'ingénieur sur la même piste. Bon accord sur le **Kick In** (même sens sur 16 bandes sur 17, confirmé par une 2e source), le plug-in est trop doux sur le **Hi-hat**, neutre sur la **Snare**, presque plat sur les **Overheads** (l'ingénieur coupe les graves, monte les aigus), et **pire que ne rien faire sur la Room**. L'ingénieur gate beaucoup plus fort. **Un seul ingénieur, un seul morceau** : pistes de changement et leur force de preuve dans [ANALYSE_CORPUS_19OCT.md](ANALYSE_CORPUS_19OCT.md). **Une seule est implémentée et ACTIVÉE (19/10, à ta demande, pour essai)** : `ProposalDefaults::cymbalReference` (EQ de référence Overheads et Hi-hat en Rock et Metal ; Natural inchangé) : accord 6 → 14 bandes sur 17 aux Overheads, 10 → 11 sur 11 au Hi-hat, `profileVersion` 3, plug-in **0.11.2**. Retour arrière : la passer à `false`. La Room vient du module Crush (choix de style, non touché). Double pédale (Track 1) : J4a compte +47 % de frappes sans changer aucun réglage.
 
 ### Dépend du nouveau corpus (raw vs mix, plusieurs kits)
 | Chantier | Détail |

@@ -9,7 +9,7 @@ Légende : ⬜ à faire · 🔄 en cours · ✅ terminé · ⏸ en réserve
 
 | Élément | État |
 |---|---|
-| Version du plug-in | **0.11.1** (`CMakeLists.txt`, depuis le 18/10/2026) ; `analysisVersion` 6, `profileVersion` 2 |
+| Version du plug-in | **0.11.2** (`CMakeLists.txt`, depuis le 19/10/2026) ; `analysisVersion` 6, `profileVersion` 3 |
 | `main` | vagues 1 et 2 fusionnées (pull requests #1 et #2, commit `b1dbabd`) : phase 0, build VS 2019 / 2022, J1, T1, T2, J2, J3, T3, T4 |
 | Branches de travail | aucune ouverte (`feature/t3-kit-phase` fusionnée) |
 | Passation | [REPRISE_PROCHAINE_SESSION.md](REPRISE_PROCHAINE_SESSION.md) : prompt à coller, état, décisions, menu des prochaines étapes, pièges |
@@ -162,6 +162,9 @@ Quatre nouveaux dossiers (`Track_1` metal moderne et `Track_2` post punk par A.H
 - **Outil** : `--vs-plugin` (`tests/VersusTests.cpp`) fait passer une piste brute dans la proposition Auto et compare sa courbe d'égalisation équivalente à celle de l'ingénieur avec le même outil de paires ; test synthétique (gain −6 dB et shelf +6 dB retrouvés, arguments invalides refusés). `scripts/CorpusTables.py` (tables `pairs`, `versus`, `shapes`, `buses`). `RunCorpus.ps1` : étiquettes par kit, `--vs-plugin` quand une paire a un rôle, et **correction d'un défaut** : `Select-Object -First 1` coupait le programme avant l'écriture des rapports (les `.md` et la plupart des `.json` manquaient).
 - **Résultats** (détail dans `docs/ANALYSE_CORPUS_19OCT.md`) : Track 1 inexploitable en paires (samples, cohérence 0,14 à 0,46) ; Track 2 : 8 paires acceptées ; Tracks 3 et 4 : bus Kick et Snare expliqués au Track 3 (0,90 et 0,82), non expliqués au Track 4 (0,63 et 0,61). Kick In : bon accord (même sens 16 / 17), confirmé par le bus du Track 3 ; Hi-hat : bon sens, trop doux ; Snare : neutre ; Overheads : presque plat contre une coupe de graves et une montée d'aigus de l'ingénieur ; Room : pire que ne rien faire ; gate de l'ingénieur bien plus profond (−33 à −66 dB de plancher).
 - Un seul ingénieur et un seul morceau : sous la règle du document 03 (8 paires, 3 mixeurs) et sans jeu de validation.
+- **Option `cymbalReference` (ACTIVÉE le 19/10/2026 à la demande de l'utilisateur : « on essaie, on reviendra en arrière si besoin » ; `ProposalDefaults::cymbalReference = true`, `profileVersion` 3, plug-in 0.11.2 ; retour arrière : la passer à `false`)** : EQ de référence pour Overheads (passe-haut 180 Hz, air +3,6 dB × force à 6 kHz) et Hi-hat (corps −7,1 dB × force à 200 Hz ; le passe-haut est déjà au maximum de sa plage, 250 Hz), Rock et Metal seulement, intensité nulle sans effet, Natural inchangé. Mesuré avec `--vs-plugin` sur le Track 2 (**en échantillon**, donc pas une validation) : Overheads 5,1 → 2,8 dB, même sens 6 → 14 sur 17 ; Hi-hat 5,9 → 3,4 dB, 10 → 11 sur 11. **Changement audible** (Overheads et Hi-hat en Rock et Metal). Le filet de 270 propositions et le test d'équivalence historique tournent avec l'option coupée (identiques) ; tests ajoutés pour le comportement actif et pour le Rock des Overheads (ancien test « aucune EQ » mis à jour). Room : le creux vient du module Crush (écart 2,4 → 1,5 dB sans lui), choix de style non touché. `--vs-plugin` gagne `--no-reference`, `--set` et `--off`. CTest 3/3.
+- **Double pédale (Track 1)** : J4a compte 263 frappes contre 179 sans (+47 %, contre +5 à +14 % sur les autres Kicks) et **ne change aucun réglage** proposé sur cette prise.
+- **Tracks 3 et 4 : autre ingénieur que A.H.** (précisé par l'utilisateur) ; le manifeste les étiquette « B ».
 
 ### Presets utilisateur, version 0.11.1 (18/10/2026)
 

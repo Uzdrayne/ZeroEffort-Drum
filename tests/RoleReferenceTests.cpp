@@ -98,6 +98,12 @@ void testRoleReference()
     {
         drum::DrumAnalyser analyser;
         analyser.prepare(rate);
+        {
+            // The net was frozen with the profiles of profileVersion 2: the cymbal reference EQ (version 3) is tested on its own.
+            auto frozen = analyser.getPolicy();
+            frozen.cymbalReference = false;
+            analyser.setPolicy(frozen);
+        }
         for (size_t offset = 0; offset < takes[take].size(); offset += 4096)
             analyser.push(takes[take].data() + offset, static_cast<int>(juce::jmin(size_t { 4096 }, takes[take].size() - offset)));
         for (int role = 0; role < 10; ++role)
