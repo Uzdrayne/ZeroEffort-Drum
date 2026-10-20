@@ -2,6 +2,7 @@
 #include "Drum/DrumPresetLibrary.h"
 #include "Drum/DrumRole.h"
 #include "Kit/KitTypes.h"
+#include "Kit/KitRegistry.h"
 #include <cmath>
 #include <iostream>
 #include <stdexcept>
@@ -151,12 +152,138 @@ void testProcessor()
     }
     processor.releaseResources();
 }
+
+// Low kick-like hits with a click, over a faint floor.
+std::vector<float> lowHits(double rate, int seconds, float gain = 1.0f)
+{
+    juce::Random random(21);
+    std::vector<float> audio(static_cast<size_t>(rate * seconds));
+    for (size_t index = 0; index < audio.size(); ++index)
+    {
+        const auto age = std::fmod(static_cast<double>(index) / rate, 0.4);
+        const auto noise = random.nextFloat() * 2.0f - 1.0f;
+        audio[index] = gain * static_cast<float>(0.5 * std::exp(-age * 20) * std::sin(juce::MathConstants<double>::twoPi * 60 * age)
+            + 0.05 * std::exp(-age * 80) * noise + 0.0002 * noise);
+    }
+    return audio;
 }
 
+std::vector<float> shifted(const std::vector<float>& audio, size_t samples, float gain)
+{
+    std::vector<float> result(audio.size(), 0.0f);
+    for (size_t index = samples; index < audio.size(); ++index) result[index] = gain * audio[index - samples];
+    return result;
+}
+
+void testGroupMeasures()
+{
+    constexpr double rate = 48000;
+    const auto a = lowHits(rate, 6);
+    const auto louder = [](const kit::GroupReport& report, size_t mic) { return report.mics[mic].levelDb; };
+
+    // Two in-phase microphones, the second 6 dB lower: the sum adds, no alert.
+    kit::GroupMic first { "Kick In", a, 0, false }, second { "Kick Out", shifted(a, 0, 0.5f), 0, false };
+    const auto plain = kit::GroupMeasures::analyse({ first, second }, rate);
+    check(plain.valid && plain.mics.size() == 2, "Two microphones give a group report");
+    check(std::abs((louder(plain, 0) - louder(plain, 1)) - 6.02f) < 0.3f, "The active level of each mic is read against the sum (6 dB apart)");
+    check(plain.sumGainDb > 0.5f && plain.sumGainLowDb > 0.5f && plain.coherence > 0.95f && plain.mics[1].lowCorrelation > 0.9f,
+        "In-phase microphones add");
+    check(std::abs(plain.mics[1].residualDelayMs) < 0.4f && plain.clipMarginDb > 0, "No residual delay, and some headroom");
+    check(!kit::GroupMeasures::toText(plain, "Kick Bus").contains("<-"), "No alert on a healthy group");
+
+    // The same microphone with inverted polarity: the low end cancels and the report says so.
+    kit::GroupMic flipped { "Kick Out", shifted(a, 0, 0.8f), 0, true };
+    const auto cancelled = kit::GroupMeasures::analyse({ first, flipped }, rate);
+    check(cancelled.valid && cancelled.sumGainLowDb < -6.0f && cancelled.mics[1].lowCorrelation < -0.9f && cancelled.coherence < -0.9f,
+        "An inverted microphone cancels the low end");
+    check(kit::GroupMeasures::toText(cancelled, "Kick Bus").contains("polarity suspect"), "The report flags the polarity");
+    // ...but a microphone whose instance already inverts it is correct: its raw audio is flipped by the correction.
+    kit::GroupMic opposed { "Kick Out", shifted(a, 0, -0.8f), 0, true };
+    const auto repaired = kit::GroupMeasures::analyse({ first, opposed }, rate);
+    check(repaired.valid && repaired.sumGainLowDb > 0 && repaired.mics[1].lowCorrelation > 0.9f, "The polarity correction of the instance is taken into account");
+
+    // A microphone 3 ms late: its residual delay is seen, and gone once the other one is delayed by the same amount.
+    const auto lateAudio = shifted(a, 144, 0.7f);
+    const auto late = kit::GroupMeasures::analyse({ first, { "Kick Out", lateAudio, 0, false } }, rate);
+    check(late.valid && std::abs(late.mics[1].residualDelayMs - 3.0f) < 0.5f, "A 3 ms residual delay is measured");
+    check(kit::GroupMeasures::toText(late, "Kick Bus").contains("alignment insufficient"), "The report flags the alignment");
+    const auto fixedByDelay = kit::GroupMeasures::analyse({ { "Kick In", a, 3.0f, false }, { "Kick Out", lateAudio, 0, false } }, rate);
+    check(fixedByDelay.valid && std::abs(fixedByDelay.mics[1].residualDelayMs) < 0.4f, "The delay applied by an instance removes the residual delay");
+
+    // Limits: one microphone, silence, too short, bad rate, determinism.
+    check(!kit::GroupMeasures::analyse({ first }, rate).valid && kit::GroupMeasures::toText(kit::GroupMeasures::analyse({ first }, rate), "x").contains("at least two"),
+        "A group of one microphone gives no invented numbers");
+    check(std::isnan(kit::GroupMeasures::analyse({ first }, rate).sumGainDb), "...they stay unavailable");
+    kit::GroupMic silent { "Silent", std::vector<float>(a.size(), 0.0f), 0, false };
+    check(!kit::GroupMeasures::analyse({ silent, silent }, rate).valid, "Silence is refused");
+    kit::GroupMic brief { "Brief", std::vector<float>(1000, 0.1f), 0, false };
+    check(!kit::GroupMeasures::analyse({ brief, brief }, rate).valid, "Less than a second is refused");
+    check(!kit::GroupMeasures::analyse({ first, second }, 100.0).valid, "A bad sample rate is refused");
+    const auto again = kit::GroupMeasures::analyse({ first, second }, rate);
+    check(again.sumGainDb == plain.sumGainDb && again.mics[1].lowCorrelation == plain.mics[1].lowCorrelation, "The measures are deterministic");
+}
+
+void testGroupAudio()
+{
+    constexpr double rate = 48000;
+    juce::SharedResourcePointer<kit::Registry> registry;
+    const auto audio = lowHits(rate, 4);
+    const auto join = [&](kit::Role role, int group, const juce::String& name, float delay, bool inverted) {
+        auto* member = registry->join();
+        check(member != nullptr, "A member must join");
+        kit::Identity identity;
+        identity.group = group;
+        identity.role = role;
+        identity.name = name;
+        identity.delayMs = delay;
+        identity.inverted = inverted;
+        registry->setIdentity(*member, identity);
+        return member;
+    };
+    auto* kickIn = join(kit::Role::kickIn, 0, "Kick In", 2.0f, false);
+    auto* kickOut = join(kit::Role::kickOut, 0, "Kick Out", 0.0f, true);
+    auto* snare = join(kit::Role::snareTop, 0, "Snare Top", 0.0f, false);
+    auto* otherKit = join(kit::Role::kickIn, 1, "Other kick", 0.0f, false);
+    for (auto* member : { kickIn, kickOut, snare, otherKit })
+        for (size_t offset = 0; offset + 4096 <= audio.size(); offset += 4096)
+        {
+            const float* channel = audio.data() + offset;
+            member->write(&channel, 1, 4096, static_cast<juce::int64>(offset), rate);
+        }
+    double readRate = 0;
+    const auto mics = registry->recentAudio(0, { kit::Role::kickIn, kit::Role::kickOut }, 131072, readRate);
+    check(mics.size() == 2 && readRate == rate, "Only the live microphones of the requested roles and group are read");
+    check(mics[0].samples.size() > static_cast<size_t>(rate) && mics[0].samples.size() == mics[1].samples.size(), "Both read the same span");
+    bool inCorrect = false, outCorrect = false;
+    for (const auto& mic : mics)
+    {
+        if (mic.name == "Kick In") inCorrect = mic.delayMs == 2.0f && !mic.inverted;
+        if (mic.name == "Kick Out") outCorrect = mic.delayMs == 0.0f && mic.inverted;
+    }
+    check(inCorrect && outCorrect, "The correction of each instance travels with its audio");
+    check(registry->recentAudio(0, { kit::Role::snareTop }, 131072, readRate).empty(), "One microphone is not a group");
+    check(registry->recentAudio(5, { kit::Role::kickIn }, 131072, readRate).empty(), "An empty Kit group gives nothing");
+
+    ZeroEffortDrumProcessor bus;
+    bus.setRateAndBufferSizeDetails(48000, 256);
+    bus.prepareToPlay(48000, 256);
+    check(bus.getGroupReportText().isEmpty(), "Only a sub-bus builds a group report");
+    bus.setControl(drum::instrument, static_cast<float>(drum::DrumInstrument::kickBus));
+    const auto report = bus.getGroupReportText();
+    check(report.contains("GROUP REPORT / Kick Bus / Kit 1") && report.contains("Kick In") && report.contains("Kick Out") && !report.contains("Snare Top"),
+        "The Kick Bus reports its own microphones");
+    bus.setControl(drum::instrument, static_cast<float>(drum::DrumInstrument::tomsBus));
+    check(bus.getGroupReportText().contains("No group report yet"), "A group without microphones says what is missing");
+    bus.releaseResources();
+    for (auto* member : { kickIn, kickOut, snare, otherKit }) registry->leave(member);
+}
+}
 void testSubBuses()
 {
     testRoles();
     testProposals();
     testProcessor();
-    std::cout << "PASS: sub-buses (role numbers kept, kit-free, no ambience or gate, reload, presets kept apart)" << std::endl;
+    testGroupMeasures();
+    testGroupAudio();
+    std::cout << "PASS: sub-buses (role numbers kept, kit-free, group EQ, reload, presets apart, group report: level, polarity, delay, registry read)" << std::endl;
 }

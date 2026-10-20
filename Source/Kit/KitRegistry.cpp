@@ -134,6 +134,49 @@ GroupView Registry::view(int group) const
     return result;
 }
 
+std::vector<GroupMic> Registry::recentAudio(int group, const std::vector<Role>& roles, int maximumSamples, double& rate) const
+{
+    std::vector<GroupMic> result;
+    rate = 0;
+    if (group < 0 || group >= groupCount || maximumSamples < 1) return result;
+    const auto now = juce::Time::getMillisecondCounter();
+    std::lock_guard<std::mutex> guard(lock);
+    std::vector<const Member*> chosen;
+    for (const auto& member : members)
+    {
+        if (member == nullptr || !member->active.load() || member->identity.group != group || !member->isLive(now)) continue;
+        if (std::find(roles.begin(), roles.end(), member->identity.role) == roles.end()) continue;
+        const auto memberRate = member->rate.load(std::memory_order_relaxed);
+        if (rate == 0) rate = memberRate;
+        if (memberRate != rate) continue;
+        chosen.push_back(member.get());
+    }
+    if (chosen.size() < 2) { rate = 0; return result; }
+    auto end = std::numeric_limits<juce::int64>::max();
+    auto first = std::numeric_limits<juce::int64>::min();
+    for (const auto* member : chosen)
+    {
+        end = juce::jmin(end, member->writeEnd.load(std::memory_order_acquire));
+        first = juce::jmax(first, member->contiguousStart.load(std::memory_order_acquire));
+    }
+    // Stay clear of the newest samples (the owners keep writing) and of the oldest (overwritten by the ring).
+    end -= Member::writeMargin;
+    auto start = juce::jmax(first, end - juce::jmin<juce::int64>(maximumSamples, Member::ringSize - 2 * Member::writeMargin));
+    if (end <= start) { rate = 0; return result; }
+    const auto count = static_cast<int>(end - start);
+    for (const auto* member : chosen)
+    {
+        GroupMic mic;
+        mic.name = member->identity.name;
+        mic.delayMs = member->identity.delayMs;
+        mic.inverted = member->identity.inverted;
+        mic.samples.assign(static_cast<size_t>(count), 0.0f);
+        if (!member->read(2, start, count, mic.samples.data())) { result.clear(); rate = 0; return result; }
+        result.push_back(std::move(mic));
+    }
+    return result;
+}
+
 void Registry::runOnce()
 {
     std::lock_guard<std::mutex> work(workLock);

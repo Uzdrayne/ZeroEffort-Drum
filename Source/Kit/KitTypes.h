@@ -82,10 +82,12 @@ struct Identity
     Role role = Role::kickIn;
     juce::String name;
     juce::String key;           // track identity shared by the ARA editor and playback instances
+    float delayMs = 0;          // correction applied by this instance (kit delay and polarity), read by the sub-bus group report
+    bool inverted = false;
     bool operator==(const Identity& other) const noexcept
     {
         return group == other.group && instrument == other.instrument && position == other.position
-            && role == other.role && name == other.name && key == other.key;
+            && role == other.role && name == other.name && key == other.key && delayMs == other.delayMs && inverted == other.inverted;
     }
     bool operator!=(const Identity& other) const noexcept { return !(*this == other); }
 };

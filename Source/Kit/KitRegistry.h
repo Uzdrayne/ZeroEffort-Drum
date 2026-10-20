@@ -1,6 +1,7 @@
 #pragma once
 
 #include "KitAnalysis.h"
+#include "KitGroupMeasures.h"
 #include <atomic>
 #include <memory>
 #include <mutex>
@@ -129,6 +130,9 @@ public:
     void startAnalysis(int group);
     void stopAnalysis(int group);
     GroupView view(int group) const;
+    // The most recent audio (at most `maximumSamples`, mono mean of each microphone) of the live members of one group whose role is in `roles`,
+    // on the span all of them cover. Used by the sub-buses for their read-only group report; empty when fewer than two microphones are live.
+    std::vector<GroupMic> recentAudio(int group, const std::vector<Role>& roles, int maximumSamples, double& rate) const;
     juce::uint32 revision(int group) const noexcept;
 
     // Kit-wide apply from the preview: every listed member applies its own recommendation

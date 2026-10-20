@@ -88,6 +88,8 @@ public:
     kit::Mode getKitMode() const noexcept;
     kit::Identity getKitIdentity() const;
     kit::GroupView getKitView() const;
+    // Read-only report of the microphones of this sub-bus (same Kit group, same instrument), empty for any other role.
+    juce::String getGroupReportText() const;
     juce::uint32 getKitMemberId() const noexcept;
     void startKitAnalysis();
     void stopKitAnalysis();

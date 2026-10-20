@@ -1239,7 +1239,26 @@ kit::Identity ZeroEffortDrumProcessor::getKitIdentity() const
     }
     identity.name = trackName.isNotEmpty() && trackName != label ? trackName + " (" + label + ")" : label;
     identity.key = memberKey();
+    identity.delayMs = settings[drum::kitDelay];
+    identity.inverted = settings[drum::kitPolarity] > 0.5f;
     return identity;
+}
+
+juce::String ZeroEffortDrumProcessor::getGroupReportText() const
+{
+    const auto role = drum::instrumentFromValue(memberSettings()[drum::instrument]);
+    if (!drum::isSubBus(role)) return {};
+    std::vector<kit::Role> roles;
+    if (role == drum::DrumInstrument::kickBus) roles = { kit::Role::kickIn, kit::Role::kickOut };
+    else if (role == drum::DrumInstrument::snareBus) roles = { kit::Role::snareTop, kit::Role::snareBottom };
+    else roles = { kit::Role::tom, kit::Role::floorTom };
+    const auto group = juce::jlimit(0, kit::groupCount - 1, static_cast<int>(std::lround(getKitControl(kitGroup))));
+    const auto title = juce::String(drum::instrumentName(role)) + " / Kit " + juce::String(group + 1);
+    double rate = 0;
+    const auto mics = kitRegistry->recentAudio(group, roles, 131072, rate);
+    if (mics.size() < 2)
+        return "GROUP REPORT / " + title + "\nNo group report yet: the microphones of this instrument must be on their own tracks with the plug-in in the same Kit group (Kit / Phase page), and the host must be playing.\n";
+    return kit::GroupMeasures::toText(kit::GroupMeasures::analyse(mics, rate), title);
 }
 
 kit::GroupView ZeroEffortDrumProcessor::getKitView() const

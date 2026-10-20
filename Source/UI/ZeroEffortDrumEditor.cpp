@@ -452,7 +452,10 @@ DrumEditor::DrumEditor(ZeroEffortDrumProcessor& processor)
     };
     apply.onClick = [this] { owner.applyAutoPreset(); timerCallback(); };
     revert.onClick = [this] { owner.revertAutoPreset(); timerCallback(); };
-    details.onClick = [this] { showText("Auto / Report", owner.getAutoPresetText()); };
+    details.onClick = [this] {
+        const auto group = owner.getGroupReportText();
+        showText("Auto / Report", group.isEmpty() ? owner.getAutoPresetText() : owner.getAutoPresetText() + "\n\n" + group);
+    };
     presets.setButtonText("Presets");
     presets.setComponentID("presetsMenu");
     presets.setTooltip("Save the current settings as your own preset, or load one saved for this instrument");
