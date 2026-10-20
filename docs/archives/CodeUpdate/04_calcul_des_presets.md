@@ -1,5 +1,11 @@
 # Calcul des presets, fonction par fonction
 
+<!-- consolidated-archive -->
+> **Archive historique.** Référence consolidée : [SPECIFICATIONS](../../SPECIFICATIONS.md).
+> Avancement vérifié : [PROJET](../../PROJET.md). Les états et chemins ci-dessous
+> sont historiques ; ne plus entretenir ce document comme un suivi actif.
+<!-- /consolidated-archive -->
+
 **Document 4 sur 4** | Version du document : 0.1 | Dépend de : 01 (mesures), 03 (cibles issues des paires brut / mixé) | Testé par : 02
 
 Les valeurs de la colonne **Actuel** viennent de `KickProfile.h`, `SnareProfile.h` et `TomProfile.h`. Je n'ai pas vu `ProfileAssembly.h` : pour la caisse claire et les toms, je ne connais que les paramètres qu'ils lui passent, pas ce qu'il en fait.

@@ -1,5 +1,8 @@
 # Corpus : préparer, lancer, lire
 
+> Archive au 20/10/2026, non maintenue. État et suivi courants : [PROJET.md](../PROJET.md).
+> Le texte ci-dessous conserve ses dates, décisions et éventuelles contradictions historiques.
+
 Le corpus reste **hors du dépôt** (aujourd'hui `C:\Users\robin\Desktop\Database_drum`). Un dossier de kits, un fichier `corpus.json` qui les décrit, un script qui lance toute la chaîne. Rien n'est joué, rien n'est écrit dans le dépôt.
 
 ## 1. Organisation conseillée
@@ -14,7 +17,7 @@ Database_drum\
 
 Pour plusieurs mixes du même kit (ou plusieurs ingés), un dossier de mix par ingé et par style : `mix1_ingeA_rock\`, `mix1_ingeB_metal\`, qui partagent le même `raw1\`.
 
-Un guide d'une page à donner à un ingé son qui prépare un kit : [`Guide_Ingenieur_Son.md`](Guide_Ingenieur_Son.md).
+Un guide d'une page à donner à un ingé son qui prépare un kit : [`Guide_Ingenieur_Son.md`](../Guide_Ingenieur_Son.md).
 
 ### Ce qu'on attend d'un kit (liste de contrôle)
 

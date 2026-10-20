@@ -1,6 +1,18 @@
 # Prompts de codage pour GitHub Copilot dans VS Code
 
+<!-- consolidated-archive -->
+> **Archive historique, prompts non actifs.** Lire [PROJET](../../PROJET.md),
+> puis [SPECIFICATIONS](../../SPECIFICATIONS.md) pour le chantier retenu.
+> Les anciens chemins, instructions et jalons ci-dessous ne doivent pas être
+> recopiés comme consignes actuelles ni déclencher une réimplémentation.
+<!-- /consolidated-archive -->
+
 **Document 7** | Version 0.2 | Basé sur les documents 01 à 06 et 08
+
+> Les prompts ci-dessous décrivent le démarrage historique depuis v0.10.0.
+> Avant de les adapter, lire [le suivi courant](../../PROJET.md) : plusieurs
+> jalons sont terminés. Le plan initial est [archivé](../PLAN_IMPLEMENTATION.md).
+> Ne pas recréer de fichiers état/plan/reprise séparés ; entretenir le suivi unique.
 
 Ce fichier contient **tout ce qu'il faut pour lancer le codage dans VS Code avec Copilot** : la préparation du dépôt, un fichier d'instructions Copilot (règles permanentes), un prompt de démarrage et un prompt par jalon. Le projet reste dans VS Code : aucun autre outil ni agent externe.
 
@@ -23,7 +35,7 @@ Constats vérifiés sur le dépôt (v0.10.0) qui modifient la préparation :
 3. Les documents restent dans `CodeUpdate/` (source de vérité). Si le chantier est validé, on pourra les déplacer vers `docs/spec/` en mettant à jour les chemins.
 4. Ajouter le fichier d'instructions de la section 2 : `.github/instructions/analyse-v1.instructions.md`. VS Code le charge automatiquement pour les fichiers ciblés par `applyTo`.
 5. Vérifier que **le projet compile et que les tests existants passent** : tâche VS Code « Build and Test Release » (preset `windows-vs2019`). Noter la durée et le résultat de référence.
-6. **Une conversation Copilot (mode Agent) par jalon** : ouvrir un nouveau chat, joindre `CodeUpdate/07_prompt_copilot_vscode.md` et `docs/PLAN_IMPLEMENTATION.md`, un commit (ou plusieurs petits) par étape.
+6. **Une conversation Copilot (mode Agent) par jalon** : ouvrir un nouveau chat, joindre `CodeUpdate/07_prompt_copilot_vscode.md` et `docs/PROJET.md`, un commit (ou plusieurs petits) par étape.
 
 ## 2. Instructions Copilot du chantier (`.github/instructions/analyse-v1.instructions.md`)
 
@@ -90,7 +102,7 @@ Lis d'abord .github/copilot-instructions.md et .github/instructions/analyse-v1.i
 puis les documents de CodeUpdate/ dans l'ordre (01 à 06, puis 08).
 
 OBJECTIF DE CETTE PHASE : explorer le dépôt et me remettre un plan. NE MODIFIE AUCUN
-FICHIER DE CODE. Tu peux seulement créer docs/PLAN_IMPLEMENTATION.md.
+FICHIER DE CODE. Tu peux seulement proposer une mise à jour de docs/PROJET.md.
 
 1. Explore le dépôt : cibles CMake, suites CTest existantes (tests/) et tâches VS Code pour
    les lancer, conventions de code. Confirme la liste des constats de l'en-tête de ce document.
@@ -107,13 +119,13 @@ FICHIER DE CODE. Tu peux seulement créer docs/PLAN_IMPLEMENTATION.md.
    avec pour chacun : fichiers touchés, tests à ajouter, risques, critère de réussite.
 6. Liste au plus 5 questions bloquantes qui nécessitent ma décision.
 
-Écris le résultat dans docs/PLAN_IMPLEMENTATION.md, résume-le-moi en 15 lignes maximum,
+Intègre le résultat au suivi docs/PROJET.md sans écraser son historique, résume-le-moi en 15 lignes maximum,
 et ATTENDS MA VALIDATION avant de coder.
 ```
 
 ## 4. Prompts de jalon
 
-Chaque prompt commence par : *« Lis docs/PLAN_IMPLEMENTATION.md et les instructions du chantier (.github/instructions/analyse-v1.instructions.md). »* Je l'ai omis dans les blocs pour les raccourcir ; ajoutez-le en tête.
+Chaque prompt commence par : *« Lis docs/PROJET.md et les instructions du chantier (.github/instructions/analyse-v1.instructions.md). Vérifie que ce jalon reste à faire avant de reprendre le prompt historique. »* Je l'ai omis dans les blocs pour les raccourcir ; ajoutez-le en tête.
 
 ### J1 : export et rechargement des snapshots (aucun changement de comportement)
 
@@ -123,7 +135,7 @@ Jalon J1. Objectif : sérialiser et recharger une analyse, sans modifier aucune 
 1. Écris DrumAnalysisSnapshot.h (il n'existe pas encore) d'après la section 7 du document 01
    et intègre-le à la classe DrumAnalysis : toSnapshot(), restoreSnapshot(), toMeasures().
    Introduis analysisVersion    et fais-le entrer uniquement dans les snapshots JSON (l'analyse n'est pas persistée : voir
-   docs/PLAN_IMPLEMENTATION.md, section 2).
+   docs/archives/PLAN_IMPLEMENTATION.md, section 2).
 2. Ajoute un hook d'export : à la fin de chaque analyse, si une option "dossier de developpement"
    est activée (désactivée par défaut, jamais dans un build de production), écrire un JSON
    { meta, analysis, measures, proposal } comme décrit en section 7 du document 01.
@@ -259,13 +271,13 @@ Les jalons suivants (J4 détecteurs par rôle, T5 overheads et room, calcul des 
 - **Demandez un plan avant de coder** pour tout jalon qui touche à plus de trois fichiers.
 - **Relisez les diffs** avant de valider, surtout dans `DrumAnalysis.h` et les profils : une erreur de seuil ne casse pas la compilation.
 - **Ne laissez pas le modèle valider seul** un « cas doré » ou une calibration : l'oreille reste la vôtre.
-- **Gardez le plan à jour** (`docs/PLAN_IMPLEMENTATION.md`) en fin de session : c'est la mémoire entre les sessions.
+- **Gardez le suivi unique à jour** (`docs/PROJET.md`) en fin de session : c'est la mémoire entre les sessions.
 - **Les hypothèses chiffrées** (40 dB, 400 ms, 0,8, k = 0,5…) restent des points de départ : elles doivent être des constantes centralisées, faciles à changer.
 
 ## 6. Points restant à confirmer en phase 0
 
 - Si `ProfileAssembly.h` compense l'effet de l'EQ sur les seuils du compresseur (risque R1, document 04).
-- Si le format de cache ARA (`RegionCache.h`) doit changer avec `analysisVersion` : **réglé en phase 0, non** (voir `docs/PLAN_IMPLEMENTATION.md`).
+- Si le format de cache ARA (`RegionCache.h`) doit changer avec `analysisVersion` : **réglé en phase 0, non** (voir `docs/archives/PLAN_IMPLEMENTATION.md`).
 - Si le registre Kit (`KitRegistry`) peut publier des mesures et relayer des trims (document 08, section 12).
 - Constitution d'un corpus de WAV (10 kits minimum) pour sortir du synthétique et calibrer les valeurs H.
 

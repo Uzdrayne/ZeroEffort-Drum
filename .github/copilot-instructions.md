@@ -16,6 +16,10 @@ build-vs2022, when Visual Studio 2019 is not installed); three CTest suites cove
 discovery. F5 runs the Debug tests, not an audio application. Preserve
 parameter IDs and plugin codes unless intentionally breaking host compatibility.
 Do not copy bundles to protected system directories automatically.
-Do not launch audio playback without confirmation. Current guides:
-docs/KitPhase10.md (kit phase, UI, architecture) and docs/DrumInstruments08.md
-(instrument settings). Older docs describe historical prototype versions.
+Do not launch audio playback without confirmation. Current project reference:
+[docs/PROJET.md](../docs/PROJET.md) (status, roadmap, validation, versions, usage
+and architecture). Update this single tracker rather than creating parallel status
+documents. [docs/SPECIFICATIONS.md](../docs/SPECIFICATIONS.md) consolidates detailed
+requirements, test criteria and decisions; keep proposals distinct from approvals.
+docs/archives contains the old guides, CodeUpdate and product plan; do not treat their old
+statuses or prototype commands as current requirements.

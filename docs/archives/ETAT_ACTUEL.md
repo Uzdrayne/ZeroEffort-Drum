@@ -1,5 +1,8 @@
 # ZeroEffort Drum : état actuel (17 octobre 2026)
 
+> Archive au 20/10/2026, non maintenue. État et suivi courants : [PROJET.md](../PROJET.md).
+> Le texte ci-dessous conserve ses dates, décisions et éventuelles contradictions historiques.
+
 Document de situation : **où on en est, ce qui est fait, ce qui manque**. Il résume sans remplacer le journal détaillé ([SUIVI_IMPLEMENTATION.md](SUIVI_IMPLEMENTATION.md)), la passation ([REPRISE_PROCHAINE_SESSION.md](REPRISE_PROCHAINE_SESSION.md)), le plan ([PLAN_IMPLEMENTATION.md](PLAN_IMPLEMENTATION.md)) et les spécifications (`CodeUpdate/01` à `08`). En cas de doute sur un chiffre, le journal fait foi.
 
 ## 1. En une page

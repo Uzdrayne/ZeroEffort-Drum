@@ -1,5 +1,11 @@
 # Cahier des charges : mesures par piste
 
+<!-- consolidated-archive -->
+> **Archive historique.** Référence consolidée : [SPECIFICATIONS](../../SPECIFICATIONS.md).
+> Avancement vérifié : [PROJET](../../PROJET.md). Les états et chemins ci-dessous
+> sont historiques ; ne plus entretenir ce document comme un suivi actif.
+<!-- /consolidated-archive -->
+
 **Document 1 sur 4** | Version du document : 0.1 | Concerne : `DrumAnalysis`, l'export JSON/CSV et la future base de données
 
 Documents liés (à écrire) : 02 programme de test, 03 comparaison brut / mixé, 04 calcul des presets.

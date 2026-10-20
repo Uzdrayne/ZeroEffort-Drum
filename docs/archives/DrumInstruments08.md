@@ -1,5 +1,8 @@
 # ZeroEffort Drum 0.9.0
 
+> Archive au 20/10/2026, non maintenue. Etat et suivi courants : [PROJET.md](../PROJET.md).
+> Le texte ci-dessous conserve ses dates, decisions et eventuelles contradictions historiques.
+
 > 0.10.0 ajoute Kit / Phase (alignement et polarite entre pistes) et une
 > nouvelle interface (onglets dans l'ordre du signal, noms selon l'instrument) :
 > voir [KitPhase10.md](KitPhase10.md). Les reglages ci-dessous restent valables ;
@@ -186,24 +189,24 @@ mais ne certifient pas qu'il s'agit bien de l'instrument choisi.
 
 ## Organisation Du Code
 
-Depuis 0.10, l'editeur est dans [Source/UI](../Source/UI) et l'analyse de kit
-dans [Source/Kit](../Source/Kit) ; voir [KitPhase10.md](KitPhase10.md).
+Depuis 0.10, l'editeur est dans [Source/UI](../../Source/UI) et l'analyse de kit
+dans [Source/Kit](../../Source/Kit) ; voir [KitPhase10.md](KitPhase10.md).
 
 L'extraction initiale des profils conservait le comportement sonore ; la
 facade applique maintenant la nouvelle courbe d'intensite :
-[DrumProposal.h](../Source/Drum/DrumProposal.h) definit `DrumStyle`, `drumStyleName`
-et `DrumProposal`. [DrumAnalysis.h](../Source/Drum/DrumAnalysis.h) garde les mesures
+[DrumProposal.h](../../Source/Drum/DrumProposal.h) definit `DrumStyle`, `drumStyleName`
+et `DrumProposal`. [DrumAnalysis.h](../../Source/Drum/DrumAnalysis.h) garde les mesures
 et les buffers FFT/histogrammes ; les profils les consultent par reference
 constante, sans copie ni analyse supplementaire. Les helpers temporels
 `kickTemporalResonance` et `kickDominantBody`, ainsi que `kickGateReleases`,
 restent specifiques au Kick dans cet objet de mesure.
 
-[DrumAutoPreset.h](../Source/Drum/DrumAutoPreset.h) est la facade `DrumAnalyser` :
+[DrumAutoPreset.h](../../Source/Drum/DrumAutoPreset.h) est la facade `DrumAnalyser` :
 elle normalise style/intensite et distribue le role explicite vers `KickProfile`,
 `SnareProfile`, `TomProfile` (les quatre Toms), `HiHatProfile`, `OverheadsProfile`,
 `RoomProfile` ou `MasterBusProfile` dans `Source/Drum/Profiles/`.
 Chaque profil possede ses coupures, frequences EQ, temps et limites ;
-[ProfileAssembly.h](../Source/Drum/Profiles/ProfileAssembly.h) partage seulement
+[ProfileAssembly.h](../../Source/Drum/Profiles/ProfileAssembly.h) partage seulement
 la validation et l'assemblage non-Kick. Les regles Glue et avertissements Bus
 sont dans le profil Master. Pas d'heritage polymorphique.
 
@@ -214,7 +217,7 @@ Mesures, refus, role/bypass/output/reset restent inchanges, comme les 88 IDs
 et les formats d'etat/archive. Les propositions au-dessus de 50 % changent.
 
 Reference de test figee AVANT extraction, sans duplication du moteur de mesure :
-[LegacyDrumProposalReference.h](../tests/LegacyDrumProposalReference.h).
+[LegacyDrumProposalReference.h](../../tests/LegacyDrumProposalReference.h).
 4 110 controles couvrent les dix roles, trois styles, doses
 0/0.5/1, trois sample-rates et dix signaux synthetiques, plus les options
 invalides. Les intensites jusqu'a 50 % et les refus restent compares exactement
@@ -393,5 +396,5 @@ par Cubase. Verifier v0.8.0. Aucune copie systeme ni lecture audio automatique.
    seule la derniere cible doit changer. Tester aussi changement de selection.
 7. Sauvegarder/reouvrir, boucler et exporter en verifiant les queues de salle.
 
-Captures : [Bus Glue / Ambiance](../build/DrumMasterBus.png),
-[Menu et EQ Kick](../build/KickInterface.png).
+Captures : [Bus Glue / Ambiance](../../build/DrumMasterBus.png),
+[Menu et EQ Kick](../../build/KickInterface.png).

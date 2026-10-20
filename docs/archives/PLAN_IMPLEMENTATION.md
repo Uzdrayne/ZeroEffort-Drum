@@ -1,5 +1,8 @@
 # Plan d'implémentation : analyse v1
 
+> Archive au 20/10/2026, non maintenue. État et suivi courants : [PROJET.md](../PROJET.md).
+> Le texte ci-dessous conserve ses dates, décisions et éventuelles contradictions historiques.
+
 Phase 0 (lecture seule, aucun code modifié). Base : tag `v0.10.0`, branche `feature/analyse-v1`.
 Sources : `CodeUpdate/01` à `08`, code de `Source/`, `tests/`, `CMakeLists.txt`.
 

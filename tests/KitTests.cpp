@@ -581,7 +581,7 @@ void testFaultDelays()
         p.kickInverted = true;
         expectCorrection(analyseFaultKit(FaultKit(p)).find(1), delay, true, kickToleranceMs, "D03 inverted kick " + juce::String(delay) + " ms", log);
     }
-    // D04 both, including the +7 ms inverted case of docs/KitPhase10.md
+    // D04 both, including the +7 ms inverted case of docs/archives/KitPhase10.md
     for (const auto delay : { 3.0, 7.0 })
     {
         FaultParams p;

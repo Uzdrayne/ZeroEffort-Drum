@@ -33,7 +33,7 @@ struct MasterBusProfile
         result.summary += " / Bus Glue: soft knee, sidechain HP 80 Hz, attack 30 ms, not an SSL emulation";
         // First version of the sub-bus profiles (document 08, SB1): the drum bus tuning, without ambience. Group profiles come from
         // the raw / mixed pairs of the corpus (SB3).
-        // Group EQ read on the sums of the mics of two engineers (docs/ANALYSE_CORPUS_19OCT.md): a dip around 280 Hz and a lift of the
+        // Group EQ read on the sums of the mics of two engineers (docs/archives/ANALYSE_CORPUS_19OCT.md): a dip around 280 Hz and a lift of the
         // presence around 3 kHz, at about half of what they did. Rock and Metal only; Natural keeps its careful correction.
         const auto role = instrumentFromValue(original[instrument]);
         const bool group = subBus && groupEq && style != DrumStyle::natural && intensity > 0

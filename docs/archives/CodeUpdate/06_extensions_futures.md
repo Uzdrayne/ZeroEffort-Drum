@@ -1,5 +1,11 @@
 # Extensions futures : éléments de batterie à ajouter
 
+<!-- consolidated-archive -->
+> **Archive historique.** Référence consolidée : [SPECIFICATIONS](../../SPECIFICATIONS.md).
+> Avancement vérifié : [PROJET](../../PROJET.md). Les états et chemins ci-dessous
+> sont historiques ; ne plus entretenir ce document comme un suivi actif.
+<!-- /consolidated-archive -->
+
 **Document 6** | Version 0.1 | Complète les documents 01 à 05
 
 **Interprétation de votre demande** : j'ai compris « hi-hat avec top et bottom » (deux micros) et, plus largement, les micros manquants (kick sub, caisse claire bottom, etc.). Si « tom et bottom » désignait autre chose, dites-le et j'ajuste la section 3.

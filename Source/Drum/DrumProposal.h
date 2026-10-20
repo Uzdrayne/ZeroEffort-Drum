@@ -16,10 +16,10 @@ inline constexpr int profileVersion = 4;
 struct ProposalDefaults
 {
     static constexpr bool compressorUsesActiveCrest = true;
-    // Reference EQ for Hi-hat and Overheads in Rock and Metal, read on one engineer and one song (docs/ANALYSE_CORPUS_19OCT.md).
+    // Reference EQ for Hi-hat and Overheads in Rock and Metal, read on one engineer and one song (docs/archives/ANALYSE_CORPUS_19OCT.md).
     // Activated on 19 October 2026 for the user to try; set to false to return to the previous profiles (profileVersion 2).
     static constexpr bool cymbalReference = true;
-    // Group EQ of the Kick Bus and Snare Bus (document 08, SB3), read on the sums of the mics of two engineers (docs/ANALYSE_CORPUS_19OCT.md).
+    // Group EQ of the Kick Bus and Snare Bus (document 08, SB3), read on the sums of the mics of two engineers (docs/archives/ANALYSE_CORPUS_19OCT.md).
     // Activated on 20 October 2026 for the user to try; set to false to return to the neutral sub-bus profile.
     static constexpr bool subBusReference = true;
 };

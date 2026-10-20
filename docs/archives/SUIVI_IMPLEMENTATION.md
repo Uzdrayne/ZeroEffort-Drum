@@ -1,5 +1,8 @@
 # Suivi de l'implémentation : analyse v1
 
+> Archive au 20/10/2026, non maintenue. État et suivi courants : [PROJET.md](../PROJET.md).
+> Le texte ci-dessous conserve ses dates, décisions et éventuelles contradictions historiques.
+
 Mis à jour à chaque étape. Plan et décisions : [PLAN_IMPLEMENTATION.md](PLAN_IMPLEMENTATION.md).
 Spécifications : `CodeUpdate/01` à `08`. Dernière mise à jour : 16 octobre 2026.
 

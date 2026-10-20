@@ -1,5 +1,8 @@
 # DRUM / KICK 0.4.3
 
+> Archive au 20/10/2026, non maintenue. Etat et suivi courants : [PROJET.md](../PROJET.md).
+> Le texte ci-dessous conserve ses dates, decisions et eventuelles contradictions historiques.
+
 Historique de la serie 0.4. La livraison actuelle, le nouveau format d'archive
 et les nouvelles limites sont decrits dans [Presence Kick 0.5.0](KickPresence05.md).
 
@@ -206,4 +209,4 @@ Commande reproductible (natural, rock ou metal en dernier argument) :
 & '.\build\DrumPrototypeTests_artefacts\Release\DrumPrototypeTests.exe' --analyse-wav 'C:\Users\robin\Documents\CubaseVST\wev test\trerst.wav' rock
 ```
 
-[Apercu de l'editeur reel](../build/KickInterface.png).
+[Apercu de l'editeur reel](../../build/KickInterface.png).

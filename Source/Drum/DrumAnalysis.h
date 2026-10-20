@@ -19,7 +19,7 @@ inline constexpr int analysisVersion = 6;
 // H: starting points to calibrate on a corpus (document 05, 01-Q1 and 01-Q5).
 struct MeasureConstants
 {
-    // 01-Q1 calibrated on 17 October 2026 (40 -> 55, see docs/SUIVI_IMPLEMENTATION.md): plateau of the active crest.
+    // 01-Q1 calibrated on 17 October 2026 (40 -> 55, see docs/archives/SUIVI_IMPLEMENTATION.md): plateau of the active crest.
     static constexpr float activeBelowP95Db = 55;     // a window is active above P95 minus this...
     static constexpr float activeAboveFloorDb = 12;   // ...and above the noise floor plus this (H: kept at 12, see 01-Q1 notes)
     static constexpr int decayReferenceWindows = 3;   // windows after a hit used to find its peak level

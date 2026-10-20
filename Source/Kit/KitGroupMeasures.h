@@ -267,7 +267,7 @@ private:
 
 // SB4, document 08 section 7.1: balance trims, proposed and never applied silently. The sub-bus measures, the user validates, each microphone
 // instance then moves its own input gain. Starting points (H): where two engineers left each microphone against the sum of its group
-// (Track 2 by A.H., Track 3 by another engineer, docs/ANALYSE_CORPUS_19OCT.md), widened by 1.5 dB on both sides. They did not agree on
+// (Track 2 by A.H., Track 3 by another engineer, docs/archives/ANALYSE_CORPUS_19OCT.md), widened by 1.5 dB on both sides. They did not agree on
 // one value (Snare Bottom: -7.0 and -21.1 dB), so a trim is only proposed for a microphone clearly outside what either of them did.
 struct BalanceConstants
 {

@@ -1,10 +1,13 @@
 # ZeroEffort Drum
 
-Plugin batterie actuel : **ZeroEffort Drum 0.10.0**, VST3 avec extension ARA,
+Plugin batterie actuel : **ZeroEffort Drum 0.11.8**, VST3 avec extension ARA,
 profils instruments, **alignement de phase entre pistes (Kit / Phase)**,
 Bus Glue, ambiance et finitions manuelles.
-[Guide 0.10 Kit / Phase et interface](docs/KitPhase10.md) ;
-[reglages par instrument et installation](docs/DrumInstruments08.md).
+**Commencer par [le suivi du projet](docs/PROJET.md)** : fait, a faire,
+validations, problemes, idees, versions, utilisation et architecture.
+Les exigences et criteres de test sont regroupes dans
+[SPECIFICATIONS.md](docs/SPECIFICATIONS.md).
+Les anciens guides sont classes dans [les archives](docs/PROJET.md#archives).
 L'ancien exemple Cubase Gain et sa suite de tests ont ete retires du projet.
 
 Base C++17 / JUCE 8.0.6 pour un effet batterie VST3/ARA Windows x64 utilisable
@@ -13,7 +16,7 @@ Standalone. Le gain positif peut provoquer un ecretage : aucun limiteur ajoute.
 
 ## Prerequis
 
-- Visual Studio Build Tools 2019 avec outils C++ x64 et Windows SDK.
+- Visual Studio Build Tools 2019 ou 2022 avec outils C++ x64 et Windows SDK.
 - Git accessible dans le PATH ; Internet pour le premier telechargement de JUCE.
 - CMake 3.31.8 portable, installe par scripts/Bootstrap.ps1 dans
   `%LOCALAPPDATA%/CubaseVST/tools`, sans installation systeme.
@@ -24,7 +27,8 @@ Standalone. Le gain positif peut provoquer un ecretage : aucun limiteur ajoute.
 
 Depuis VS Code : executer la tache **Build and Test Release**.
 La premiere configuration telecharge JUCE et compile son outil juceaide.
-Les compilations suivantes reutilisent les dependances dans build/.
+Les compilations suivantes reutilisent les dependances dans build/
+(build-vs2022/ si Visual Studio 2019 n'est pas installe).
 
 Depuis un terminal PowerShell a la racine du projet :
 
@@ -46,9 +50,14 @@ Fermer Cubase et copier le dossier .vst3 entier, pas seulement sa DLL, dans
 `C:\Program Files\Common Files\ARA` pour l'extension, et dans le dossier VST3
 scanne pour l'insert. Aucune copie systeme ni lecture audio automatique.
 Ajouter une nouvelle instance **ZeroEffort Drum** sur une copie du projet.
-Voir [Installation et essais](docs/DrumInstruments08.md).
+Avec VS 2022, remplacer `build/` par `build-vs2022/`.
+Voir [Installation et essais](docs/PROJET.md#utilisation).
 
 ## ZeroEffort Drum
+
+Les sections par version ci-dessous sont des reperes historiques, pas un second
+suivi actif. Pour les fonctionnalites et validations actuelles, utiliser
+[PROJET.md](docs/PROJET.md).
 
 ### Kit / Phase Et Interface 0.10.0
 
@@ -65,7 +74,7 @@ Nouvelle interface : potards a arc lumineux, panneaux, onglets dans l'ordre du
 signal (Kit / Phase, Filtres, Expander, Focus ou Nettoyage, EQ, Compresseur,
 Bus, Precision, Impact) et noms selon l'instrument (Kick : Poids / Carton /
 Batte / Air ; Snare : Corps / Bague / Claque / Timbre...).
-Architecture, revue critique et limites : [KitPhase10.md](docs/KitPhase10.md).
+Architecture, revue critique et limites historiques : [KitPhase10.md](docs/archives/KitPhase10.md).
 
 ### Finitions 0.9.0
 
@@ -99,7 +108,7 @@ modification selectionnee, pas la derniere piste rendue.
 A/B est une compensation RMS avant le gain Output final, pas LUFS ; soft clip est une
 coloration parallele, pas un plafond garanti. Pas de vraie plate. La liaison
 entre micros est traitee par Kit / Phase (0.10). Details et limites dans le
-[guide courant](docs/DrumInstruments08.md).
+[suivi courant](docs/PROJET.md#problemes).
 
 ### Instruments Et Auto Preset 0.8.0
 
@@ -193,12 +202,13 @@ ZeroEffort Drum est maintenant la cible principale, toujours compilee ;
 l'ancien commutateur `ENABLE_ARA_PROTOTYPE` n'est plus utilise.
 Les sections 0.1.x suivantes sont historiques.
 
-Installation et essai actuels : [Instruments et Drum Bus 0.8.0](docs/DrumInstruments08.md).
-Historique multibande : [Multibande et Interface 0.7.0](docs/KickMultiband07.md).
-Historique EQ : [EQ et Interface 0.6.0](docs/KickInterface06.md).
-Historique Presence : [Presence Kick 0.5.0](docs/KickPresence05.md).
-Historique Auto : [Auto Musical 0.4.3](docs/KickAuto04.md).
-Chaine manuelle et historique Auto : [Drum / Kick](docs/KickTest.md).
+Installation et essai actuels : [suivi du projet](docs/PROJET.md#utilisation).
+Historique instruments : [Instruments et Drum Bus 0.8.0](docs/archives/DrumInstruments08.md).
+Historique multibande : [Multibande et Interface 0.7.0](docs/archives/KickMultiband07.md).
+Historique EQ : [EQ et Interface 0.6.0](docs/archives/KickInterface06.md).
+Historique Presence : [Presence Kick 0.5.0](docs/archives/KickPresence05.md).
+Historique Auto : [Auto Musical 0.4.3](docs/archives/KickAuto04.md).
+Chaine manuelle et historique Auto : [Drum / Kick](docs/archives/KickTest.md).
 Apercu reel : [Interface Kick](build/KickInterface.png).
 Vue des nouveaux reglages : [Focus et Presence](build/KickPresence.png).
 Compression trois bandes : [Multibande](build/KickMultibande.png).
@@ -212,7 +222,7 @@ encore le plugin de traitement drum. Compilation optionnelle via
 `-DENABLE_ARA_PROTOTYPE=ON` ; le SDK ARA 2.2.0 est alors telecharge.
 
 Installation manuelle, limites et procedure de validation :
-[Test du prototype ARA](docs/ARAPrototypeTest.md).
+[Test du prototype ARA](docs/archives/ARAPrototypeTest.md).
 Pour Cubase 12, copier manuellement ce prototype de developpement dans
 `C:\Program Files\Common Files\ARA\`, pas uniquement dans `VST3`.
 Ce chemin ARA specifique est requis par la procedure developpeur de Steinberg.
@@ -235,7 +245,8 @@ le nouveau workflow Auto 0.3.0 est decrit ci-dessus.
 Le correctif JUCE est reapplique au configure CMake depuis
 [cmake/PatchJuceARABuses.cmake](cmake/PatchJuceARABuses.cmake), uniquement actif
 pour cette cible. L'ancien exemple Gain a depuis ete retire du projet.
-Le cahier des charges est dans [plan.md](plan.md).
+Le cahier des charges consolide est dans [SPECIFICATIONS.md](docs/SPECIFICATIONS.md).
+L'ancien [plan produit](docs/archives/plan.md) est conserve comme archive historique.
 
 ## Developpement
 

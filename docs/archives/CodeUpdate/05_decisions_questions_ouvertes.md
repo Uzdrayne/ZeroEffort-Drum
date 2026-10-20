@@ -1,5 +1,11 @@
 # Décisions proposées pour les questions ouvertes
 
+<!-- consolidated-archive -->
+> **Archive historique.** Référence consolidée : [SPECIFICATIONS](../../SPECIFICATIONS.md).
+> Avancement vérifié : [PROJET](../../PROJET.md). Les états et chemins ci-dessous
+> sont historiques ; une proposition n'est pas une décision automatiquement validée.
+<!-- /consolidated-archive -->
+
 **Document 5** | Version 0.1 | Complète les documents 01 à 04
 
 Chaque question ouverte reçoit une **décision proposée**, sa raison et la façon de la vérifier. Ce sont des propositions : tant que vous ne les validez pas, elles restent à l'état « proposé ». Une fois validées, elles **remplacent** les questions ouvertes des documents d'origine pour le codage.

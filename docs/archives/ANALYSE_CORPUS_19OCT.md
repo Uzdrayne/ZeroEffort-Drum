@@ -1,5 +1,8 @@
 # Analyse du corpus du 19 octobre 2026 (Track 1 à 4)
 
+> Archive au 20/10/2026, non maintenue. État et suivi courants : [PROJET.md](../PROJET.md).
+> Le texte ci-dessous conserve ses dates, décisions et éventuelles contradictions historiques.
+
 Premier passage complet de la chaîne `scripts/RunCorpus.ps1` sur les quatre nouveaux dossiers, avec la nouvelle commande `--vs-plugin` (le plug-in contre l'ingénieur). **Rien n'a été changé dans les profils ni dans le son** : ce document dit ce que les données permettent de conclure, et surtout ce qu'elles ne permettent pas encore.
 
 Sorties : `Database_drum\out_v6\` (`pairs\`, `buses\`, `versus\`, `snapshots\`, `summary.md`). Lecture : `python scripts\CorpusTables.py versus|pairs|shapes|buses Database_drum\out_v6`.

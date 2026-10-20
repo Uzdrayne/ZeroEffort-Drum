@@ -1,5 +1,8 @@
 # DRUM / KICK 0.6.0
 
+> Archive au 20/10/2026, non maintenue. Etat et suivi courants : [PROJET.md](../PROJET.md).
+> Le texte ci-dessous conserve ses dates, decisions et eventuelles contradictions historiques.
+
 Guide historique. Version actuelle : [Multibande 0.7.0](KickMultiband07.md).
 Les mesures ci-dessous concernent uniquement le traitement 0.6.0.
 
@@ -117,6 +120,6 @@ variable de 0.5 est conserve ; 0.5 peut ignorer les nouveaux Q mais ne peut
 pas reproduire leur son, et les versions 0.4 ne lisent pas ce format.
 Conserver une sauvegarde avant toute mise a jour ou retour a l'ancienne version.
 
-Captures : [EQ et spectre](../build/KickInterface.png),
-[Filtres](../build/KickFiltres.png), [Expander](../build/KickExpander.png),
-[Compresseur](../build/KickCompresseur.png), [Focus / Presence](../build/KickPresence.png).
+Captures : [EQ et spectre](../../build/KickInterface.png),
+[Filtres](../../build/KickFiltres.png), [Expander](../../build/KickExpander.png),
+[Compresseur](../../build/KickCompresseur.png), [Focus / Presence](../../build/KickPresence.png).

@@ -1,11 +1,21 @@
 # Plugin De Batterie Acoustique - Plan
 
-## Feuille De Route Active - ZeroEffort Drum
+<!-- consolidated-archive -->
+> **Archive historique.** Exigences et intentions conservées dans
+> [SPECIFICATIONS](../SPECIFICATIONS.md), avancement dans [PROJET](../PROJET.md).
+> Les fonctionnalités envisagées et anciennes commandes ne sont pas des
+> exigences actuelles ; ne pas réactiver les cibles prototype ou Standalone.
+<!-- /consolidated-archive -->
 
-Mise a jour : 2026-10-15. Produit actuel : ZeroEffort Drum 0.10.0,
+> Plan historique, non maintenu depuis la consolidation du 20/10/2026.
+> Etat, priorites et suivi courant : [docs/PROJET.md](../PROJET.md).
+
+## Feuille De Route Historique - ZeroEffort Drum
+
+Etat au 2026-10-15 : ZeroEffort Drum 0.10.0,
 C++17/JUCE 8.0.6, Windows x64, VST3 avec ARA, sans Standalone.
-Guides courants : [KitPhase10.md](docs/KitPhase10.md) (Kit / Phase, interface,
-architecture) et [DrumInstruments08.md](docs/DrumInstruments08.md) (reglages).
+Guides de cette version : [KitPhase10.md](KitPhase10.md) (Kit / Phase, interface,
+architecture) et [DrumInstruments08.md](DrumInstruments08.md) (reglages).
 Les sections numerotees plus bas conservent le cahier des charges historique :
 elles ne constituent pas une liste de fonctionnalites actuellement livrees.
 
@@ -618,7 +628,7 @@ EQ avant/apres compresseur : choix prevu, avec changement sans discontinuite.
 Le prototype est volontairement limite a 30 secondes par region, 128 regions et
 128 Mio par renderer, sans resampling/time-stretch. Il n'analyse pas une chanson.
 Le cache est invalide apres notifications d'edition, sans reconstruction automatique.
-Procedure utilisateur : [Test ARA](docs/ARAPrototypeTest.md).
+Procedure utilisateur historique : [Test ARA](ARAPrototypeTest.md).
 La validation automatique ne remplace pas ce jalon dans Cubase.
 
 ### Etapes Suivantes
@@ -630,7 +640,7 @@ courbe EQ et diagnostic separe. Reglages ARA par AudioModification selon
 selection effective, archive versionnee et lecture des anciens marqueurs.
 Tests moteur/reponse/stereo/etat/archive et vrai bundle reussis ; nouveaux
 reglages selection/edition/reouverture ARA a valider dans Cubase. Voir
-[Essai Kick](docs/KickTest.md) pour les limites de cette premiere chaine,
+[Essai Kick](KickTest.md) pour les limites de cette premiere chaine,
 notamment gate sans hold/hysteresis et compresseur sans knee reglable.
 La liste du socle manuel ci-dessus reste la cible, pas une liste entierement livree.
 

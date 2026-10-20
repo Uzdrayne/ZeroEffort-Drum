@@ -1,5 +1,9 @@
 # Reprise de session : ZeroEffort Drum, chantier « analyse v1 »
 
+> Archive au 20/10/2026, non maintenue. État et suivi courants : [PROJET.md](../PROJET.md).
+> Le texte ci-dessous conserve ses dates, décisions et éventuelles contradictions historiques.
+> Ne pas utiliser les anciens prompts pour recréer les fichiers de suivi déplacés.
+
 Document de passation, mis à jour le 17 octobre 2026. **Pour l'état global (fait, désactivé, manquant), lire d'abord `docs/ETAT_ACTUEL.md`.** L'interface du plug-in est maintenant entièrement en anglais (documents et rapports développeur en français). Il contient un **prompt à coller** (section 1) puis le contexte complet pour qu'un assistant reparte sans rien redécouvrir.
 
 ---

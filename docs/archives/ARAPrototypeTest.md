@@ -1,5 +1,9 @@
 # Test Du Prototype ARA Dans Cubase Pro 12
 
+> Archive au 20/10/2026, non maintenue. Etat et suivi courants : [PROJET.md](../PROJET.md).
+> Le texte ci-dessous conserve ses dates, decisions et eventuelles contradictions historiques.
+> Les commandes de build et noms de cibles du prototype ne sont plus utilisables.
+
 ## But Et Statut
 
 Ce document conserve l'historique et les essais du prototype d'integration

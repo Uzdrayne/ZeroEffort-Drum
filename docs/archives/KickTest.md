@@ -1,5 +1,8 @@
 # Drum / Kick 0.3.1
 
+> Archive au 20/10/2026, non maintenue. Etat et suivi courants : [PROJET.md](../PROJET.md).
+> Le texte ci-dessous conserve ses dates, decisions et eventuelles contradictions historiques.
+
 Guide historique. Pour la livraison actuelle avec styles et calibration :
 [Auto Musical 0.4.0](KickAuto04.md). Les mesures ci-dessous concernent 0.3.1,
 avant calibration du rendu ; le comportement actuel de sortie differe.
@@ -14,7 +17,7 @@ pour conserver les identifiants et le chemin de chargement valides dans Cubase.
 L'interface affiche DRUM / KICK et v0.3.1.
 
 Build : build/DrumARAPrototype_artefacts/Release/VST3/Drum ARA Prototype.vst3.
-Apercu du composant JUCE reel : [Interface](../build/KickInterface.png).
+Apercu du composant JUCE reel : [Interface](../../build/KickInterface.png).
 
 Fermer Cubase avant de remplacer le bundle entier dans Common Files/ARA.
 Mettre aussi a jour la copie Common Files/VST3 si elle est conservee.

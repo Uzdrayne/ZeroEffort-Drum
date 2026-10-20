@@ -1,5 +1,6 @@
 ---
-applyTo: "Source/Drum/**,Source/Kit/**,Source/ARA/**,tests/**,CodeUpdate/**"
+description: "Règles du chantier analyse, mesures, presets et Kit ; références documentaires consolidées."
+applyTo: "Source/Drum/**,Source/Kit/**,Source/ARA/**,tests/**,docs/PROJET.md,docs/SPECIFICATIONS.md"
 ---
 # ZeroEffort Drum : règles du chantier « analyse v1 »
 
@@ -8,14 +9,14 @@ Plug-in de mixage de batterie (VST3 + ARA), JUCE 8, Windows x64. Le dépôt est 
 n'envoie rien hors de la machine, n'ajoute aucune dépendance reseau sans demander.
 
 ## Spécifications (source de vérité)
-- CodeUpdate/01_cahier_des_charges_mesures.md  : quoi mesurer
-- CodeUpdate/02_programme_de_test.md           : comment tester
-- CodeUpdate/03_comparaison_brut_mixe.md       : méthode brut/mixé
-- CodeUpdate/04_calcul_des_presets.md          : calcul des réglages
-- CodeUpdate/05_decisions_questions_ouvertes.md: décisions (remplacent les questions ouvertes de 01-04)
-- CodeUpdate/06_extensions_futures.md          : registre de rôles, nouveaux éléments
-- CodeUpdate/08_sous_bus.md                    : sous-bus par instrument (Kick Bus, Snare Bus, ...)
-En cas de conflit : 05 > 08 > 01-04 > 06. Si une règle manque ou est ambiguë, demande, ne devine pas.
+- [SPECIFICATIONS.md](../../docs/SPECIFICATIONS.md) : mesures, export, brut/mixé,
+  presets, rôles, sous-bus, tests, décisions et hypothèses.
+- [PROJET.md](../../docs/PROJET.md) : état vérifié, problèmes, validations,
+  feuille de route, versions et point de reprise.
+Les anciens CodeUpdate et plan.md sont dans docs/archives : références historiques,
+pas des listes de travaux à rejouer. La spécification consolidée distingue les
+décisions des propositions et conserve l'ordre de priorité historique.
+Si une règle manque, se contredit ou est ambiguë, demande, ne devine pas.
 
 ## Règles de travail
 1. Lis le code existant AVANT de proposer une modification. Ne suppose pas l'existence de
@@ -36,10 +37,11 @@ En cas de conflit : 05 > 08 > 01-04 > 06. Si une règle manque ou est ambiguë, 
    audio, ne copie aucun bundle dans un dossier système, et ne change aucun identifiant de
    paramètre ni code plug-in (règles de .github/copilot-instructions.md).
 8. Garde les documents synchronisés : quand une mesure ou une règle est implémentée, mets à jour
-   la colonne "État" du document correspondant dans le même commit.
+   l'état dans PROJET.md et, si sa portée change, l'exigence dans SPECIFICATIONS.md
+   dans le même commit. Ne crée pas de suivi parallèle et ne réécris pas les archives.
 9. Après chaque tâche, donne : ce qui est fait, les fichiers modifiés, les tests ajoutés,
    les commandes pour les lancer, les écarts avec les spécifications, les questions ouvertes.
-10. Si une hypothèse chiffrée de la spec (marquée H dans 05) est utilisée, nomme-la en constante
+10. Si une hypothèse chiffrée de SPECIFICATIONS.md (marquée H) est utilisée, nomme-la en constante
     centralisée avec un commentaire "H: à calibrer", jamais en nombre magique dispersé.
 
 ## Définition de "terminé"

@@ -10,7 +10,7 @@
 // corrections plus coherence scores. Runs on a background thread (or offline in tests): it
 // allocates and must never be called from the audio thread.
 //
-// Method (validated on a real Kick / Snare / OH L / OH R multitrack, see docs/KitPhase10.md):
+// Method (validated on a real Kick / Snare / OH L / OH R multitrack, see docs/archives/KitPhase10.md):
 // 1. Onsets are detected on each close microphone (its own hits dominate there).
 // 2. Around every onset, a short window of the close mic and a longer window of the other mic are
 //    transformed; band-limited cross-spectra are accumulated over all hits (even/odd hits apart).

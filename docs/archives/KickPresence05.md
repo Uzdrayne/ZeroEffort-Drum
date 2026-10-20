@@ -1,5 +1,8 @@
 # DRUM / KICK 0.5.0
 
+> Archive au 20/10/2026, non maintenue. Etat et suivi courants : [PROJET.md](../PROJET.md).
+> Le texte ci-dessous conserve ses dates, decisions et eventuelles contradictions historiques.
+
 Historique de la serie 0.5. Livraison actuelle :
 [EQ et Interface 0.6.0](KickInterface06.md).
 

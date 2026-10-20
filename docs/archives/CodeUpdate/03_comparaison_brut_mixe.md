@@ -1,5 +1,11 @@
 # Comparer une piste brute et la même piste mixée
 
+<!-- consolidated-archive -->
+> **Archive historique.** Référence consolidée : [SPECIFICATIONS](../../SPECIFICATIONS.md).
+> Avancement vérifié : [PROJET](../../PROJET.md). Les états et chemins ci-dessous
+> sont historiques ; ne plus entretenir ce document comme un suivi actif.
+<!-- /consolidated-archive -->
+
 **Document 3 sur 4** | Version du document : 0.1 | Dépend de : `01_cahier_des_charges_mesures.md` | Alimente : `04_calcul_des_presets.md`
 
 ---

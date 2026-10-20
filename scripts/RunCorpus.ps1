@@ -7,7 +7,7 @@
   (--bus) or raw / mix pair (--pair) the comparison reports. Nothing is played, nothing is written inside the repository.
   Layout of the output folder (default <corpus>\out): snapshots\<kit>, reports\replay.*, buses\*, pairs\*, versus\* (pairs with a role), summary.md
 
-  Manifest: see docs\corpus.example.json and docs\Corpus.md.
+  Manifest and current workflow: see docs\corpus.example.json and docs\PROJET.md (Corpus section).
 #>
 param(
     [Parameter(Mandatory)][string]$Corpus,                       # folder that holds corpus.json

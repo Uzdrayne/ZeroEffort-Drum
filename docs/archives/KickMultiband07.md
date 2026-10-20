@@ -1,5 +1,8 @@
 # DRUM / KICK 0.7.0
 
+> Archive au 20/10/2026, non maintenue. Etat et suivi courants : [PROJET.md](../PROJET.md).
+> Le texte ci-dessous conserve ses dates, decisions et eventuelles contradictions historiques.
+
 Guide historique. Version actuelle : [Instruments et Drum Bus 0.8.0](DrumInstruments08.md).
 
 ## Interface Globale
@@ -127,7 +130,7 @@ mais ne reproduisent pas le son multibande ; conserver la sauvegarde initiale.
 6. Tester Revenir avant toute retouche manuelle, puis sauvegarde/reouverture,
    boucle et export sur la copie du projet.
 
-Captures : [Multibande](../build/KickMultibande.png),
-[EQ et graphique global](../build/KickInterface.png),
-[Large bande](../build/KickCompresseur.png),
-[Focus / Presence](../build/KickPresence.png).
+Captures : [Multibande](../../build/KickMultibande.png),
+[EQ et graphique global](../../build/KickInterface.png),
+[Large bande](../../build/KickCompresseur.png),
+[Focus / Presence](../../build/KickPresence.png).

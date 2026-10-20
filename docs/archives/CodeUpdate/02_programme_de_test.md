@@ -1,5 +1,11 @@
 # Programme de test
 
+<!-- consolidated-archive -->
+> **Archive historique.** Référence consolidée : [SPECIFICATIONS](../../SPECIFICATIONS.md).
+> Avancement vérifié : [PROJET](../../PROJET.md). Les états et chemins ci-dessous
+> sont historiques ; ne plus entretenir ce document comme un suivi actif.
+<!-- /consolidated-archive -->
+
 **Document 2 sur 4** | Version du document : 0.1 | Dépend de : `01_cahier_des_charges_mesures.md` (identifiants L01, D02, O03…)
 
 Documents liés : 03 comparaison brut / mixé (à écrire), 04 calcul des presets (à écrire).

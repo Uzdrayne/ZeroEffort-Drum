@@ -1,5 +1,8 @@
 # ZeroEffort Drum 0.10.0 - Kit / Phase Et Nouvelle Interface
 
+> Archive au 20/10/2026, non maintenue. Etat et suivi courants : [PROJET.md](../PROJET.md).
+> Le texte ci-dessous conserve ses dates, decisions et eventuelles contradictions historiques.
+
 Guide courant de la version 0.10.0. Les reglages par instrument, Auto, Bus et
 finitions restent decrits dans [DrumInstruments08.md](DrumInstruments08.md).
 Source de la demande : `MajorUpdate/ARA_update1.md` et `MajorUpdate/prompt.txt`.

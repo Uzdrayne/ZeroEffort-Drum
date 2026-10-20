@@ -1,5 +1,11 @@
 # Sous-bus par instrument
 
+<!-- consolidated-archive -->
+> **Archive historique.** Référence consolidée : [SPECIFICATIONS](../../SPECIFICATIONS.md).
+> Avancement vérifié : [PROJET](../../PROJET.md). Les états et chemins ci-dessous
+> sont historiques ; les numéros SB diffèrent de ceux de l'ancien journal.
+<!-- /consolidated-archive -->
+
 **Document 8** | Version 0.1 | Complète les documents 01 à 07 | Dépend de : 01 (mesures), 04 (presets), 06 (registre de rôles)
 
 **Interprétation de votre demande** : un instrument à plusieurs micros (Kick : In, Out, Sub ; Snare : Top, Bottom ; Hi-hat : Top, Bottom) a un **sous-bus** qui reçoit la somme de ses micros. Le bus batterie complet existe déjà ; il se place au-dessus.
@@ -170,7 +176,7 @@ Un micro appartient à **au plus un** sous-bus.
 
 | Jalon | Contenu | Livrable |
 |---|---|---|
-| SB1 (**fait le 20/10/2026**, rôles et menu seulement, voir `docs/SUIVI_IMPLEMENTATION.md`) | `GroupDescriptor`, rattachement des micros à un sous-bus par le registre, type d'instance « Sous-bus » dans l'interface | Un sous-bus qui s'identifie et liste ses micros |
+| SB1 (**fait le 20/10/2026**, rôles et menu seulement, voir [le suivi](../../PROJET.md#fait)) | `GroupDescriptor`, rattachement des micros à un sous-bus par le registre, type d'instance « Sous-bus » dans l'interface | Un sous-bus qui s'identifie et liste ses micros |
 | SB2 (**fait le 20/10/2026**, rapport texte dans le bouton Report) | Mesures `sb_` (SB01 à SB03, SB06 à SB08) en lecture seule, sans effet sur les presets | Rapport de groupe dans le Bilan |
 | SB3 | Tests S01 à S08 | Tests au vert |
 | SB4 | Presets de sous-bus : EQ de groupe et compression de groupe sur la somme | Sous-bus Kick et Snare utilisables |
