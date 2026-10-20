@@ -9,7 +9,7 @@ Légende : ⬜ à faire · 🔄 en cours · ✅ terminé · ⏸ en réserve
 
 | Élément | État |
 |---|---|
-| Version du plug-in | **0.11.3** (`CMakeLists.txt`, depuis le 20/10/2026) ; `analysisVersion` 6, `profileVersion` 3 |
+| Version du plug-in | **0.11.4** (`CMakeLists.txt`, depuis le 20/10/2026) ; `analysisVersion` 6, `profileVersion` 4 |
 | `main` | vagues 1 et 2 fusionnées (pull requests #1 et #2, commit `b1dbabd`) : phase 0, build VS 2019 / 2022, J1, T1, T2, J2, J3, T3, T4 |
 | Branches de travail | aucune ouverte (`feature/t3-kit-phase` fusionnée) |
 | Passation | [REPRISE_PROCHAINE_SESSION.md](REPRISE_PROCHAINE_SESSION.md) : prompt à coller, état, décisions, menu des prochaines étapes, pièges |
@@ -165,7 +165,8 @@ Document 08, étape SB1 : l'instance peut être posée sur la **piste de groupe 
 - **Profil provisoire** : le réglage du bus de batterie, **sans ambiance**, résumé « SUB-BUS » (`MasterBusProfile`, paramètre `subBus`) ; aucun gate, nettoyage ni module Kick. Ligne par rôle dans `roleDescriptors` (registre de rôles). Le profil propre à chaque groupe vient de SB3 (paires `KICK_IN+OUT`, `SNARE_TOP+BOTTOM`, bus du Track 3).
 - **Presets** : une famille par sous-bus (`Kick Bus`, `Snare Bus`, `Toms Bus`), séparée des micros et du bus maître.
 - **Aucun changement audible** pour les rôles existants : filet de 270 propositions et équivalence historique identiques. Tests : `tests/SubBusTests.cpp` (numéros, noms, absence d'ambiance et de gate, hors alignement, rechargement d'un projet, presets séparés), menu de l'éditeur (13 entrées, sélection des trois sous-bus). Mise en garde : l'automatisation hôte du paramètre « Instrument » (normalisée 0-1) change d'échelle puisque la liste passe de 10 à 13 choix ; les projets enregistrés gardent leur valeur (l'état la stocke en clair).
-- Reste : SB2 (mesures de groupe en lecture seule), SB3 (profils de groupe issus du corpus), SB4 (trims de balance proposés). Hi-hat Bus laissé de côté.
+- **SB3 (même jour, 0.11.4)** : commande `--sub-sum` (paire sous-bus : somme alignée des micros contre le bus de l'ingénieur, `tests/PairTests.cpp`) et profil de groupe **activé** (`ProposalDefaults::subBusReference = true`, `profileVersion` 4) pour Kick Bus et Snare Bus en Rock et Metal : creux de −2 dB × intensité à 280 Hz, présence à 3 kHz (+2,0 / +1,5 dB × intensité). Appuyé par les sommes de micros de deux ingénieurs (même direction : creux vers 250 Hz, présence à 2,5-4 kHz), chiffré sur la seule paire évaluable (Snare Top+Bottom d'A.H. : accord de sens 6 → 12 sur 13 bandes) ; le Track 3 est trop peu cohérent (0,55-0,59) pour être évalué. **Changement audible** pour ces deux rôles uniquement (nouveaux, jamais livrés). Retour arrière : `false`. Détail dans `docs/ANALYSE_CORPUS_19OCT.md`, section 9. Toms Bus : aucune donnée, profil neutre. CTest 3/3.
+- Reste : SB2 (mesures de groupe en lecture seule), SB4 (trims de balance proposés). Hi-hat Bus laissé de côté.
 
 ### Phases Calcul et Vérification du radar : pourquoi elles sont longues (20/10/2026)
 

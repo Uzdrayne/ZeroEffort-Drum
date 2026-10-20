@@ -277,3 +277,60 @@ int runBusCommand(const juce::StringArray& commandLine)
         return fail("cannot write the outputs");
     return 0;
 }
+
+// Developer command: ZeroEffortDrumTests.exe --sub-sum <bus mix.wav> <output prefix> <name>=<input.wav> ... (1 to 4 inputs)
+// Aligns the microphones of a sub-bus on the engineer's bus (same lags and polarities as --bus), writes their average to
+// <prefix>_sum.wav and the matching part of the bus to <prefix>_mix.wav: the "sub-bus pair" of document 08 (raw = aligned sum of the
+// mics without treatment, mixed = the bus output). Feed both files to --vs-plugin with a Kick Bus or Snare Bus role.
+int runSubSumCommand(const juce::StringArray& commandLine)
+{
+    if (commandLine.isEmpty() || commandLine[0] != "--sub-sum") return -1;
+    const auto fail = [](const juce::String& message) { std::cerr << "ERROR: " << message << std::endl; return 1; };
+    if (commandLine.size() < 4 || commandLine.size() > 7) return fail("usage: --sub-sum <bus mix.wav> <output prefix> <name>=<input.wav> ... (1 to 4 inputs)");
+    std::vector<float> mix;
+    double busRate = 0;
+    juce::String error;
+    if (!loadMono(juce::File(commandLine[1]), mix, busRate, error)) return fail(error);
+    std::vector<std::vector<float>> inputs;
+    for (int index = 3; index < commandLine.size(); ++index)
+    {
+        std::vector<float> samples;
+        double inputRate = 0;
+        if (!loadMono(juce::File(commandLine[index].fromFirstOccurrenceOf("=", false, false)), samples, inputRate, error)) return fail(error);
+        if (inputRate != busRate) return fail("the sample rates differ for " + commandLine[index].upToFirstOccurrenceOf("=", false, false));
+        inputs.push_back(std::move(samples));
+    }
+    const auto bus = drum::DrumPairAnalysis::analyseBus(inputs, mix, busRate);
+    if (bus.lagSamples.size() != inputs.size()) return fail("the microphones could not be aligned on the bus: " + bus.reason);
+    std::int64_t begin = 0, end = static_cast<std::int64_t>(mix.size());
+    for (size_t input = 0; input < inputs.size(); ++input)
+    {
+        begin = juce::jmax<std::int64_t>(begin, bus.lagSamples[input]);
+        end = juce::jmin<std::int64_t>(end, static_cast<std::int64_t>(inputs[input].size()) + bus.lagSamples[input]);
+    }
+    if (end - begin < static_cast<std::int64_t>(busRate * 2)) return fail("less than 2 s of common signal once aligned");
+    std::vector<float> sum(static_cast<size_t>(end - begin), 0.0f), cropped(mix.begin() + begin, mix.begin() + end);
+    for (size_t input = 0; input < inputs.size(); ++input)
+    {
+        const auto sign = bus.inverted[input] ? -1.0f : 1.0f;
+        for (size_t index = 0; index < sum.size(); ++index)
+            sum[index] += sign * inputs[input][static_cast<size_t>(begin + static_cast<std::int64_t>(index) - bus.lagSamples[input])]
+                / static_cast<float>(inputs.size());
+    }
+    const auto write = [&](const juce::File& file, const std::vector<float>& audio) {
+        file.deleteFile();
+        auto stream = std::make_unique<juce::FileOutputStream>(file);
+        if (!stream->openedOk()) return false;
+        juce::WavAudioFormat format;
+        std::unique_ptr<juce::AudioFormatWriter> writer(format.createWriterFor(stream.get(), busRate, 1, 24, {}, 0));
+        if (writer == nullptr) return false;
+        stream.release();
+        const float* channel = audio.data();
+        return writer->writeFromFloatArrays(&channel, 1, static_cast<int>(audio.size()));
+    };
+    const auto prefix = commandLine[2];
+    if (!write(juce::File(prefix + "_sum.wav"), sum) || !write(juce::File(prefix + "_mix.wav"), cropped)) return fail("cannot write the outputs");
+    std::cout << "sub-bus pair written: " << prefix << "_sum.wav / _mix.wav (" << static_cast<double>(sum.size()) / busRate << " s, "
+              << inputs.size() << " mics, bus coherence " << bus.medianCoherence << ")" << std::endl;
+    return 0;
+}

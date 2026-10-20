@@ -55,10 +55,24 @@ void testProposals()
 {
     constexpr double rate = 48000;
     const auto audio = take(rate, 20);
-    drum::DrumAnalyser analyser;
+    drum::DrumAnalyser analyser, grouped;
     analyser.prepare(rate);
+    grouped.prepare(rate);
     for (size_t offset = 0; offset < audio.size(); offset += 4096)
-        analyser.push(audio.data() + offset, static_cast<int>(juce::jmin<size_t>(4096, audio.size() - offset)));
+    {
+        const auto count = static_cast<int>(juce::jmin<size_t>(4096, audio.size() - offset));
+        analyser.push(audio.data() + offset, count);
+        grouped.push(audio.data() + offset, count);
+    }
+    check(grouped.getPolicy().subBusReference && drum::ProposalDefaults::subBusReference, "The group EQ is on by default (profileVersion 4)");
+    auto neutral = analyser.getPolicy();
+    neutral.subBusReference = false;
+    analyser.setPolicy(neutral);
+    const auto proposeGrouped = [&](drum::DrumInstrument role, drum::DrumStyle style, float intensity) {
+        auto original = drum::defaultSettings();
+        original[drum::instrument] = static_cast<float>(role);
+        return grouped.propose(original, style, intensity);
+    };
     const auto propose = [&](drum::DrumInstrument role, drum::DrumStyle style) {
         auto original = drum::defaultSettings();
         original[drum::instrument] = static_cast<float>(role);
@@ -82,6 +96,21 @@ void testProposals()
                 "The first sub-bus profile is the drum bus tuning");
         }
     }
+    using drum::DrumInstrument;
+    using drum::DrumStyle;
+    for (const auto role : { DrumInstrument::kickBus, DrumInstrument::snareBus })
+    {
+        const auto neutralRock = propose(role, DrumStyle::rock);
+        const auto rock = proposeGrouped(role, DrumStyle::rock, 0.75f);
+        check(neutralRock.settings[drum::eqOn] == 0 && neutralRock.summary.contains("Neutral group profile"), "Without the option the group EQ stays off");
+        check(rock.valid && rock.settings[drum::eqOn] == 1 && rock.settings[drum::boxFrequency] == 280 && rock.settings[drum::boxGain] < -1.0f
+            && rock.settings[drum::attackFrequency] == 3000 && rock.settings[drum::attackGain] > 1.0f && rock.summary.contains("Group EQ"),
+            "The Kick Bus and Snare Bus get a dip around 280 Hz and a presence lift");
+        check(proposeGrouped(role, DrumStyle::metal, 1.0f).settings[drum::attackGain] > rock.settings[drum::attackGain], "The lift grows with the intensity");
+        check(proposeGrouped(role, DrumStyle::natural, 0.75f).settings[drum::eqOn] == 0, "Natural keeps its careful correction");
+        check(proposeGrouped(role, DrumStyle::rock, 0.0f).settings[drum::eqOn] == 0, "Zero intensity changes nothing");
+    }
+    check(proposeGrouped(DrumInstrument::tomsBus, DrumStyle::rock, 0.75f).settings[drum::eqOn] == 0, "The Toms Bus has no data yet and stays neutral");
     check(propose(drum::DrumInstrument::master, drum::DrumStyle::rock).summary.contains("BUS: analysis of the sum only")
         && !propose(drum::DrumInstrument::master, drum::DrumStyle::rock).summary.contains("SUB-BUS"),
         "The drum master bus keeps its own text");

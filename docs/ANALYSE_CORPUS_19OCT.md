@@ -97,7 +97,26 @@ Quand de nouvelles données arriveront (autre ingénieur, autre morceau), `--vs-
 
 Le Kick du Track 1 sert surtout à vérifier la détection des doubles frappes (J4a, active depuis le 17/10). Avec J4a, le Kick compte **263 frappes** contre 179 sans (+47 %), contre +5 à +14 % sur les trois autres Kicks : la double pédale est mieux suivie. **Aucun réglage proposé ne change** sur cette prise (0 réglage différent, Metal 75 %) : c'est sans risque.
 
-## 9. Questions ouvertes
+## 9. Sous-bus (SB3) : profil de groupe du Kick Bus et du Snare Bus (20/10/2026)
+
+Nouvelle commande `--sub-sum <bus.wav> <préfixe> nom=micro.wav ...` : aligne les micros d'un sous-bus sur le bus de l'ingénieur (mêmes décalages et polarités que `--bus`), écrit leur moyenne (`_sum.wav`) et la partie correspondante du bus (`_mix.wav`) : la « paire sous-bus » du document 08. On la passe à `--vs-plugin` avec le rôle 10 (Kick Bus) ou 11 (Snare Bus).
+
+Courbes sur la **somme des micros** (dB relatifs ; Track 3 = autre ingénieur, paires peu cohérentes 0,55-0,59 car sample et déclencheur absents des fichiers, donc seulement indicatives) :
+
+| | 160 | 250 | 400 | 630 | 1k | 2,5k | 4k | 6,3k |
+|---|---|---|---|---|---|---|---|---|
+| Kick Bus, Track 3 (B) | −0,8 | **−7,7** | −0,4 | −3,5 | +1,8 | +6,9 | **+10,8** | +6,5 |
+| Kick In+Out, Track 2 (A.H.) | −13,8 | **−17,6** | −6,1 | −7,3 | +0,4 | +0,9 | +1,7 | +1,0 |
+| Snare Bus, Track 3 (B) | +2,5 | −1,9 | −7,2 | −5,2 | −2,6 | **+6,3** | +0,4 | +2,7 |
+| Snare Top+Bottom, Track 2 (A.H.) | −1,7 | −6,3 | −3,0 | −0,9 | +0,9 | **+3,9** | +3,3 | +2,2 |
+
+Les deux ingénieurs creusent vers 250 Hz et relèvent la présence entre 2,5 et 4 kHz, sur le Kick comme sur la Snare ; l'amplitude est très différente (A.H. est bien plus marqué, post punk). Le profil provisoire des sous-bus était plat.
+
+**Implémenté : `ProposalDefaults::subBusReference` (activé le 20/10/2026, `profileVersion` 4, plug-in 0.11.4)**, pour le Kick Bus et le Snare Bus en **Rock et Metal** (Natural, intensité 0 et Toms Bus inchangés, faute de données) : creux de −2,0 dB × intensité à 280 Hz (Q 1,0) et montée de présence à 3 kHz (+2,0 dB au Kick Bus, +1,5 dB au Snare Bus, × intensité, Q 0,9), soit environ la moitié de ce qu'ont fait les ingénieurs. Retour arrière : `subBusReference = false`.
+
+Mesure en échantillon sur la seule paire évaluable (Snare Top+Bottom d'A.H., 16 bandes fiables) : accord de sens **6 → 12 bandes sur 13**, corrélation des formes 0,41 → 0,85, écart 2,8 → 1,8 dB. Kick In+Out (9 bandes) : 2/3 → 3/3, corrélation 0,38 → 0,62. **À écouter** : un seul ingénieur le confirme chiffres en main, le second n'indique que la direction.
+
+## 10. Questions ouvertes
 
 - **Style et nom de l'ingénieur des Tracks 3 et 4** : autre ingénieur que A.H. (confirmé), mais pas de `INFO.txt` ; le manifeste les note « B » en Rock.
 - **Toms du Track 4** : 6 toms et un ride. Seuls Tom 1 à 3 sont pris comme snapshots (rôles 2, 3, 4) ; Tom 4 à 6 et Ride attendent ta confirmation (Tom 6 = tom basse ?).

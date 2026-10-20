@@ -54,8 +54,8 @@ struct RoleProposers
     { return RoomProfile::propose(a, s, style, intensity); }
     static DrumProposal bus(const DrumAnalysis& a, const Settings& s, DrumStyle style, float intensity, const ProposalPolicy&)
     { return MasterBusProfile::propose(a, s, style, intensity); }
-    static DrumProposal subBus(const DrumAnalysis& a, const Settings& s, DrumStyle style, float intensity, const ProposalPolicy&)
-    { return MasterBusProfile::propose(a, s, style, intensity, true); }
+    static DrumProposal subBus(const DrumAnalysis& a, const Settings& s, DrumStyle style, float intensity, const ProposalPolicy& policy)
+    { return MasterBusProfile::propose(a, s, style, intensity, true, policy.subBusReference); }
 };
 
 // One row per DrumInstrument, in the order of the enum.

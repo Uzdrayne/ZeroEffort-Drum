@@ -63,7 +63,7 @@ int runVersusCommand(const juce::StringArray& arguments)
     // which module is responsible for a part of the curve, or what a different value would do.
     auto commandLine = arguments;
     juce::StringArray overrides;
-    const bool noReference = commandLine.contains("--no-reference");   // ProposalPolicy::cymbalReference = false
+    const bool noReference = commandLine.contains("--no-reference");   // ProposalPolicy::cymbalReference and subBusReference = false
     commandLine.removeString("--no-reference");
     for (const auto* option : { "--off", "--set" })
         if (const auto index = commandLine.indexOf(option); index >= 0 && index + 1 < commandLine.size())
@@ -97,7 +97,7 @@ int runVersusCommand(const juce::StringArray& arguments)
     const auto folded = loudestOf(raw);
     for (size_t offset = 0; offset < folded.size(); offset += 32768)
         analyser.push(folded.data() + offset, static_cast<int>(juce::jmin<size_t>(32768, folded.size() - offset)));
-    if (noReference) { auto policy = analyser.getPolicy(); policy.cymbalReference = false; analyser.setPolicy(policy); }
+    if (noReference) { auto policy = analyser.getPolicy(); policy.cymbalReference = false; policy.subBusReference = false; analyser.setPolicy(policy); }
     auto original = drum::defaultSettings();
     original[drum::instrument] = static_cast<float>(role);
     auto proposal = analyser.propose(original, style, intensity);
