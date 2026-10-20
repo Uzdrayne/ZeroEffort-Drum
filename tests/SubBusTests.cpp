@@ -277,6 +277,139 @@ void testGroupAudio()
     bus.releaseResources();
     for (auto* member : { kickIn, kickOut, snare, otherKit }) registry->leave(member);
 }
+
+void testBalance()
+{
+    constexpr double rate = 48000;
+    const auto a = lowHits(rate, 6);
+    const auto mic = [&](const char* name, kit::Role role, float gain, juce::uint32 id, bool inverted = false) {
+        kit::GroupMic result { name, shifted(a, 0, gain), 0, inverted };
+        result.role = role;
+        result.id = id;
+        return result;
+    };
+    const auto propose = [&](const std::vector<kit::GroupMic>& mics, float intensity) {
+        return kit::GroupBalance::propose(mics, kit::GroupMeasures::analyse(mics, rate), intensity);
+    };
+    const auto line = [](const kit::BalanceProposal& proposal, const char* name) {
+        for (const auto& entry : proposal.lines) if (entry.name == name) return entry;
+        throw std::runtime_error("no such line");
+    };
+
+    // Kick Out far too weak: it gets a bounded, partial trim up; Kick In is inside the band and gets nothing.
+    const auto weak = propose({ mic("Kick In", kit::Role::kickIn, 1.0f, 11), mic("Kick Out", kit::Role::kickOut, 0.1f, 12) }, 1.0f);
+    check(weak.valid && weak.any(), "A microphone far under the range gets a trim");
+    check(line(weak, "Kick In").trimDb == 0 && line(weak, "Kick Out").trimDb > 4.0f && line(weak, "Kick Out").trimDb <= kit::BalanceConstants::maximumTrimDb,
+        "The trim is partial and bounded (k = 0.5, 6 dB at most)");
+    check(line(weak, "Kick Out").id == 12, "The trim is addressed to the member of the microphone");
+    const auto gentle = propose({ mic("Kick In", kit::Role::kickIn, 1.0f, 11), mic("Kick Out", kit::Role::kickOut, 0.1f, 12) }, 0.5f);
+    check(line(gentle, "Kick Out").trimDb > 0 && line(gentle, "Kick Out").trimDb < line(weak, "Kick Out").trimDb, "The trim follows the intensity");
+    check(!propose({ mic("Kick In", kit::Role::kickIn, 1.0f, 11), mic("Kick Out", kit::Role::kickOut, 0.1f, 12) }, 0.0f).any(), "Intensity 0 proposes nothing");
+
+    // Kick In much weaker than Kick Out: the weak one is brought up and the strong one down or left alone, never both up.
+    const auto loud = propose({ mic("Kick In", kit::Role::kickIn, 0.1f, 11), mic("Kick Out", kit::Role::kickOut, 1.0f, 12) }, 1.0f);
+    check(loud.any() && line(loud, "Kick In").trimDb > 0 && line(loud, "Kick Out").trimDb <= 0, "A weak primary microphone is brought up");
+
+    // Balanced microphones: nothing to do and it says so.
+    const auto balanced = propose({ mic("Snare Top", kit::Role::snareTop, 1.0f, 21), mic("Snare Bottom", kit::Role::snareBottom, 0.3f, 22) }, 1.0f);
+    check(balanced.valid && !balanced.any() && balanced.note.contains("no trim proposed"), "A balance inside the range of the two engineers gets no trim");
+
+    // Refusals of the document: a microphone in doubtful polarity, or late: no trim at all.
+    const auto flipped = propose({ mic("Kick In", kit::Role::kickIn, 1.0f, 11), mic("Kick Out", kit::Role::kickOut, 0.1f, 12, true) }, 1.0f);
+    check(flipped.valid && !flipped.any() && flipped.note.contains("No trim before the correction of Kit / Phase"), "Doubtful polarity: no trim before Kit / Phase");
+    auto lateMic = mic("Kick Out", kit::Role::kickOut, 0.1f, 12);
+    lateMic.samples = shifted(a, 144, 0.1f);
+    check(!propose({ mic("Kick In", kit::Role::kickIn, 1.0f, 11), lateMic }, 1.0f).any(), "A late microphone: no trim before Kit / Phase");
+
+    // No reference for the toms, one microphone, text and determinism.
+    const auto toms = propose({ mic("Tom 1", kit::Role::tom, 1.0f, 31), mic("Tom 2", kit::Role::tom, 0.1f, 32) }, 1.0f);
+    check(toms.valid && !toms.any() && line(toms, "Tom 2").note.contains("no reference"), "The toms have no reference yet: no invented target");
+    const std::vector<kit::GroupMic> single { mic("Kick In", kit::Role::kickIn, 1.0f, 11) };
+    check(!kit::GroupBalance::propose(single, kit::GroupMeasures::analyse(single, rate), 1.0f).valid, "One microphone gives no proposal");
+    check(kit::GroupBalance::toText(weak).contains("applied only if you ask") && kit::GroupBalance::toText(weak).contains("trim +"), "The text says it is a suggestion");
+    check(line(propose({ mic("Kick In", kit::Role::kickIn, 1.0f, 11), mic("Kick Out", kit::Role::kickOut, 0.1f, 12) }, 1.0f), "Kick Out").trimDb == line(weak, "Kick Out").trimDb,
+        "The proposal is deterministic");
+    for (const auto& band : kit::balanceBands) check(band.lowDb < band.highDb && band.highDb <= 1.5f, "The reference bands are ordered and sane");
+}
+
+void testBalanceApply()
+{
+    juce::SharedResourcePointer<kit::Registry> registry;
+    const auto make = [](float input) {
+        auto processor = std::make_unique<ZeroEffortDrumProcessor>();
+        processor->setRateAndBufferSizeDetails(48000, 256);
+        processor->prepareToPlay(48000, 256);
+        processor->setControl(drum::instrument, static_cast<float>(drum::DrumInstrument::kick));
+        processor->setControl(drum::input, input);
+        processor->kitTick();
+        return processor;
+    };
+    auto kickIn = make(-3.0f);
+    auto kickOut = make(23.0f);
+    kickOut->setKitControl(ZeroEffortDrumProcessor::kitMic, 1.0f);
+    kickOut->kitTick();
+    check(kickIn->getKitMemberId() != 0 && kickOut->getKitMemberId() != 0 && kickIn->getKitMemberId() != kickOut->getKitMemberId(), "Two members");
+
+    registry->requestBalance(0, { { kickOut->getKitMemberId(), 6.0f } }, false);
+    kickIn->kitTick();
+    kickOut->kitTick();
+    check(std::abs(kickIn->getSettings()[drum::input] + 3.0f) < 0.01f, "A microphone that is not addressed keeps its gain");
+    check(std::abs(kickOut->getSettings()[drum::input] - 24.0f) < 0.01f, "The trim moves the input gain of the addressed microphone, within its range");
+    registry->requestBalance(0, { { kickOut->getKitMemberId(), -1.0f } }, false);
+    kickOut->kitTick();
+    check(std::abs(kickOut->getSettings()[drum::input] - 23.0f) < 0.01f, "A second request adds to the first");
+    registry->requestBalance(0, {}, true);
+    kickIn->kitTick();
+    kickOut->kitTick();
+    check(std::abs(kickOut->getSettings()[drum::input] - 23.0f) < 0.01f && std::abs(kickIn->getSettings()[drum::input] + 3.0f) < 0.01f,
+        "Undo gives back the gain the microphone had before the first request");
+    registry->requestBalance(0, {}, true);
+    kickOut->kitTick();
+    check(std::abs(kickOut->getSettings()[drum::input] - 23.0f) < 0.01f, "Undoing twice changes nothing");
+    registry->requestBalance(5, { { kickOut->getKitMemberId(), 3.0f } }, false);
+    kickOut->kitTick();
+    check(std::abs(kickOut->getSettings()[drum::input] - 23.0f) < 0.01f, "A request for another Kit group is ignored");
+
+    // The sub-bus side: measure on live members, ask, undo.
+    constexpr double rate = 48000;
+    const auto a = lowHits(rate, 4);
+    const auto join = [&](kit::Role role, const juce::String& name, float gain) {
+        auto* member = registry->join();
+        kit::Identity identity;
+        identity.group = 0;
+        identity.role = role;
+        identity.name = name;
+        registry->setIdentity(*member, identity);
+        const auto audio = shifted(a, 0, gain);
+        for (size_t offset = 0; offset + 4096 <= audio.size(); offset += 4096)
+        {
+            const float* channel = audio.data() + offset;
+            member->write(&channel, 1, 4096, static_cast<juce::int64>(offset), rate);
+        }
+        return member;
+    };
+    auto* strong = join(kit::Role::snareTop, "Snare Top", 1.0f);
+    auto* weakBottom = join(kit::Role::snareBottom, "Snare Bottom", 0.05f);
+    ZeroEffortDrumProcessor bus;
+    bus.setRateAndBufferSizeDetails(48000, 256);
+    bus.prepareToPlay(48000, 256);
+    check(!bus.measureBalance().valid && !bus.applyBalanceTrims() && !bus.undoBalanceTrims(), "Only a sub-bus measures a balance");
+    bus.setControl(drum::instrument, static_cast<float>(drum::DrumInstrument::snareBus));
+    const auto proposal = bus.measureBalance();
+    check(proposal.valid && proposal.any(), "A Snare Bottom 26 dB under the Top is proposed a trim up");
+    check(proposal.lines.size() == 2 && bus.getBalanceProposal().any(), "The proposal is kept for the buttons");
+    const auto before = registry->balanceSerial(0);
+    check(bus.applyBalanceTrims() && registry->balanceSerial(0) == before + 1 && bus.canUndoBalanceTrims(), "Applying asks the microphones");
+    const auto request = registry->balanceRequest(0);
+    check(!request.undo && request.trims.size() == 1 && request.trims[0].first == weakBottom->id() && request.trims[0].second > 0,
+        "Only the microphone outside the range is addressed, upwards");
+    check(!bus.applyBalanceTrims(), "Applying twice does not repeat the request");
+    check(bus.undoBalanceTrims() && registry->balanceRequest(0).undo && !bus.canUndoBalanceTrims(), "Undo asks the microphones to go back");
+    check(bus.getGroupReportText().contains("BALANCE"), "The group report carries the suggestion");
+    bus.releaseResources();
+    registry->leave(strong);
+    registry->leave(weakBottom);
+}
 }
 void testSubBuses()
 {
@@ -285,5 +418,7 @@ void testSubBuses()
     testProcessor();
     testGroupMeasures();
     testGroupAudio();
-    std::cout << "PASS: sub-buses (role numbers kept, kit-free, group EQ, reload, presets apart, group report: level, polarity, delay, registry read)" << std::endl;
+    testBalance();
+    testBalanceApply();
+    std::cout << "PASS: sub-buses (role numbers kept, kit-free, group EQ, reload, presets apart, group report, balance trims: bounds, refusals, apply and undo)" << std::endl;
 }

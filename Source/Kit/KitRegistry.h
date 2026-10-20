@@ -147,6 +147,17 @@ public:
     void requestApply(int group, const std::vector<juce::uint32>& members, bool reset);
     juce::uint32 applySerial(int group) const noexcept;
     ApplyRequest applyRequest(int group) const;
+    // Balance trims (SB4): the sub-bus asks, after the user validated, every listed microphone instance to move its own input gain by
+    // its trim, or (undo) to restore the gain it had before. Same hand-over as the kit apply request: each member reads it on its message thread.
+    struct BalanceRequest
+    {
+        juce::uint32 serial = 0;
+        bool undo = false;
+        std::vector<std::pair<juce::uint32, float>> trims;   // member id, dB
+    };
+    void requestBalance(int group, std::vector<std::pair<juce::uint32, float>> trims, bool undo);
+    juce::uint32 balanceSerial(int group) const noexcept;
+    BalanceRequest balanceRequest(int group) const;
     void runOnce();
     int memberCount() const;
 
@@ -191,6 +202,8 @@ private:
     std::array<GroupState, groupCount> groups;
     std::array<std::atomic<juce::uint32>, groupCount> revisions {};
     std::array<std::atomic<juce::uint32>, groupCount> applySerials {};
+    std::array<BalanceRequest, groupCount> balances;
+    std::array<std::atomic<juce::uint32>, groupCount> balanceSerials {};
     juce::uint32 nextId = 1;
     Worker worker { *this };
 };

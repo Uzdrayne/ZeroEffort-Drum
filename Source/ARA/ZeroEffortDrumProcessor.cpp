@@ -1244,23 +1244,99 @@ kit::Identity ZeroEffortDrumProcessor::getKitIdentity() const
     return identity;
 }
 
-juce::String ZeroEffortDrumProcessor::getGroupReportText() const
+bool ZeroEffortDrumProcessor::collectGroup(std::vector<kit::GroupMic>& mics, double& rate, juce::String& title) const
 {
     const auto role = drum::instrumentFromValue(memberSettings()[drum::instrument]);
-    if (!drum::isSubBus(role)) return {};
+    mics.clear();
+    rate = 0;
+    if (!drum::isSubBus(role)) return false;
     std::vector<kit::Role> roles;
     if (role == drum::DrumInstrument::kickBus) roles = { kit::Role::kickIn, kit::Role::kickOut };
     else if (role == drum::DrumInstrument::snareBus) roles = { kit::Role::snareTop, kit::Role::snareBottom };
     else roles = { kit::Role::tom, kit::Role::floorTom };
     const auto group = juce::jlimit(0, kit::groupCount - 1, static_cast<int>(std::lround(getKitControl(kitGroup))));
-    const auto title = juce::String(drum::instrumentName(role)) + " / Kit " + juce::String(group + 1);
-    double rate = 0;
-    const auto mics = kitRegistry->recentAudio(group, roles, 131072, rate);
-    if (mics.size() < 2)
-        return "GROUP REPORT / " + title + "\nNo group report yet: the microphones of this instrument must be on their own tracks with the plug-in in the same Kit group (Kit / Phase page), and the host must be playing.\n";
-    return kit::GroupMeasures::toText(kit::GroupMeasures::analyse(mics, rate), title);
+    title = juce::String(drum::instrumentName(role)) + " / Kit " + juce::String(group + 1);
+    mics = kitRegistry->recentAudio(group, roles, 131072, rate);
+    return true;
 }
 
+juce::String ZeroEffortDrumProcessor::getGroupReportText() const
+{
+    std::vector<kit::GroupMic> mics;
+    double rate = 0;
+    juce::String title;
+    if (!collectGroup(mics, rate, title)) return {};
+    if (mics.size() < 2)
+        return "GROUP REPORT / " + title + "\nNo group report yet: the microphones of this instrument must be on their own tracks with the plug-in in the same Kit group (Kit / Phase page), and the host must be playing.\n";
+    const auto report = kit::GroupMeasures::analyse(mics, rate);
+    return kit::GroupMeasures::toText(report, title) + "\n" + kit::GroupBalance::toText(kit::GroupBalance::propose(mics, report, getAutoIntensity()));
+}
+
+kit::BalanceProposal ZeroEffortDrumProcessor::measureBalance()
+{
+    std::vector<kit::GroupMic> mics;
+    double rate = 0;
+    juce::String title;
+    lastBalance = {};
+    if (!collectGroup(mics, rate, title)) return lastBalance;
+    if (mics.size() < 2)
+    {
+        lastBalance.note = "Needs two microphones of this instrument in the same Kit group, and the host playing.";
+        return lastBalance;
+    }
+    lastBalance = kit::GroupBalance::propose(mics, kit::GroupMeasures::analyse(mics, rate), getAutoIntensity());
+    return lastBalance;
+}
+
+bool ZeroEffortDrumProcessor::applyBalanceTrims()
+{
+    if (!lastBalance.any()) return false;
+    std::vector<std::pair<juce::uint32, float>> trims;
+    for (const auto& line : lastBalance.lines)
+        if (line.trimDb != 0 && line.id != 0) trims.emplace_back(line.id, line.trimDb);
+    if (trims.empty()) return false;
+    const auto group = juce::jlimit(0, kit::groupCount - 1, static_cast<int>(std::lround(getKitControl(kitGroup))));
+    kitRegistry->requestBalance(group, std::move(trims), false);
+    balanceUndoable = true;
+    lastBalance = {};
+    lastBalance.valid = true;
+    lastBalance.note = "Trims sent to the microphones. Play again, then measure to check the result.";
+    kitTick();
+    return true;
+}
+
+bool ZeroEffortDrumProcessor::undoBalanceTrims()
+{
+    if (!balanceUndoable) return false;
+    const auto group = juce::jlimit(0, kit::groupCount - 1, static_cast<int>(std::lround(getKitControl(kitGroup))));
+    kitRegistry->requestBalance(group, {}, true);
+    balanceUndoable = false;
+    lastBalance = {};
+    lastBalance.valid = true;
+    lastBalance.note = "The microphones got their previous input gain back.";
+    kitTick();
+    return true;
+}
+
+void ZeroEffortDrumProcessor::writeOwnInput(float db)
+{
+    db = juce::jlimit(drum::controlSpecs[drum::input].minimum, drum::controlSpecs[drum::input].maximum, db);
+    if (!isBoundToARA())
+    {
+        setControl(drum::input, db);
+        return;
+    }
+    std::vector<DrumModification*> written;
+    if (const auto* renderer = getPlaybackRenderer())
+        for (auto* region : renderer->getPlaybackRegions())
+        {
+            auto* modification = static_cast<DrumModification*>(region->getAudioModification());
+            if (std::find(written.begin(), written.end(), modification) != written.end()) continue;
+            written.push_back(modification);
+            modification->settings.values[drum::input].store(db);
+            modification->notifyContentChanged(juce::ARAContentUpdateScopes::samplesAreAffected(), true);
+        }
+}
 kit::GroupView ZeroEffortDrumProcessor::getKitView() const
 {
     return kitRegistry->view(juce::jlimit(0, kit::groupCount - 1, static_cast<int>(std::lround(getKitControl(kitGroup)))));
@@ -1376,6 +1452,30 @@ void ZeroEffortDrumProcessor::kitTick()
                     if (recommendation->measured)
                         writeOwnKit(recommendation->delayMs * amount, recommendation->invert && amount > 0);
         }
+    }
+    // A sub-bus asked, after the user validated, for balance trims: this microphone moves its own input gain (undoable).
+    const auto balanceNow = kitRegistry->balanceSerial(identity.group);
+    if (identity.group != balanceGroup)
+    {
+        balanceGroup = identity.group;
+        balanceSerialSeen = balanceNow;
+    }
+    else if (balanceNow != balanceSerialSeen)
+    {
+        balanceSerialSeen = balanceNow;
+        const auto request = kitRegistry->balanceRequest(identity.group);
+        if (request.undo)
+        {
+            if (balanceStored) writeOwnInput(balanceBefore);
+            balanceStored = false;
+        }
+        else
+            for (const auto& [member, trim] : request.trims)
+                if (member == kitMember->id())
+                {
+                    if (!balanceStored) { balanceBefore = settings[drum::input]; balanceStored = true; }
+                    writeOwnInput(settings[drum::input] + trim);
+                }
     }
     if (mode != static_cast<int>(kit::Mode::automatic)) return;
     const auto revision = kitRegistry->revision(identity.group);

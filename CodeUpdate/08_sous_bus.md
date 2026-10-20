@@ -174,7 +174,7 @@ Un micro appartient à **au plus un** sous-bus.
 | SB2 (**fait le 20/10/2026**, rapport texte dans le bouton Report) | Mesures `sb_` (SB01 à SB03, SB06 à SB08) en lecture seule, sans effet sur les presets | Rapport de groupe dans le Bilan |
 | SB3 | Tests S01 à S08 | Tests au vert |
 | SB4 | Presets de sous-bus : EQ de groupe et compression de groupe sur la somme | Sous-bus Kick et Snare utilisables |
-| SB5 | Trims de balance proposés (mode Suggérer) | Balance suggérée, validée par l'utilisateur |
+| SB5 (**fait le 20/10/2026**, appelé SB4 dans le suivi : trims proposés, appliqués sur clic, annulables) | Trims de balance proposés (mode Suggérer) | Balance suggérée, validée par l'utilisateur |
 | SB6 | Détecteur partagé pour les gates | Ouverture cohérente des micros d'un même instrument |
 | SB7 | Cibles de sous-bus issues des paires brut / mixé, balance cible | Cibles publiées avec leur dispersion |
 

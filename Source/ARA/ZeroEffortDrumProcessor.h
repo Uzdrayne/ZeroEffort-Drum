@@ -90,7 +90,12 @@ public:
     kit::GroupView getKitView() const;
     // Read-only report of the microphones of this sub-bus (same Kit group, same instrument), empty for any other role.
     juce::String getGroupReportText() const;
-    juce::uint32 getKitMemberId() const noexcept;
+    // Balance trims of a sub-bus (SB4): measure, then apply only on the user's request; undo restores the previous input gains.
+    kit::BalanceProposal measureBalance();
+    const kit::BalanceProposal& getBalanceProposal() const noexcept { return lastBalance; }
+    bool applyBalanceTrims();
+    bool undoBalanceTrims();
+    bool canUndoBalanceTrims() const noexcept { return balanceUndoable; }    juce::uint32 getKitMemberId() const noexcept;
     void startKitAnalysis();
     void stopKitAnalysis();
     const kit::Recommendation* findOwnRecommendation(const kit::Report& report) const;
@@ -116,6 +121,13 @@ private:
     juce::uint32 kitAppliedRevision = 0;
     float kitAppliedStrength = -1;
     juce::uint32 kitApplySerial = 0;
+    kit::BalanceProposal lastBalance;
+    int balanceGroup = -1;
+    juce::uint32 balanceSerialSeen = 0;
+    float balanceBefore = 0;
+    bool balanceUndoable = false, balanceStored = false;
+    bool collectGroup(std::vector<kit::GroupMic>& mics, double& rate, juce::String& title) const;
+    void writeOwnInput(float db);
     int kitApplyGroup = -1;
     double preparedRate = 0;
 

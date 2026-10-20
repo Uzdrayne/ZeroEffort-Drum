@@ -327,6 +327,22 @@ void testEditor(ZeroEffortDrumProcessor& processor, const juce::File& imageFile)
         }
         require(juce::String(drum::instrumentName(drum::instrumentFromValue(processor.getSettings()[drum::instrument]))) == "Toms Bus",
             "The last sub-bus is the Toms Bus");
+        choose(12);
+        open(editor, "pageKit");
+        auto* measure = child<juce::TextButton>(editor, "kitAnalyse");
+        auto* applyTrims = child<juce::TextButton>(editor, "kitApply");
+        auto* undoTrims = child<juce::TextButton>(editor, "kitReport");
+        require(measure->getButtonText() == "Measure balance" && applyTrims->getButtonText() == "Apply trims" && undoTrims->getButtonText() == "Undo trims",
+            "The Kit page of a sub-bus offers to measure, apply and undo the balance trims");
+        require(!applyTrims->isEnabled() && !undoTrims->isEnabled(), "Nothing can be applied or undone before a proposal exists");
+        require(!child<juce::ToggleButton>(editor, "kitPolarity")->isVisible() && !child<juce::Slider>(editor, "kitDelayMs")->isVisible()
+            && !child<juce::TextButton>(editor, "kitMode0")->isVisible(), "A sub-bus has no alignment controls");
+        measure->onClick();
+        require(!processor.getBalanceProposal().any() && processor.getBalanceProposal().note.isNotEmpty(), "Measuring without microphones says what is missing");
+        writeSnapshot(editor, imageFile.getSiblingFile("SubBus_balance.png"));
+        choose(1);
+        require(child<juce::TextButton>(editor, "kitAnalyse")->getButtonText() == "Analyze kit"
+            && child<juce::TextButton>(editor, "kitReport")->getButtonText() == "Full report", "A microphone gets the kit buttons back");
         choose(2);
         require(bodyGain->getTooltip().startsWith("Body") && tab(editor, "pageFocus").getButtonText() == "Cleanup",
             "Snare must rename EQ bands and the cleanup page");

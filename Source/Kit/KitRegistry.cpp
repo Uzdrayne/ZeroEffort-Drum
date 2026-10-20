@@ -107,6 +107,29 @@ Registry::ApplyRequest Registry::applyRequest(int group) const
     return groups[static_cast<size_t>(group)].apply;
 }
 
+void Registry::requestBalance(int group, std::vector<std::pair<juce::uint32, float>> trims, bool undo)
+{
+    if (group < 0 || group >= groupCount) return;
+    std::lock_guard<std::mutex> guard(lock);
+    auto& request = balances[static_cast<size_t>(group)];
+    request.serial = balanceSerials[static_cast<size_t>(group)].load() + 1;
+    request.undo = undo;
+    request.trims = std::move(trims);
+    balanceSerials[static_cast<size_t>(group)].store(request.serial);
+}
+
+juce::uint32 Registry::balanceSerial(int group) const noexcept
+{
+    return group >= 0 && group < groupCount ? balanceSerials[static_cast<size_t>(group)].load() : 0;
+}
+
+Registry::BalanceRequest Registry::balanceRequest(int group) const
+{
+    if (group < 0 || group >= groupCount) return {};
+    std::lock_guard<std::mutex> guard(lock);
+    return balances[static_cast<size_t>(group)];
+}
+
 int Registry::memberCount() const
 {
     std::lock_guard<std::mutex> guard(lock);
@@ -170,6 +193,8 @@ std::vector<GroupMic> Registry::recentAudio(int group, const std::vector<Role>& 
         mic.name = member->identity.name;
         mic.delayMs = member->identity.delayMs;
         mic.inverted = member->identity.inverted;
+        mic.role = member->identity.role;
+        mic.id = member->id();
         mic.samples.assign(static_cast<size_t>(count), 0.0f);
         if (!member->read(2, start, count, mic.samples.data())) { result.clear(); rate = 0; return result; }
         result.push_back(std::move(mic));

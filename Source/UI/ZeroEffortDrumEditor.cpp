@@ -287,6 +287,7 @@ private:
     void rotary(juce::Slider& slider);
     void horizontal(juce::Slider& slider);
     int instrument() const { return currentInstrument; }
+    bool onSubBus() const { return drum::isSubBus(static_cast<drum::DrumInstrument>(juce::jmax(0, currentInstrument))); }
 
     ZeroEffortDrumProcessor& owner;
     DrumLookAndFeel look;
@@ -526,6 +527,12 @@ DrumEditor::DrumEditor(ZeroEffortDrumProcessor& processor)
     kitAnalyse.getProperties().set("primary", true);
     kitAnalyse.setTooltip("Start listening to all tracks in the group together, then read the project (20 to 45 s of playback)");
     kitAnalyse.onClick = [this] {
+        if (onSubBus())
+        {
+            owner.measureBalance();
+            repaint();
+            return;
+        }
         if (kitView.analysing) owner.stopKitAnalysis();
         else
         {
@@ -537,10 +544,20 @@ DrumEditor::DrumEditor(ZeroEffortDrumProcessor& processor)
     kitApply.setButtonText("Preview and apply");
     kitApply.setComponentID("kitApply");
     kitApply.setTooltip("See the proposed corrections for the whole kit and choose which to apply");
-    kitApply.onClick = [this] { preview.show(kitView.report); };
+    kitApply.onClick = [this] {
+        if (onSubBus()) owner.applyBalanceTrims();
+        else preview.show(kitView.report);
+        timerCallback();
+    };
     kitReport.setButtonText("Full report");
     kitReport.setComponentID("kitReport");
     kitReport.onClick = [this] {
+        if (onSubBus())
+        {
+            owner.undoBalanceTrims();
+            timerCallback();
+            return;
+        }
         juce::String text = kitView.status + "\n\n" + kitView.report.lines.joinIntoString("\n");
         const auto& scores = kitView.report.scores;
         if (scores.phaseBefore >= 0)
@@ -848,7 +865,14 @@ void DrumEditor::resized()
                                         static_cast<juce::Component*>(&kitReport), static_cast<juce::Component*>(&kitDelayDown),
                                         static_cast<juce::Component*>(&kitDelayUp) })
         component->setVisible(kitVisible);
-    for (auto& mode : kitModes) mode.setVisible(kitVisible);
+    // A sub-bus receives a sum: no alignment controls. Its three buttons measure, apply and undo the balance trims of its microphones.
+    if (onSubBus())
+        for (juce::Component* component : { static_cast<juce::Component*>(&kitStrength), static_cast<juce::Component*>(&kitStrengthLabel),
+                                            static_cast<juce::Component*>(&kitDelay), static_cast<juce::Component*>(&kitDelayLabel),
+                                            static_cast<juce::Component*>(&kitPolarity), static_cast<juce::Component*>(&kitDelayDown),
+                                            static_cast<juce::Component*>(&kitDelayUp) })
+            component->setVisible(false);
+    for (auto& mode : kitModes) mode.setVisible(kitVisible && !onSubBus());
     preview.setBounds(pageArea.getUnion(levelArea));
     if (preview.isVisible()) preview.toFront(false);
     status.setBounds(pageArea.getUnion(levelArea));
@@ -906,7 +930,7 @@ void DrumEditor::layoutPage(std::array<bool, drum::controlCount>& shown)
         case kitPage:
         {
             panel(16, 268, "KIT IDENTITY");
-            panel(292, 236, "CORRECTION", palette::amber);
+            panel(292, 236, onSubBus() ? "BALANCE" : "CORRECTION", palette::amber);
             panel(536, 368, "KIT REPORT");
             kitGroupMenu.setBounds(30, 446, 240, 30);
             for (size_t index = 0; index < kitModes.size(); ++index)
@@ -1346,14 +1370,35 @@ void DrumEditor::paintPage(juce::Graphics& graphics, const drum::Settings& setti
             caption("MIC", 30, 484, 200, palette::textFaint, 11.5f, true);
             caption(identity.role == kit::Role::none ? juce::String("Outside kit (bus)") : identity.name, 30, 502, 240, palette::text, 14.0f, true);
             caption(juce::String("Role: ") + kit::roleName(identity.role), 30, 520, 240, palette::textDim, 12.0f);
-            caption("MODE", 30, 540, 200, palette::textFaint, 11.5f, true);
+            if (!onSubBus()) caption("MODE", 30, 540, 200, palette::textFaint, 11.5f, true);
             const auto* own = owner.findOwnRecommendation(kitView.report);
             juce::String proposal = "Proposal: analyze the kit";
             if (own != nullptr && own->measured && own->role != kit::Role::overhead)
                 proposal = "Proposal: +" + juce::String(own->delayMs, 2) + " ms" + (own->invert ? ", polarity inverted" : "");
             else if (own != nullptr && own->role == kit::Role::overhead)
                 proposal = "Timing reference: no delay";
-            caption(proposal, 306, 578, 220, own != nullptr && own->invert ? palette::amber : palette::textDim, 11.5f, true);
+            if (onSubBus())
+            {
+                const auto& balance = owner.getBalanceProposal();
+                int y = 428;
+                if (!balance.valid && balance.note.isEmpty())
+                    caption("Measure the balance while the host plays.", 306, y, 214, palette::textDim, 12.0f);
+                for (const auto& line : balance.lines)
+                {
+                    caption(line.name + (std::isfinite(line.levelDb) ? "   " + juce::String(line.levelDb, 1) + " dB" : juce::String()), 306, y, 214, palette::text, 12.5f, true);
+                    caption(line.trimDb != 0 ? "trim " + juce::String(line.trimDb > 0 ? "+" : "") + juce::String(line.trimDb, 1) + " dB" : juce::String("no trim"), 312, y + 16, 208,
+                        line.trimDb != 0 ? palette::amber : palette::textFaint, 12.0f);
+                    y += 36;
+                }
+                if (balance.note.isNotEmpty())
+                {
+                    graphics.setColour(palette::textDim);
+                    graphics.setFont(uiFont(11.5f));
+                    graphics.drawFittedText(balance.note, { 306, juce::jmax(y, 428), 214, 560 - juce::jmax(y, 428) }, juce::Justification::topLeft, 5, 0.9f);
+                }
+            }
+            else
+                caption(proposal, 306, 578, 220, own != nullptr && own->invert ? palette::amber : palette::textDim, 11.5f, true);
             paintKitReport(graphics, { 536, 390, 368, 322 });
             break;
         }
@@ -1713,6 +1758,25 @@ void DrumEditor::timerCallback()
             }
         }
         kitReport.setEnabled(!kitView.report.lines.isEmpty() || kitView.status.isNotEmpty());
+    }
+    if (onSubBus())
+    {
+        kitAnalyse.setButtonText("Measure balance");
+        kitApply.setButtonText("Apply trims");
+        kitReport.setButtonText("Undo trims");
+        kitAnalyse.setTooltip("Read the level of each microphone of this instrument against the sum, from the last seconds of playback (the microphones must be in the same Kit group)");
+        kitApply.setTooltip("Move the input gain of the microphones by the proposed trims. Nothing is applied before you click.");
+        kitReport.setTooltip("Give the microphones back the input gain they had before the trims");
+        kitApply.setEnabled(owner.getBalanceProposal().any());
+        kitReport.setEnabled(owner.canUndoBalanceTrims());
+    }
+    else
+    {
+        kitReport.setButtonText("Full report");
+        kitApply.setButtonText("Preview and apply");
+        kitApply.setTooltip("See the proposed corrections for the whole kit and choose which to apply");
+        kitReport.setTooltip({});
+        kitAnalyse.setTooltip("Start listening to all tracks in the group together, then read the project (20 to 45 s of playback)");
     }
     repaint();
 }

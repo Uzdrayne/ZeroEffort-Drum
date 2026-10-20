@@ -1,7 +1,9 @@
 #pragma once
 
+#include "KitTypes.h"
 #include <juce_dsp/juce_dsp.h>
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <limits>
 #include <vector>
@@ -29,6 +31,8 @@ struct GroupMic
     std::vector<float> samples;      // what the instance received: the raw microphone, before its own correction
     float delayMs = 0;               // correction applied by its instance
     bool inverted = false;
+    Role role = Role::none;
+    juce::uint32 id = 0;             // registry member, to address a balance trim to its instance
 };
 
 struct GroupMicMeasure
@@ -260,4 +264,102 @@ private:
         return aa > 0 && bb > 0 ? static_cast<float>(ab / std::sqrt(aa * bb)) : GroupConstants::unavailableValue;
     }
 };
-}
+
+// SB4, document 08 section 7.1: balance trims, proposed and never applied silently. The sub-bus measures, the user validates, each microphone
+// instance then moves its own input gain. Starting points (H): where two engineers left each microphone against the sum of its group
+// (Track 2 by A.H., Track 3 by another engineer, docs/ANALYSE_CORPUS_19OCT.md), widened by 1.5 dB on both sides. They did not agree on
+// one value (Snare Bottom: -7.0 and -21.1 dB), so a trim is only proposed for a microphone clearly outside what either of them did.
+struct BalanceConstants
+{
+    static constexpr float gain = 0.5f;            // k of the document: share of the distance to the band that is proposed
+    static constexpr float maximumTrimDb = 6.0f;
+    static constexpr float minimumTrimDb = 0.5f;   // below this, nothing is proposed
+    static constexpr float margin = 1.5f;
+};
+
+struct BalanceBand { Role role; float lowDb, highDb; };   // plausible level of a microphone against the sum, in dB
+inline constexpr std::array<BalanceBand, 4> balanceBands {{
+    { Role::kickIn, -3.7f - BalanceConstants::margin, -1.0f + BalanceConstants::margin },
+    { Role::kickOut, -6.7f - BalanceConstants::margin, -2.4f + BalanceConstants::margin },
+    { Role::snareTop, -1.0f - BalanceConstants::margin, 0.0f + BalanceConstants::margin },
+    { Role::snareBottom, -21.1f - BalanceConstants::margin, -7.0f + BalanceConstants::margin },
+}};
+
+struct BalanceLine
+{
+    juce::uint32 id = 0;
+    juce::String name;
+    float levelDb = GroupConstants::unavailableValue;
+    float trimDb = 0;
+    juce::String note;
+};
+
+struct BalanceProposal
+{
+    bool valid = false;
+    juce::String note;                 // why nothing is proposed, when it is the case
+    std::vector<BalanceLine> lines;
+    bool any() const
+    {
+        return valid && std::any_of(lines.begin(), lines.end(), [](const BalanceLine& line) { return line.trimDb != 0; });
+    }
+};
+
+class GroupBalance
+{
+public:
+    static BalanceProposal propose(const std::vector<GroupMic>& mics, const GroupReport& report, float intensity)
+    {
+        BalanceProposal proposal;
+        if (!report.valid || report.mics.size() != mics.size()) { proposal.note = "no valid group measure"; return proposal; }
+        proposal.valid = true;
+        for (size_t index = 0; index < mics.size(); ++index)
+            proposal.lines.push_back({ mics[index].id, mics[index].name, report.mics[index].levelDb, 0.0f, {} });
+        // Refusal of the document: with a mic late or in doubtful polarity, the levels read are not the ones the bus will hold.
+        for (const auto& mic : report.mics)
+            if ((std::isfinite(mic.lowCorrelation) && mic.lowCorrelation < GroupConstants::polarityAlert)
+                || (std::isfinite(mic.residualDelayMs) && std::abs(mic.residualDelayMs) > GroupConstants::delayAlertMs))
+            {
+                proposal.note = "No trim before the correction of Kit / Phase: " + mic.name + " is late or in doubtful polarity.";
+                return proposal;
+            }
+        if (std::isfinite(report.sumGainLowDb) && report.sumGainLowDb < -1.5f)
+        {
+            proposal.note = "No trim before the correction of Kit / Phase: the low end of the sum is weaker than the microphones alone.";
+            return proposal;
+        }
+        if (!(intensity > 0)) { proposal.note = "Intensity is 0: nothing is proposed."; return proposal; }
+        for (size_t index = 0; index < mics.size(); ++index)
+        {
+            auto& line = proposal.lines[index];
+            const auto band = std::find_if(balanceBands.begin(), balanceBands.end(), [&](const BalanceBand& b) { return b.role == mics[index].role; });
+            if (band == balanceBands.end()) { line.note = "no reference for this microphone"; continue; }
+            if (!std::isfinite(line.levelDb)) { line.note = "level not measured"; continue; }
+            const auto wanted = line.levelDb < band->lowDb ? band->lowDb - line.levelDb : line.levelDb > band->highDb ? band->highDb - line.levelDb : 0.0f;
+            const auto trim = juce::jlimit(-BalanceConstants::maximumTrimDb, BalanceConstants::maximumTrimDb,
+                BalanceConstants::gain * wanted * juce::jlimit(0.0f, 1.0f, intensity));
+            if (std::abs(trim) < BalanceConstants::minimumTrimDb)
+            {
+                line.note = wanted == 0 ? "within what two engineers did" : "close enough";
+                continue;
+            }
+            line.trimDb = std::round(trim * 10.0f) / 10.0f;
+            line.note = line.levelDb < band->lowDb ? "weaker than what two engineers left" : "stronger than what two engineers left";
+        }
+        if (!proposal.any()) proposal.note = "Balance within the range of the two reference engineers: no trim proposed.";
+        return proposal;
+    }
+
+    static juce::String toText(const BalanceProposal& proposal)
+    {
+        juce::String text = "BALANCE (suggestion, applied only if you ask)\n";
+        if (!proposal.valid) return text + proposal.note + "\n";
+        for (const auto& line : proposal.lines)
+        {
+            text << "- " << line.name << " : " << (std::isfinite(line.levelDb) ? juce::String(line.levelDb, 1) : juce::String("n/a")) << " dB against the sum, ";
+            text << (line.trimDb != 0 ? "trim " + juce::String(line.trimDb > 0 ? "+" : "") + juce::String(line.trimDb, 1) + " dB" : juce::String("no trim")) << " (" << line.note << ")\n";
+        }
+        if (proposal.note.isNotEmpty()) text << proposal.note << "\n";
+        return text;
+    }
+};}
