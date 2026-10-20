@@ -316,13 +316,26 @@ public:
         for (size_t index = 0; index < mics.size(); ++index)
             proposal.lines.push_back({ mics[index].id, mics[index].name, report.mics[index].levelDb, 0.0f, {} });
         // Refusal of the document: with a mic late or in doubtful polarity, the levels read are not the ones the bus will hold.
+        // When two microphones cancel, both look suspect: the weaker one is named (the louder one is the reference to align on).
+        const GroupMicMeasure* culprit = nullptr;
+        bool polarityCause = false;
         for (const auto& mic : report.mics)
-            if ((std::isfinite(mic.lowCorrelation) && mic.lowCorrelation < GroupConstants::polarityAlert)
-                || (std::isfinite(mic.residualDelayMs) && std::abs(mic.residualDelayMs) > GroupConstants::delayAlertMs))
-            {
-                proposal.note = "No trim before the correction of Kit / Phase: " + mic.name + " is late or in doubtful polarity.";
-                return proposal;
-            }
+        {
+            const bool polarity = std::isfinite(mic.lowCorrelation) && mic.lowCorrelation < GroupConstants::polarityAlert;
+            const bool late = std::isfinite(mic.residualDelayMs) && std::abs(mic.residualDelayMs) > GroupConstants::delayAlertMs;
+            if (!polarity && !late) continue;
+            const auto weaker = culprit == nullptr || (std::isfinite(mic.levelDb) && (!std::isfinite(culprit->levelDb) || mic.levelDb < culprit->levelDb));
+            if (!weaker) continue;
+            culprit = &mic;
+            polarityCause = polarity;
+        }
+        if (culprit != nullptr)
+        {
+            proposal.note = "No trim before the correction of Kit / Phase: " + culprit->name + (polarityCause
+                ? " is in doubtful polarity (low-band correlation " + juce::String(culprit->lowCorrelation, 2) + "). Invert it (Kit / Phase page of its track), then measure again."
+                : " is late by " + juce::String(std::abs(culprit->residualDelayMs), 1) + " ms. Align it with Kit / Phase, then measure again.");
+            return proposal;
+        }
         if (std::isfinite(report.sumGainLowDb) && report.sumGainLowDb < -1.5f)
         {
             proposal.note = "No trim before the correction of Kit / Phase: the low end of the sum is weaker than the microphones alone.";

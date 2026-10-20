@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.22)
-project(ZeroEffortDrum VERSION 0.11.6 LANGUAGES C CXX)
+project(ZeroEffortDrum VERSION 0.11.7 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -23,7 +23,7 @@ include(cmake/PatchJuceARABuses.cmake)
 juce_add_plugin(ZeroEffortDrum
     COMPANY_NAME "Robin"
     COMPANY_WEBSITE "https://example.invalid/zeroeffort-drum"
-    VERSION 0.11.6
+    VERSION 0.11.7
     BUNDLE_ID "com.robin.zeroeffortdrum"
     PLUGIN_MANUFACTURER_CODE Rbin
     PLUGIN_CODE Zedr

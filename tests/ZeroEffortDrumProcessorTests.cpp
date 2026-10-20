@@ -79,6 +79,32 @@ float measureTone(const drum::Settings& settings, double frequency, double sampl
     return static_cast<float>(std::sqrt(energy / measurementSamples));
 }
 
+// The global Makeup belongs to whichever compressor is running: the broadband one, or the multiband one (as a master makeup on top of the
+// makeup of each band). Without the Compressor switch it does nothing.
+void testMakeupScope()
+{
+    const auto base = measureTone(drum::defaultSettings(), 1000);
+    const auto gainDb = [&](const drum::Settings& settings) { return 20.0f * std::log10(measureTone(settings, 1000) / base); };
+    const auto quiet = [] {
+        auto settings = drum::defaultSettings();
+        settings[drum::threshold] = 0;
+        for (auto control : { drum::lowThreshold, drum::midThreshold, drum::highThreshold }) settings[control] = 0;
+        settings[drum::makeup] = 6;
+        return settings;
+    }();
+    auto settings = quiet;
+    require(std::abs(gainDb(settings)) < 0.05f, "Makeup does nothing while the Compressor switch is off");
+    settings[drum::multibandOn] = 1;
+    require(std::abs(gainDb(settings)) < 0.05f, "Makeup does nothing in multiband mode while the Compressor switch is off");
+    settings = quiet;
+    settings[drum::compressorOn] = 1;
+    require(std::abs(gainDb(settings) - 6.0f) < 0.2f, "Makeup acts on the broadband compressor");
+    settings[drum::multibandOn] = 1;
+    require(std::abs(gainDb(settings) - 6.0f) < 0.3f, "In multiband mode the same Makeup acts as a master makeup");
+    for (auto control : { drum::lowMakeup, drum::midMakeup, drum::highMakeup }) settings[control] = 3;
+    require(std::abs(gainDb(settings) - 9.0f) < 0.3f, "The master makeup adds to the makeup of each band");
+}
+
 void testKickResponse()
 {
     for (const auto rate : { 44100.0, 48000.0, 96000.0 })
@@ -1385,6 +1411,7 @@ int main(int argumentCount, char** arguments)
         testDrumBus();
         testKickArchive();
         testKickPresence();
+        testMakeupScope();
         testAutoPreset();
         testAutoExpander();
         testTemporalAutoEQ();
@@ -1507,7 +1534,7 @@ int main(int argumentCount, char** arguments)
             "ARA plugin name must match ZeroEffort Drum");
         require(factory->manufacturerName != nullptr && juce::String(factory->manufacturerName).isNotEmpty(),
             "ARA manufacturer must be present");
-        require(factory->version != nullptr && juce::String(factory->version) == "0.11.6",
+        require(factory->version != nullptr && juce::String(factory->version) == "0.11.7",
             "ARA factory version must match the corrected prototype");
         require(juce::String(factory->factoryID) == "com.robin.zeroeffortdrum.factory.1",
             "ARA identity must identify ZeroEffort Drum separately from the prototype and gain plugin");

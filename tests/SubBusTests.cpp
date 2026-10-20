@@ -317,9 +317,11 @@ void testBalance()
     // Refusals of the document: a microphone in doubtful polarity, or late: no trim at all.
     const auto flipped = propose({ mic("Kick In", kit::Role::kickIn, 1.0f, 11), mic("Kick Out", kit::Role::kickOut, 0.1f, 12, true) }, 1.0f);
     check(flipped.valid && !flipped.any() && flipped.note.contains("No trim before the correction of Kit / Phase"), "Doubtful polarity: no trim before Kit / Phase");
+    check(flipped.note.contains("Kick Out") && flipped.note.contains("doubtful polarity") && flipped.note.contains("Invert it"), "The refusal names the microphone and the cause");
     auto lateMic = mic("Kick Out", kit::Role::kickOut, 0.1f, 12);
     lateMic.samples = shifted(a, 144, 0.1f);
-    check(!propose({ mic("Kick In", kit::Role::kickIn, 1.0f, 11), lateMic }, 1.0f).any(), "A late microphone: no trim before Kit / Phase");
+    const auto late = propose({ mic("Kick In", kit::Role::kickIn, 1.0f, 11), lateMic }, 1.0f);
+    check(!late.any() && late.note.contains("late by") && late.note.contains("Align it"), "A late microphone: no trim before Kit / Phase, and the refusal says by how much");
 
     // No reference for the toms, one microphone, text and determinism.
     const auto toms = propose({ mic("Tom 1", kit::Role::tom, 1.0f, 31), mic("Tom 2", kit::Role::tom, 0.1f, 32) }, 1.0f);

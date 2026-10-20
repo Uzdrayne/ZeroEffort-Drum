@@ -9,7 +9,7 @@ Légende : ⬜ à faire · 🔄 en cours · ✅ terminé · ⏸ en réserve
 
 | Élément | État |
 |---|---|
-| Version du plug-in | **0.11.6** (`CMakeLists.txt`, depuis le 20/10/2026) ; `analysisVersion` 6, `profileVersion` 4 |
+| Version du plug-in | **0.11.7** (`CMakeLists.txt`, depuis le 20/10/2026) ; `analysisVersion` 6, `profileVersion` 4 |
 | `main` | vagues 1 et 2 fusionnées (pull requests #1 et #2, commit `b1dbabd`) : phase 0, build VS 2019 / 2022, J1, T1, T2, J2, J3, T3, T4 |
 | Branches de travail | aucune ouverte (`feature/t3-kit-phase` fusionnée) |
 | Passation | [REPRISE_PROCHAINE_SESSION.md](REPRISE_PROCHAINE_SESSION.md) : prompt à coller, état, décisions, menu des prochaines étapes, pièges |
@@ -172,6 +172,8 @@ Document 08, étape SB1 : l'instance peut être posée sur la **piste de groupe 
   - **Refus** (spec) : pas de trim si un micro est en polarité douteuse (corrélation grave < −0,25), en retard (> 1 ms) ou si le grave de la somme est plus faible que les micros seuls ; l'intensité 0 ne propose rien.
   - **Application** : la demande passe par le registre (`requestBalance`, comme l'application Kit). **Chaque instance micro** du même groupe ajuste **son propre gain d'entrée** (`input`, −24 à +24 dB, ARA compris) ; elle mémorise le gain d'origine à la première demande, et **Undo** le rend. Une demande pour un autre groupe est ignorée. C'est un **changement audible, mais seulement sur ton clic**.
   - Tests : bornes, intensité, refus, toms, déterminisme, demande dans le registre, application et annulation sur deux instances micro (gain 23 dB + 6 dB borné à 24, deux demandes cumulées, annulation double sans effet, autre groupe ignoré), côté sous-bus (mesure sur membres actifs, demande, annulation), page Kit du sous-bus (boutons, absence de contrôles d'alignement, capture `SubBus_balance.png`). CTest 3/3.
+- **Retour du premier essai (0.11.7)** : sur le Snare Bus, le plug-in a refusé tout trim (« Snare Bottom en retard ou en polarité douteuse ») ; le message ne disait pas laquelle et la ligne de niveau était tronquée à l'écran. Le refus nomme maintenant la cause et sa valeur (« polarité douteuse, corrélation grave −0,62 : inverse-la sur la page Kit / Phase de sa piste » ou « en retard de 1,9 ms : aligne-la avec Kit / Phase »), et le niveau passe sur la deuxième ligne avec le trim. Le refus lui-même est voulu (spec 7.1) : un micro de dessous de caisse claire est presque toujours à inverser. Test mis à jour. CTest 3/3.
+- **Question de l'utilisateur sur le Makeup (20/10/2026)** : le Makeup du compresseur n'est pas un défaut. C'est un seul réglage (`compressorMakeupDb`) : potard du compresseur classique, ou slider « Makeup général » à côté des crossovers en multibande, où il s'ajoute au Makeup de chaque bande ; sans l'interrupteur Compresseur il ne fait rien. Test de mesure ajouté (`testMakeupScope` : 0 dB compresseur éteint, +6 dB classique, +6 dB multibande, +9 dB avec +3 dB par bande). Seule réserve : le slider général s'appelle aussi « Makeup » en multibande (renommage proposé, non fait).
 - Le chantier sous-bus du document 08 est terminé jusqu'à SB4 (SB5 et SB6 : gate lié, cibles issues des paires, non faits). Hi-hat Bus laissé de côté.
 
 ### Phases Calcul et Vérification du radar : pourquoi elles sont longues (20/10/2026)

@@ -1385,8 +1385,9 @@ void DrumEditor::paintPage(juce::Graphics& graphics, const drum::Settings& setti
                     caption("Measure the balance while the host plays.", 306, y, 214, palette::textDim, 12.0f);
                 for (const auto& line : balance.lines)
                 {
-                    caption(line.name + (std::isfinite(line.levelDb) ? "   " + juce::String(line.levelDb, 1) + " dB" : juce::String()), 306, y, 214, palette::text, 12.5f, true);
-                    caption(line.trimDb != 0 ? "trim " + juce::String(line.trimDb > 0 ? "+" : "") + juce::String(line.trimDb, 1) + " dB" : juce::String("no trim"), 312, y + 16, 208,
+                    caption(line.name, 306, y, 214, palette::text, 12.0f, true);
+                    const auto level = std::isfinite(line.levelDb) ? juce::String(line.levelDb, 1) + " dB, " : juce::String();
+                    caption(level + (line.trimDb != 0 ? "trim " + juce::String(line.trimDb > 0 ? "+" : "") + juce::String(line.trimDb, 1) + " dB" : juce::String("no trim")), 312, y + 16, 208,
                         line.trimDb != 0 ? palette::amber : palette::textFaint, 12.0f);
                     y += 36;
                 }
