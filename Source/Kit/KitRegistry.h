@@ -164,7 +164,7 @@ public:
 private:
     struct GroupState
     {
-        bool startRequested = false, stopRequested = false, analysing = false;
+        bool startRequested = false, stopRequested = false, analysing = false, invalidateRequested = false;
         std::unique_ptr<KitSession> session;
         std::vector<Member*> sessionMembers;
         std::vector<juce::uint32> sessionIds, epochs;

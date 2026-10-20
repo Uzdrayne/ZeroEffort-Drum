@@ -459,7 +459,7 @@ DrumEditor::DrumEditor(ZeroEffortDrumProcessor& processor)
     };
     presets.setButtonText("Presets");
     presets.setComponentID("presetsMenu");
-    presets.setTooltip("Save the current settings as your own preset, or load one saved for this instrument");
+    presets.setTooltip("Save or load sound, instrument and mic position. Kit group and phase corrections stay unchanged.");
     presets.onClick = [this] { showPresetMenu(); };
     addAndMakeVisible(presets);
     autoReport.setFont(uiFont(12.0f));

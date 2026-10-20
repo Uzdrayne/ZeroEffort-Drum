@@ -40,7 +40,7 @@ inline const char* presetFamilyName(PresetFamily family) noexcept
 class DrumPresetLibrary
 {
 public:
-    static constexpr int formatVersion = 1;
+    static constexpr int formatVersion = 2;
     static constexpr int maximumNameLength = 48;
     static constexpr juce::int64 maximumFileBytes = 256 * 1024;
 
@@ -54,14 +54,13 @@ public:
     const juce::File& getRoot() const noexcept { return root; }
     void setRoot(const juce::File& folder) { root = folder; }
 
-    // What a preset holds: the sound of the instrument. The role, the bypass, the kit alignment, the Auto options and the
-    // mono monitoring belong to the track or the session, not to the sound.
+    // Sound and instrument/microphone identity travel together; alignment and monitoring remain session-specific.
     static bool isStored(size_t control) noexcept
     {
         switch (control)
         {
-            case bypass: case instrument: case autoStyleOption: case autoIntensityOption: case monitorMonoOn:
-            case kitGroup: case kitMic: case kitMode: case kitStrength: case kitPolarity: case kitDelay:
+            case bypass: case autoStyleOption: case autoIntensityOption: case monitorMonoOn:
+            case kitGroup: case kitMode: case kitStrength: case kitPolarity: case kitDelay:
                 return false;
             default:
                 return true;
@@ -115,6 +114,11 @@ public:
     {
         const auto clean = cleanName(name);
         if (clean.isEmpty()) return juce::Result::fail("This name cannot be used for a preset");
+        for (auto index : { instrument, kitMic })
+            if (!validIdentityValue(static_cast<size_t>(index), settings[index]))
+                return juce::Result::fail("Invalid preset identity: " + juce::String(controlSpecs[index].id));
+        if (instrumentFromValue(settings[instrument]) != origin || presetFamilyOf(origin) != family)
+            return juce::Result::fail("Preset identity does not match its family");
         const auto folder = folderFor(family);
         if (!folder.createDirectory()) return juce::Result::fail("Cannot create the preset folder: " + folder.getFullPathName());
         auto controls = std::make_unique<juce::DynamicObject>();
@@ -165,26 +169,37 @@ public:
         const auto parsed = juce::JSON::parse(file.loadFileAsString());
         const auto* object = parsed.getDynamicObject();
         if (object == nullptr) return juce::Result::fail("Not a preset file: " + name);
-        if (!object->getProperty("format").isInt() || static_cast<int>(object->getProperty("format")) > formatVersion)
+        const auto format = object->getProperty("format");
+        if (!format.isInt() || static_cast<int>(format) < 1)
+            return juce::Result::fail("Invalid preset format: " + name);
+        const auto version = static_cast<int>(format);
+        if (version > formatVersion)
             return juce::Result::fail("This preset was saved by a newer version: " + name);
         if (object->getProperty("family").toString() != presetFamilyName(family))
             return juce::Result::fail("This preset belongs to another instrument: " + name);
         const auto* controls = object->getProperty("controls").getDynamicObject();
         if (controls == nullptr) return juce::Result::fail("Preset without settings: " + name);
-        result = defaultSettings();
+        auto loaded = defaultSettings();
         for (size_t index = 0; index < controlSpecs.size(); ++index)
         {
-            if (!isStored(index))
+            const auto identity = index == instrument || index == kitMic;
+            if (!isStored(index) || (identity && version == 1))
             {
-                result[index] = current[index];
+                loaded[index] = current[index];
                 continue;
             }
             const auto stored = controls->getProperty(controlSpecs[index].id);
+            if (identity && (!(stored.isDouble() || stored.isInt() || stored.isInt64())
+                || !validIdentityValue(index, static_cast<double>(stored))))
+                return juce::Result::fail("Invalid preset identity (" + juce::String(controlSpecs[index].id) + "): " + name);
             if (!stored.isDouble() && !stored.isInt() && !stored.isInt64()) continue;
             const auto value = static_cast<double>(stored);
             if (std::isfinite(value))
-                result[index] = juce::jlimit(controlSpecs[index].minimum, controlSpecs[index].maximum, static_cast<float>(value));
+                loaded[index] = juce::jlimit(controlSpecs[index].minimum, controlSpecs[index].maximum, static_cast<float>(value));
         }
+        if (version >= 2 && presetFamilyOf(instrumentFromValue(loaded[instrument])) != family)
+            return juce::Result::fail("Preset identity does not match its family: " + name);
+        result = loaded;
         return juce::Result::ok();
     }
 
@@ -198,6 +213,12 @@ public:
     }
 
 private:
+    static bool validIdentityValue(size_t index, double value) noexcept
+    {
+        return std::isfinite(value) && value == std::floor(value)
+            && value >= controlSpecs[index].minimum && value <= controlSpecs[index].maximum;
+    }
+
     juce::File root;
 };
 }

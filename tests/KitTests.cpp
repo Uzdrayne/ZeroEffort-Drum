@@ -403,7 +403,27 @@ void testRegistryWithInstances()
         check(std::abs(processors[1]->getKitControl(ZeroEffortDrumProcessor::kitDelay) - before - 1000.0f / 48000.0f) < 0.012f,
             "Manual fine adjustment must move the delay by one sample");
     }
-    std::cout << "PASS: four instances discovered each other, Auto at Force 50 %, Suggest and preview wait for Apply, reset, fine nudge\n";
+    processors[0]->requestKitApply({ processors[0]->getKitMemberId(), processors[1]->getKitMemberId() });
+    const auto correction = processors[1]->getKitControl(ZeroEffortDrumProcessor::kitDelay);
+    processors[0]->setKitControl(ZeroEffortDrumProcessor::kitMic, kit::positionMain);
+    check(!processors[1]->getKitView().report.valid && !processors[1]->canApplyKitRecommendation(),
+        "Changing a measured identity must invalidate the kit report for all instances");
+    processors[1]->kitTick();
+    check(processors[1]->getKitControl(ZeroEffortDrumProcessor::kitDelay) == correction,
+        "An application queued before the identity change must not apply stale recommendations");
+    registry->runOnce();
+    check(!processors[1]->getKitView().report.valid,
+        "The worker must not republish the previous identity's analysis");
+    processors[0]->startKitAnalysis();
+    registry->runOnce();
+    check(processors[0]->getKitView().analysing, "A new analysis must be possible after identity invalidation");
+    processors[2]->setKitControl(ZeroEffortDrumProcessor::kitMic, kit::positionRight);
+    check(!processors[0]->getKitView().analysing && !processors[0]->getKitView().report.valid,
+        "An OH position change with the same role must invalidate an ongoing analysis");
+    registry->runOnce();
+    check(!processors[0]->getKitView().analysing && !processors[0]->getKitView().report.valid,
+        "The worker must cancel the invalidated session rather than publish it");
+    std::cout << "PASS: four instances discovered each other, Auto at Force 50 %, Suggest and preview wait for Apply, reset, fine nudge, identity invalidation\n";
 }
 
 // ---- T3: artificial defects (document 02, section 5.4) -------------------------------------------------------------

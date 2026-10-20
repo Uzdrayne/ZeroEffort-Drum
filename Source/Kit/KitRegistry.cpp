@@ -55,6 +55,23 @@ void Registry::leave(Member* member)
 void Registry::setIdentity(Member& member, const Identity& identity)
 {
     std::lock_guard<std::mutex> guard(lock);
+    const auto& previous = member.identity;
+    if (previous.group != identity.group || previous.instrument != identity.instrument
+        || previous.position != identity.position || previous.role != identity.role || previous.key != identity.key)
+    {
+        auto& state = groups[static_cast<size_t>(previous.group)];
+        if (state.report.find(member.id()) != nullptr
+            || (state.analysing && std::find(state.sessionIds.begin(), state.sessionIds.end(), member.id()) != state.sessionIds.end()))
+        {
+            // Hide stale results immediately; only the worker disposes of an in-flight session.
+            state.invalidateRequested = true;
+            state.report = {};
+            state.apply.report = {};
+            balances[static_cast<size_t>(previous.group)].trims.clear();
+            state.status = "Kit identity changed : analyze again";
+            revisions[static_cast<size_t>(previous.group)].fetch_add(1);
+        }
+    }
     member.identity = identity;
     member.identity.group = juce::jlimit(0, groupCount - 1, identity.group);
 }
@@ -150,7 +167,7 @@ GroupView Registry::view(int group) const
         if (member != nullptr && member->active.load() && member->identity.group == group)
             result.members.push_back({ member->id(), member->identity, member->isLive(now), member->everPlayed(),
                 member->channels.load(), member->rate.load() });
-    result.analysing = state.analysing || state.startRequested;
+    result.analysing = !state.invalidateRequested && (state.analysing || state.startRequested);
     result.status = state.status;
     result.report = state.report;
     result.reportRevision = revisions[static_cast<size_t>(group)].load();
@@ -214,6 +231,7 @@ void Registry::publish(int group, Report report, const juce::String& status, boo
 {
     std::lock_guard<std::mutex> guard(lock);
     auto& state = groups[static_cast<size_t>(group)];
+    if (state.invalidateRequested) return;
     report.final = finished;
     state.report = std::move(report);
     state.status = status;
@@ -232,6 +250,16 @@ void Registry::tick(int group, juce::uint32 now)
     bool finishing = false;
     {
         std::lock_guard<std::mutex> guard(lock);
+        if (state.invalidateRequested)
+        {
+            state.invalidateRequested = false;
+            state.analysing = false;
+            state.status = "Kit identity changed : analyze again";
+            state.session.reset();
+            state.sessionMembers.clear();
+            state.sessionIds.clear();
+            state.inputs.clear();
+        }
         if (state.stopRequested)
         {
             state.stopRequested = false;

@@ -1,6 +1,6 @@
 # ZeroEffort Drum - spécifications de référence
 
-**Consolidation du 20 octobre 2026 · Révision documentaire 1**
+**Consolidation du 20 octobre 2026 · Révision documentaire 2**
 
 Ce document rassemble les exigences utiles des anciens documents 01 à 08 et du
 plan produit. Il décrit **ce que le système doit préserver ou permettre**, pas
@@ -298,6 +298,36 @@ indépendant. Consigner résultat et version dans le suivi.
 GR, range d'expander/2 et drive, avec plafond par style et préservation des
 corrections de phase/niveau. La répartition **40 % micro / 40 % sous-bus / 20 %
 bus** reste H. Les limites individuelles actuelles ne prouvent pas ce budget.
+
+### 4.4 Presets utilisateur : son et identité
+
+**Décision validée le 20/10/2026, F17 :** un nouveau preset `.zedpreset`
+restaure le son, l'instrument et la position de micro sélectionnés à sa sauvegarde.
+Charger Kick In depuis Kick Out doit donc afficher **Kick In** ; charger un
+Tom 2 depuis Floor Tom restaure **Tom 2**. Le classement par famille reste
+inchangé (toms partagés ; pas de chargement transversal Kick/Snare).
+
+- **Format 2** : `controls` conserve `instrument` et `kitMic` par leurs IDs
+  stables. Ces deux valeurs sont obligatoires, numériques, entières et dans
+  leurs plages ; l'instrument doit correspondre à la famille du fichier.
+  Une identité invalide provoque un refus explicite sans application partielle.
+- **Format 1** : reste lisible avec son comportement antérieur ; rôle et position
+  courants sont conservés. Le nom descriptif `instrument` à la racine n'est pas
+  interprété comme une identité complète. Pour mémoriser la position, choisir
+  l'identité voulue puis réenregistrer le preset en format 2.
+- Groupe Kit, mode/force, retard, polarité, bypass, écoute mono et options du
+  prochain Auto ne sont pas importés. Les indications style/intensité restent
+  informatives. Revert restaure le son **et l'identité** précédents.
+- UI et identité publiée au registre suivent le chargement et Revert. Si une
+  identité utilisée par l'analyse Kit change, masquer/invalider son rapport
+  de groupe et ses recommandations en attente ; le worker abandonne l'analyse
+  obsolète. Les corrections déjà appliquées restent inchangées.
+- Critères : aller-retour des rôles/positions, anciens fichiers, refus de format
+  ou identité invalide, conservation des paramètres de session, Revert,
+  libellés de l'éditeur et invalidation d'une analyse terminée ou en cours.
+
+Ce changement ne modifie ni les règles Auto ni les IDs de paramètres.
+Le format des presets est distinct des versions d'analyse/profil et des états hôte.
 
 <a id="kit"></a>
 ## 5. Kit, sous-bus et extensions

@@ -77,6 +77,7 @@ void testLibrary()
     current[drum::bodyGain] = -2;
     drum::Settings loaded {};
     check(library.load(kick, "Tight kick", current, loaded).wasOk(), "A saved preset must load");
+    check(loaded[drum::kitMic] == sound[drum::kitMic], "Loading Kick In must restore its microphone position");
     for (size_t index = 0; index < loaded.size(); ++index)
     {
         if (drum::DrumPresetLibrary::isStored(index))
@@ -97,11 +98,13 @@ void testLibrary()
     check(loaded[drum::input] == drum::controlSpecs[drum::input].maximum, "Out-of-range values must be clamped");
     check(loaded[drum::highPass] == drum::controlSpecs[drum::highPass].initial, "Unusable values fall back to the default");
     check(loaded[drum::lowPass] == drum::controlSpecs[drum::lowPass].initial, "Missing controls fall back to the default");
+    check(loaded[drum::instrument] == current[drum::instrument] && loaded[drum::kitMic] == current[drum::kitMic],
+        "Legacy presets without identity must preserve the current instrument and microphone");
 
     check(library.hint(kick, "Hand made").isEmpty(), "A preset saved without a style has no hint");
     write("Odd hint", R"({"format":1,"family":"Kick","style":"<b>Rock!</b>","intensity":250,"controls":{}})");
     check(library.hint(kick, "Odd hint") == "bRockb 100 %", "The hint is sanitised and bounded");
-    write("Newer", R"({"format":2,"family":"Kick","controls":{}})");
+    write("Newer", R"({"format":3,"family":"Kick","controls":{}})");
     check(library.load(kick, "Newer", current, loaded).failed(), "A preset from a newer format must be refused");
     write("Broken", "{ not json");
     check(library.load(kick, "Broken", current, loaded).failed(), "A broken file must be refused");
@@ -125,6 +128,72 @@ void testLibrary()
     check(library.remove(kick, "Tight kick").failed(), "Deleting twice must fail cleanly");
 }
 
+void testIdentityFormat()
+{
+    TemporaryFolder temporary;
+    const drum::DrumPresetLibrary library(temporary.folder);
+    for (int role = 0; role < drum::instrumentCount; ++role)
+    {
+        const auto instrument = static_cast<drum::DrumInstrument>(role);
+        const auto family = drum::presetFamilyOf(instrument);
+        for (int position = 0; position <= 3; ++position)
+        {
+            auto sound = drum::defaultSettings();
+            sound[drum::instrument] = static_cast<float>(role);
+            sound[drum::kitMic] = static_cast<float>(position);
+            auto current = drum::defaultSettings();
+            current[drum::instrument] = static_cast<float>(drum::DrumInstrument::floorTom);
+            current[drum::kitMic] = static_cast<float>((position + 1) % 4);
+            current[drum::kitGroup] = 6;
+            current[drum::kitDelay] = 4;
+            current[drum::kitPolarity] = 1;
+            check(library.save(family, "Identity", sound, instrument, "test").wasOk(), "Identity preset must save");
+            drum::Settings loaded {};
+            check(library.load(family, "Identity", current, loaded).wasOk(), "Identity preset must load");
+            check(loaded[drum::instrument] == sound[drum::instrument] && loaded[drum::kitMic] == sound[drum::kitMic],
+                "Every instrument and microphone position must round-trip");
+            for (auto control : { drum::kitGroup, drum::kitMode, drum::kitStrength, drum::kitDelay, drum::kitPolarity })
+                check(loaded[control] == current[control], "Presets must not import Kit membership or corrections");
+        }
+    }
+
+    const auto kick = drum::PresetFamily::kick;
+    const auto current = drum::defaultSettings();
+    auto invalid = current;
+    invalid[drum::kitMic] = 0.5f;
+    check(library.save(kick, "Bad save", invalid, drum::DrumInstrument::kick, "test").failed()
+        && !library.exists(kick, "Bad save"), "Invalid identity must not be written");
+    check(library.save(kick, "Bad family", current, drum::DrumInstrument::snare, "test").failed(),
+        "Saved identity and family must agree");
+    const auto toms = drum::PresetFamily::toms;
+    check(library.fileFor(toms, "Legacy").replaceWithText(
+        R"({"format":1,"family":"Toms","instrument":"Tom 2","controls":{"bodyDb":2}})"), "Legacy tom fixture must be written");
+    auto oldTrack = current;
+    oldTrack[drum::instrument] = static_cast<float>(drum::DrumInstrument::floorTom);
+    oldTrack[drum::kitMic] = 3;
+    drum::Settings oldLoaded {};
+    check(library.load(toms, "Legacy", oldTrack, oldLoaded).wasOk()
+        && oldLoaded[drum::instrument] == oldTrack[drum::instrument] && oldLoaded[drum::kitMic] == oldTrack[drum::kitMic],
+        "Legacy descriptive metadata must not invent a restorable identity");
+    for (const auto* json : {
+        R"({"format":2,"family":"Kick","controls":{"instrument":0}})",
+        R"({"format":2,"family":"Kick","controls":{"instrument":0,"kitMic":"In"}})",
+        R"({"format":2,"family":"Kick","controls":{"instrument":0,"kitMic":1.5}})",
+        R"({"format":2,"family":"Kick","controls":{"instrument":0,"kitMic":4}})",
+        R"({"format":2,"family":"Kick","controls":{"instrument":13,"kitMic":0}})",
+        R"({"format":2,"family":"Kick","controls":{"instrument":1,"kitMic":0}})",
+        R"({"format":0,"family":"Kick","controls":{}})" })
+    {
+        check(library.fileFor(kick, "Invalid").replaceWithText(json), "Malformed preset fixture must be written");
+        auto loaded = current;
+        loaded[drum::bodyGain] = -3;
+        const auto untouched = loaded;
+        const auto result = library.load(kick, "Invalid", current, loaded);
+        check(result.failed() && result.getErrorMessage().isNotEmpty(), "Malformed identity must be refused explicitly");
+        check(loaded == untouched, "A refused preset must not return partial settings");
+    }
+}
+
 void testProcessor()
 {
     TemporaryFolder temporary;
@@ -136,6 +205,7 @@ void testProcessor()
     processor.setControl(drum::instrument, static_cast<float>(drum::DrumInstrument::snare));
     processor.setControl(drum::bodyGain, 3.5f);
     processor.setControl(drum::ratio, 5.0f);
+    processor.setKitControl(ZeroEffortDrumProcessor::kitMic, 1);
     processor.setAutoStyle(drum::DrumStyle::metal, 0.6f);
     check(processor.saveUserPreset("Crack").wasOk() && processor.listUserPresets().size() == 1, "The current settings must be saved");
     check(processor.getUserPresetHint("Crack") == "Metal 60 %", "The hint shows the Auto style selected when saving");
@@ -151,8 +221,17 @@ void testProcessor()
     processor.setControl(drum::instrument, static_cast<float>(drum::DrumInstrument::floorTom));
     check(processor.listUserPresets().size() == 1 && processor.listUserPresets().front() == "Boomy",
         "The toms share their presets");
+    check(processor.loadUserPreset("Boomy").wasOk()
+        && processor.getSettings()[drum::instrument] == static_cast<float>(drum::DrumInstrument::tom2),
+        "A shared tom preset must restore its original tom");
+    check(processor.revertAutoPreset()
+        && processor.getSettings()[drum::instrument] == static_cast<float>(drum::DrumInstrument::floorTom),
+        "Revert must restore the previous tom");
 
     processor.setControl(drum::instrument, static_cast<float>(drum::DrumInstrument::snare));
+    processor.setKitControl(ZeroEffortDrumProcessor::kitMic, 0);
+    processor.setKitControl(ZeroEffortDrumProcessor::kitDelay, 3);
+    processor.setKitControl(ZeroEffortDrumProcessor::kitPolarity, 1);
     processor.setControl(drum::bodyGain, -4.0f);
     processor.setControl(drum::ratio, 2.0f);
     processor.setControl(drum::bypass, 1.0f);
@@ -164,8 +243,15 @@ void testProcessor()
         "Loading must apply the stored sound");
     check(processor.getAutoStyle() == drum::DrumStyle::natural && std::abs(processor.getAutoIntensity() - 0.3f) < 0.001f,
         "Loading must not apply the remembered Auto style");
-    check(after[drum::instrument] == before[drum::instrument] && after[drum::bypass] == before[drum::bypass],
-        "Loading must keep the role and the bypass of the track");
+    check(after[drum::kitMic] == 1 && after[drum::bypass] == before[drum::bypass]
+        && after[drum::kitDelay] == before[drum::kitDelay] && after[drum::kitPolarity] == before[drum::kitPolarity],
+        "Loading must restore Snare Bottom without importing bypass or phase corrections");
+    const auto view = processor.getKitView();
+    const auto member = std::find_if(view.members.begin(), view.members.end(), [&](const auto& entry) {
+        return entry.id == processor.getKitMemberId();
+    });
+    check(member != view.members.end() && member->identity.role == kit::Role::snareBottom,
+        "Loading must immediately publish the restored identity to Kit");
     check(processor.canRevertAutoPreset() && !processor.canApplyAutoPreset(), "A loaded preset can be reverted");
     check(processor.revertAutoPreset(), "Revert must be possible after a load");
     const auto reverted = processor.getSettings();
@@ -177,12 +263,43 @@ void testProcessor()
     check(processor.deleteUserPreset("Crack").wasOk() && processor.listUserPresets().empty(), "A preset can be deleted");
     processor.releaseResources();
 }
+
+void testPresetEditorIdentity()
+{
+    TemporaryFolder temporary;
+    ZeroEffortDrumProcessor processor;
+    processor.setUserPresetRoot(temporary.folder);
+    check(processor.saveUserPreset("Kick In").wasOk(), "Kick In fixture must save");
+    processor.setKitControl(ZeroEffortDrumProcessor::kitMic, 1);
+    std::unique_ptr<juce::AudioProcessorEditor> editor(processor.createEditor());
+    auto* position = dynamic_cast<juce::ComboBox*>(editor->findChildWithID("kitMic"));
+    auto* instrument = dynamic_cast<juce::ComboBox*>(editor->findChildWithID("drumInstrument"));
+    check(position != nullptr && instrument != nullptr, "Identity menus must exist");
+    check(processor.loadUserPreset("Kick In").wasOk(), "Kick In must load from Kick Out");
+    juce::MessageManager::getInstance()->runDispatchLoopUntil(80);
+    check(position->isVisible() && position->getText() == "Kick In" && instrument->getSelectedId() == 1,
+        "The editor header must display the loaded Kick In identity");
+    check(processor.revertAutoPreset(), "Identity load must be undoable in the editor");
+    juce::MessageManager::getInstance()->runDispatchLoopUntil(80);
+    check(position->getText() == "Kick Out", "Revert must refresh the previous microphone label");
+    processor.setControl(drum::instrument, static_cast<float>(drum::DrumInstrument::tom2));
+    check(processor.saveUserPreset("Tom 2").wasOk(), "Tom identity fixture must save");
+    processor.setControl(drum::instrument, static_cast<float>(drum::DrumInstrument::floorTom));
+    check(processor.loadUserPreset("Tom 2").wasOk(), "Shared tom preset must load in the editor");
+    juce::MessageManager::getInstance()->runDispatchLoopUntil(80);
+    check(instrument->getText() == "Tom 2" && !position->isVisible(), "Loading must refresh the instrument menu and position visibility");
+    check(processor.revertAutoPreset(), "Tom identity must be undoable");
+    juce::MessageManager::getInstance()->runDispatchLoopUntil(80);
+    check(instrument->getText() == "Floor Tom", "Revert must refresh the original instrument label");
+}
 }
 
 void testPresets()
 {
     testNames();
     testLibrary();
+    testIdentityFormat();
     testProcessor();
-    std::cout << "PASS: user presets (names, files, families, load / revert)\n";
+    testPresetEditorIdentity();
+    std::cout << "PASS: user presets (names, files, 52 identities, legacy format, invalid identity, Kit preservation, load / revert, editor labels)\n";
 }

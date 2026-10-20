@@ -60,7 +60,7 @@ public:
     bool canApplyAutoPreset() const;
     bool canRevertAutoPreset() const;
     juce::String getAutoPresetText() const;
-    // User presets: the sound of this instrument, stored per family (the four toms share theirs). Loading can be undone with revertAutoPreset().
+    // User presets: sound and instrument/microphone identity, stored per family. Loading can be undone with revertAutoPreset().
     drum::PresetFamily getUserPresetFamily() const;
     std::vector<juce::String> listUserPresets() const;
     bool userPresetExists(const juce::String& name) const;

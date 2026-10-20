@@ -915,6 +915,7 @@ float ZeroEffortDrumProcessor::getAutoIntensity() const
 
 void ZeroEffortDrumProcessor::writeSettings(const drum::Settings& settings)
 {
+    const auto current = getSettings();
     if (isBoundToARA())
     {
         for (auto* modification : selectedModifications(*this))
@@ -925,11 +926,12 @@ void ZeroEffortDrumProcessor::writeSettings(const drum::Settings& settings)
     }
     else
     {
-        const auto current = getSettings();
         for (size_t index = 0; index < settings.size(); ++index)
             if (settings[index] != current[index])
                 setControl(static_cast<int>(index), settings[index]);
     }
+    if (settings[drum::instrument] != current[drum::instrument] || settings[drum::kitMic] != current[drum::kitMic])
+        kitTick();
 }
 
 bool ZeroEffortDrumProcessor::applyAutoPreset()
@@ -950,6 +952,7 @@ bool ZeroEffortDrumProcessor::revertAutoPreset()
     if (!canRevertAutoPreset()) return false;
     auto settings = autoSession->before;
     drum::keepKitSettings(settings, getSettings());
+    settings[drum::kitMic] = autoSession->before[drum::kitMic];
     writeSettings(settings);
     autoSession->changed = false;
     autoSession->text = "Auto / Previous settings restored";

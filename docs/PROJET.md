@@ -13,20 +13,22 @@ Les détails des anciennes livraisons et les résultats chiffrés restent dans l
 critères de test et les décisions. Les anciens CodeUpdate et le plan produit
 sont archivés, pas à relire à chaque reprise.
 
-> **À retenir :** version **0.11.8**, analyse **6**, profils **4**. Le traitement
+> **À retenir :** version **0.11.9**, analyse **6**, profils **4**. Le traitement
 > par instrument, le radar Auto, Kit / Phase, les presets et les sous-bus avec
-> balance sur validation sont implémentés. La priorité proposée est de consolider
-> les essais dans Cubase et le corpus, pas de considérer ces fonctions comme
-> toutes validées musicalement.
+> balance sur validation sont implémentés. **La base musicale précédente a été
+> validée par l'utilisateur sur Track 2 dans Cubase** ; son équilibre Auto est
+> conservé. L'identité des presets est restaurée en 0.11.9 et **validée par
+> l'utilisateur dans Cubase**. Suite du [plan ciblé](#plan-cible) : hi-hat, puis stabilisation.
 
 ## Sommaire
 
 1. [Tableau de bord](#tableau-de-bord)
 2. [Fait : fonctionnalités disponibles](#fait)
    - [Synthèse de l'audit des spécifications](#synthese-specs)
-3. [À valider : essais et preuves manquantes](#validation)
+3. [Validation : acquis et preuves restantes](#validation)
 4. [Problèmes et limites connus](#problemes)
 5. [À faire : feuille de route](#a-faire)
+   - [Plan ciblé retenu et ordre d'exécution](#plan-cible)
 6. [Idées pour la suite](#idees)
 7. [Versions et historique](#versions)
 8. [Utilisation, compilation et installation](#utilisation)
@@ -42,15 +44,15 @@ sont archivés, pas à relire à chaque reprise.
 |---|---|
 | Produit | Effet batterie **VST3 + ARA pour Cubase**, Windows x64, mono/stéréo ; pas de Standalone |
 | Socle | C++17, JUCE 8.0.6, SDK ARA 2.2.0, CMake |
-| Version | **0.11.8**, vérifiée dans [CMakeLists.txt](../CMakeLists.txt) |
+| Version | **0.11.9**, vérifiée dans [CMakeLists.txt](../CMakeLists.txt) |
 | Versions internes | `analysisVersion = 6`, `profileVersion = 4`, vérifiées dans le code |
 | État Git de référence | Branche `main`, dernier commit avant consolidation : `31391ec` (note de polarité des overheads) |
-| Dernières livraisons | Sous-bus, rapports de groupe, trims appliqués sur clic, refus plus explicites, note de polarité OH |
-| Tests automatiques | Dernier résultat **rapporté** : CTest **3/3** ; pas de nouvelle exécution pour cette consolidation documentaire |
-| Couverture réelle | Les anciens documents signalent des tests de kit réel **ignorés** depuis la disparition de leurs WAV ; 3/3 ne signifie donc pas couverture complète |
-| Validation dans Cubase | Plusieurs essais ponctuels confirmés ; campagne complète de la version actuelle encore à faire |
+| Dernières livraisons | F17 : presets avec instrument/micro, Revert complet et invalidation des rapports Kit obsolètes |
+| Tests automatiques | **Exécutés le 20/10 sur 0.11.9 : CTest 3/3**, Build and Test Release, VS2019 ; nouveaux tests bibliothèque/processeur/éditeur/Kit au vert |
+| Couverture réelle | Deux familles d'essais kit réel **ignorées** (WAV non disponibles via `ZED_WAV_DIRECTORY`) ; essai utilisateur F17 confirmé, sans remplacer ces tests automatisés |
+| Validation dans Cubase | Base musicale approuvée sur Track 2 ; identité des presets 0.11.9 testée et validée le 20/10 ; détection hi-hat réservée et généralisation non certifiée |
 | Corpus | Hors dépôt, dernier inventaire documenté : 4 tracks ; données et résultats non réexaminés pendant cette consolidation |
-| Travail en cours | Aucun nouveau chantier DSP engagé par ce document ; priorités ci-dessous **proposées**, sans engagement de date |
+| Travail en cours | F17 terminé, tests et validation utilisateur acquis ; prochain chantier : hi-hat (F18), puis stabilisation (F19). Aucun changement des règles Auto ou de l'équilibre Kick |
 
 **Légende des statuts**
 
@@ -105,10 +107,16 @@ familles de presets et ne sont pas alignés comme des micros.
 - Presets `.zedpreset` dans `%APPDATA%\ZeroEffort Drum\Presets\<famille>\` :
   enregistrer, charger, remplacer, supprimer vers la corbeille ; les quatre toms
   partagent leurs presets. Chargement annulable par Revert.
-- Un preset conserve le **son**, pas le rôle, bypass, Kit / Phase, Mono ni les
-  options Auto. Style et intensité y sont des indications, jamais réappliquées
-  au chargement. Analyse, bilan et retour Auto ne constituent pas un historique
-  persistant de session.
+- Depuis **0.11.9**, un nouveau preset (format 2) conserve le **son, le rôle et
+  la position de micro** : Kick In rétablit Kick In ; Tom 2 rétablit Tom 2, même
+  depuis Floor Tom. Revert restaure aussi l'identité précédente.
+- Groupe Kit, mode/force, retard/polarité, bypass, Mono et options Auto restent
+  ceux de la session. Style et intensité du preset sont seulement indicatifs.
+  Un changement d'identité invalide les résultats Kit concernés, pas les
+  corrections déjà appliquées ; refaire l'analyse avant une nouvelle correction.
+- Les anciens fichiers (format 1) restent lisibles et **gardent l'identité
+  courante**. Choisir le rôle/micro voulu puis réenregistrer pour le mémoriser.
+  Analyse, bilan et retour Auto ne constituent pas un historique persistant de session.
 
 ### 2.3 Analyse, mesures et outillage
 
@@ -214,9 +222,37 @@ Il n'y a pas de pourcentage d'achèvement : une fonction codée, un test synthé
 et une validation musicale sont trois preuves différentes.
 
 <a id="validation"></a>
-## 3. À valider : essais et preuves manquantes
+## 3. Validation : acquis et preuves restantes
 
-### Ce que les anciens retours confirment réellement
+<a id="validation-musicale"></a>
+### Validation utilisateur du 20 octobre 2026
+
+- [x] **V08 · État musical actuel accepté sur Track 2 dans Cubase.**
+
+L'utilisateur a largement essayé la version actuelle sur **Track 2**, morceau
+qu'il connaît bien ; il est en relation directe avec l'ingénieur du son d'origine.
+Les réglages Auto sont jugés cohérents et le résultat musical satisfaisant.
+Aucun autre problème n'est signalé dans cet usage, hormis un **souci de détection
+du hi-hat à caractériser** (P12).
+
+**Décision validée : conserver l'équilibre sonore actuel.** Le Kick pourrait,
+selon le goût de l'utilisateur, avoir un peu plus de gain et un renfort plus bas
+(idée : environ 10 Hz sous la fondamentale estimée). Ce n'est pas une anomalie
+retenue : aucun changement de gain, d'accord ou de dose Auto n'est engagé.
+Une calibration plus générale attendra des kits de différents ingénieurs.
+
+Cette acceptation musicale suffit pour poursuivre le projet : **pas de campagne
+d'écoute exhaustive à refaire pour l'enregistrer**. Elle ne certifie pas chaque
+opération de sauvegarde/export, chaque politique Kit ni tous les cas hôte.
+Track 2 ayant déjà servi aux références, ce retour n'est pas une validation
+statistique indépendante ni une suite de cas dorés automatisés.
+
+Version du dépôt au moment de ce retour : **0.11.8** ; le retour porte sur la « version actuelle »
+testée par l'utilisateur, sans nouvelle vérification du binaire chargé.
+Aucun build, test automatique ou nouvel essai audio n'a été exécuté pour cette
+validation documentaire ; les problèmes techniques connus restent ouverts.
+
+### Historique des retours et portée
 
 | Retour | Ce qu'il permet de conclure |
 |---|---|
@@ -225,8 +261,14 @@ et une validation musicale sont trois preuves différentes.
 | 17/10 | Export JSON Auto réel en ARA et progression du radar pendant la capture insert confirmés dans Cubase |
 | 20/10, sous-bus | Premier essai de balance Snare Bus : refus constaté ; message amélioré en 0.11.7, pas preuve d'une campagne complète Apply/Undo |
 | 20/10, polarités | Résultat du Track 2 reproduit hors ligne et cohérent avec le retour Cubase ; note explicative ajoutée en 0.11.8 |
+| 20/10, validation utilisateur | Auto musicalement satisfaisant sur Track 2 dans Cubase ; état sonore accepté, hi-hat réservé ; voir V08 |
+| 20/10, presets 0.11.9 | L'utilisateur confirme « testé et validé » après le correctif F17 et le parcours proposé de sauvegarde/chargement d'identité et Revert ; chantier accepté dans Cubase |
 
-### Checklist de validation de la version actuelle
+### Couverture technique et preuves restant à préciser
+
+Cette liste conserve les vérifications non attestées individuellement ; elle ne
+remet pas en cause V08 et ne bloque pas le plan ciblé. Les prochains essais seront
+concentrés sur les fonctions modifiées.
 
 - [ ] **V01 · Installation** : vérifier la version réellement chargée et l'absence
   d'un ancien build d'export ; copies ARA et VST3 cohérentes.
@@ -243,8 +285,10 @@ et une validation musicale sont trois preuves différentes.
 - [ ] **V07 · Preuves musicales** : constituer des cas dorés validés par
   l'utilisateur et un jeu de validation indépendant du jeu de calibration.
 
-Ces cases restent ouvertes tant que le résultat, les conditions et la version
-testée ne sont pas consignés. Ne pas extrapoler une réussite du prototype à 0.11.8.
+Ces cases restent ouvertes pour leur périmètre complet tant que le résultat,
+les conditions et la version testée ne sont pas consignés. V03 bénéficie de
+l'acceptation musicale V08, sans preuve de comparaison isolée de chaque politique.
+Ne pas extrapoler ce retour à une certification de tous les cas.
 
 <a id="problemes"></a>
 ## 4. Problèmes et limites connus
@@ -262,6 +306,7 @@ testée ne sont pas consignés. Ne pas extrapoler une réussite du prototype à 
 | P09 | Snapshots : proposition initiale, pas résultat final calibré ; politiques cymbales/sous-bus non enregistrées | Un rejeu n'est pas une preuve d'identité de toute la chaîne finale ; noter versions et politiques utilisées |
 | P10 | Générateurs de référence signalés périmés après traduction anglaise | Ne pas régénérer aveuglément les références avec les anciens scripts ; contrôler avant utilisation |
 | P11 | Automatisation Instrument : plage passée de 10 à 13 choix ; ancien changement de plage Output en 0.6 | États en valeurs conservés, mais vérifier les anciennes courbes normalisées dans l'hôte |
+| P12 | Souci de détection hi-hat signalé par l'utilisateur sur Track 2 le 20/10 | Symptôme et passage à reproduire avant diagnostic ; lien possible avec P05/F07, pas une cause établie ; chantier ciblé F18 |
 
 **Détail P04.** Sur deux Kicks en Rock 80 %, source Attack 9,8 / 11,1 dB,
 cible 13,4 / 14,7, obtenu 4,8 / 2,6. L'axe mesure l'énergie **0-70 ms contre
@@ -292,14 +337,57 @@ est une option d'affichage à décider séparément d'une révision du compresse
 <a id="a-faire"></a>
 ## 5. À faire : feuille de route
 
-**Ordre proposé, à choisir selon les ressources disponibles.**
+<a id="plan-cible"></a>
+### Plan ciblé retenu le 20 octobre 2026
+
+**Exécuter dans cet ordre, sans retoucher l'équilibre musical accepté.**
+Les étapes 1 et 2 sont terminées, **validation utilisateur dans Cubase comprise**.
+Hi-hat et stabilisation restent planifiés.
+
+| Étape | ID | Statut | Travail et critère de clôture |
+|---|---|---|---|
+| 1 · Valider la base | V08 | **Fait** | Retour utilisateur consigné sur Track 2 ; équilibre actuel conservé, Kick classé comme préférence artistique et hi-hat identifié comme réserve |
+| 2 · Identité des presets | F17 | **Terminé et validé · 0.11.9** | Instrument/micro restaurés, affichage et Revert testés, formats 1/2 compatibles en lecture, Kit de session conservé et résultats obsolètes invalidés ; utilisateur satisfait après essai Cubase le 20/10 |
+| 3 · Détection hi-hat | F18 | **À faire, prochain chantier** | Reproduire P12 sur Track 2, identifier le mécanisme, écrire un test puis corriger le cas ; vérifier l'absence de régression sur les autres instruments sans engager tout F07 |
+| 4 · Stabilisation | F19 | **À faire après F18** | Tests ciblés puis trois suites CTest avec SKIP signalés ; valider le passage hi-hat et la non-régression des presets sur le build final ; validation F17 déjà acquise |
+
+**Résultat F17 :** format de presets **2**, lecture du format **1** conservée ;
+aucun changement d'ID de paramètre, des formats d'état hôte ou des versions
+d'analyse/profil. Contrat détaillé dans [SPECIFICATIONS.md](SPECIFICATIONS.md#presets).
+Les fichiers malformés sont refusés avec un message, sans application partielle.
+
+**Preuves F17 :** 52 combinaisons rôle/position, lecture des anciens presets,
+identité invalide, conservation des réglages de session, chargement/Revert,
+libellés Kick In/Kick Out et Tom 2/Floor Tom dans l'éditeur ; invalidation Kit
+après analyse terminée ou changement de position OH pendant une analyse.
+Test de régression d'abord en échec sur le rapport Kit obsolète, puis corrigé.
+Validation finale : `powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/Build.ps1 -Action Verify`,
+**3/3** ; les deux essais kit réel restent SKIP faute de WAV. VST3 0.11.9 compilé
+localement, non installé automatiquement, aucune lecture audio lancée par l'assistant.
+**Validation utilisateur reçue le 20/10 à 12:01 : « testé et validé, c'est bon ».**
+Le correctif est accepté dans Cubase après proposition du parcours Kick In →
+Kick Out → chargement → vérification de l'identité → Revert. F17 est clôturé ;
+ce retour ne certifie pas tous les autres scénarios de la checklist technique.
+
+**Périmètre F18 :** ne pas présumer que le problème est un mauvais comptage de
+frappes, un refus Auto ou un réglage incorrect. Il faudra identifier le passage
+et le symptôme exacts avant de choisir la correction. Si une évolution sonore
+est nécessaire, la signaler et limiter l'essai au cas concerné.
+
+**Après F19 :** élargir le corpus puis réévaluer les cibles avec plusieurs
+ingénieurs. Le gain/renfort Kick, les nouveaux rôles, le gate partagé et le moteur
+statistique général ne sont pas inclus dans cette mise à jour ciblée.
+
+### Réserve de chantiers à plus long terme
+
+**Priorités indicatives ; le plan ciblé ci-dessus fixe l'ordre immédiat.**
 P1 = fiabiliser l'existant ; P2 = terminer les fondations ; P3 = extension.
 Aucune date ni nouvelle activation n'est décidée ici.
 
 | ID | Priorité | Chantier | Dépendance | Critère de clôture |
 |---|---|---|---|---|
 | F01 | P1 | Restaurer la couverture kit réel (P01) | WAV synchronisés + choix de référence | Tests concernés réellement exécutés, sans SKIP, référence identifiée |
-| F02 | P1 | Campagne Cubase V01-V06 | Hôte et accord pour l'écoute | Résultats versionnés, anomalies reproductibles consignées |
+| F02 | P1 | Compléter les preuves techniques Cubase V01-V06 au fil des changements ; acceptation musicale V08 acquise | Cas concernés + hôte et accord pour l'écoute | Résultats versionnés, anomalies reproductibles consignées ; ne pas refaire l'écoute générale déjà acceptée |
 | F03 | P1 | Calibrer les garde-fous Kit et décider leur activation/UI (P03) | Plusieurs kits + écoute | Correction juste **ou refus explicite**, sans régression des kits ordinaires |
 | F04 | P1 | Clarifier la cible Attack (P04) | Décision affichage vs changement sonore | Cible honnête ou modélisée et vérifiée ; modification sonore validée séparément |
 | F05 | P2 | Corriger le biais Kick (P02) | Tests synthétiques + kits réels | Précision demandée ou refus fiable ; changement contrôlé |
@@ -322,15 +410,19 @@ rapport hors fenêtre **1,2**, tolérance OH **1,5 ms**, plages radar et seuils 
 balance. Le seuil actif à 55 dB a été calibré sur un petit corpus : ce n'est pas
 une preuve universelle.
 
-**Choix rapide pour une prochaine session :** avec Cubase, F02 ; avec les anciens
-WAV, F01 ; sans écoute et sans corpus, F06 à comportement strictement constant.
-Ne pas commencer plusieurs chantiers sonores simultanément.
+**Prochaine session : F18, détection hi-hat sur Track 2.** F01 reste à traiter pour
+rétablir la couverture automatisée réelle ; ne pas confondre cette dette avec
+un refus de la validation musicale. Ne pas commencer plusieurs chantiers sonores
+simultanément.
 
 <a id="idees"></a>
 ## 6. Idées pour la suite
 
 Ces pistes ne sont **ni livrées ni engagées** :
 
+- Kick : un peu plus de gain ou renfort environ 10 Hz sous la fondamentale
+  estimée, selon préférence artistique. **Décision du 20/10 : laisser le son
+  actuel inchangé**, sans imposer cette idée aux presets Auto.
 - Radar : comparaison A/B à l'écoute dans le panneau, spectres avant/après,
   explications au survol des réglages.
 - Kit : corrélation détaillée par paire dans l'UI, rapports persistants, mode
@@ -366,7 +458,7 @@ fonctionnalités annoncées pour la prochaine version.
 
 | Numéro | Signification | Valeur |
 |---|---|---|
-| Version du plug-in | Livraison visible, build et compatibilité | **0.11.8** |
+| Version du plug-in | Livraison visible, build et compatibilité | **0.11.9** |
 | `analysisVersion` | Mesures, constantes ou état d'analyse sérialisé | **6** |
 | `profileVersion` | Règles qui construisent les propositions | **4** |
 
@@ -379,6 +471,7 @@ le retour et comparer ses résultats selon les règles du chantier.
 
 | Version / date documentée | Contenu principal | Repère |
 |---|---|---|
+| 0.11.9 · 20/10 | F17 : presets son + identité, compatibilité format 1, Revert et rapports Kit invalidés après changement d'identité ; règles Auto inchangées | Build Release + CTest 3/3 ; validé par l'utilisateur dans Cubase ; 2 familles réelles SKIP |
 | 0.11.8 · 20/10 | Note sur les polarités relatives aux OH ; `--kit` accepte le stéréo en lisant le canal gauche | `31391ec` |
 | 0.11.7 · 20/10 | Refus de trims plus précis, niveaux lisibles ; test de portée du Makeup | `3d21911` |
 | 0.11.6 · 20/10 | Balance de sous-bus proposée, Apply/Undo sur clic | `63b8f2e` |
@@ -617,10 +710,15 @@ Prochaine action :
 
 ### Point de reprise
 
-Lire ce document, vérifier versions et état Git, choisir **un** chantier de la
-feuille de route selon la présence de Cubase/corpus. Les trois points à ne pas
-oublier sont **les tests réels ignorés**, **les garde-fous Kit désactivés** et
-**la différence entre cible radar et résultat mesuré**.
+**V08 consignée ; F17 terminé et validé dans Cubase en 0.11.9, sans changement des règles Auto.**
+Reprendre le [plan ciblé](#plan-cible) à **F18 : détection hi-hat**, puis F19
+(stabilisation). Ne pas redemander la validation F17 déjà reçue ; prévoir seulement
+sa non-régression avec les prochains changements. Ne pas réouvrir la calibration
+générale ni le Kick sans nouvelle décision. Vérifier versions et état Git avant le code.
+
+Les limites à conserver visibles sont **les tests réels ignorés**, **les
+garde-fous Kit désactivés** et **la différence entre cible radar et résultat
+mesuré** ; la satisfaction sur Track 2 ne les clôt pas automatiquement.
 
 <a id="archives"></a>
 ## 12. Sources et archives
