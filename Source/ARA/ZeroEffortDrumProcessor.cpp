@@ -610,7 +610,22 @@ void ZeroEffortDrumProcessor::cancelAutoPreset()
     autoSession->radar.refused = false;
 }
 
+// Called by the editor timer. The analysis phase advances one chunk per call so that the radar builds up while it runs; the calibration and
+// verification phases are plain renders of the whole take and advance for a slice of time per call, otherwise a long take would wait on the timer.
 void ZeroEffortDrumProcessor::updateAutoPreset()
+{
+    const auto started = juce::Time::getMillisecondCounterHiRes();
+    const auto phase = autoSession->phase;
+    do stepAutoPreset(phase == 0);
+    while (phase >= 1 && autoSession->busy && autoSession->phase == phase && !autoSession->ready
+           && juce::Time::getMillisecondCounterHiRes() - started < autoRenderSliceMs);
+    // The measured curve of the verification is refreshed once per tick, not once per chunk.
+    if (phase == 2 && autoSession->busy && autoSession->phase == 2)
+        if (const auto* output = autoSession->preview.outputAnalysis())
+            autoSession->radar.result = drum::DrumAutoRadar::measure(*output);
+}
+
+void ZeroEffortDrumProcessor::stepAutoPreset(bool measureRadar)
 {
     auto& session = *autoSession;
     if ((!session.busy && !session.ready && !session.changed)) return;
@@ -704,10 +719,13 @@ void ZeroEffortDrumProcessor::updateAutoPreset()
     session.text = juce::String("Auto / ") + (session.phase == 0 ? "Analysis " : session.phase == 1 ? "Calibration " : "Verification ")
         + juce::String(session.total > 0 ? 100.0 * session.offset / session.total : 0.0, 0) + " %";
     session.radar.progress = session.total > 0 ? static_cast<float>(session.offset) / static_cast<float>(session.total) : 0.0f;
-    if (session.phase == 0)
-        session.radar.source = drum::DrumAutoRadar::measure(session.analyser.analysis());
-    else if (session.phase == 2)
-        if (const auto* output = session.preview.outputAnalysis()) session.radar.result = drum::DrumAutoRadar::measure(*output);
+    if (measureRadar || session.offset == session.total)
+    {
+        if (session.phase == 0)
+            session.radar.source = drum::DrumAutoRadar::measure(session.analyser.analysis());
+        else if (session.phase == 2)
+            if (const auto* output = session.preview.outputAnalysis()) session.radar.result = drum::DrumAutoRadar::measure(*output);
+    }
     if (session.offset == session.total)
     {
         if (session.phase == 0)

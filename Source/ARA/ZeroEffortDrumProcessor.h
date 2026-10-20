@@ -123,6 +123,8 @@ private:
     drum::DrumPresetLibrary presetLibrary { drum::DrumPresetLibrary::defaultRoot() };
     juce::String autoTargetKey() const;
     juce::Result failPreset(const juce::String& message);
+    void stepAutoPreset(bool measureRadar);
+    static constexpr double autoRenderSliceMs = 22.0;   // of the 50 ms editor tick, left to the calibration and verification renders
     void writeSettings(const drum::Settings& settings);
     static juce::AudioProcessorValueTreeState::ParameterLayout createParameters();
     drum::DrumEngine engine;
