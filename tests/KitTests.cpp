@@ -1048,8 +1048,34 @@ void testRoleNames()
 }
 }
 
+// Overheads in opposite polarity make every other track look inverted: the report then says so (a note, the corrections stay as measured).
+void testOverheadPolarityHint()
+{
+    const auto make = [](kit::Role role, bool measured, bool invert) {
+        kit::Recommendation recommendation;
+        recommendation.role = role;
+        recommendation.measured = measured;
+        recommendation.invert = invert;
+        return recommendation;
+    };
+    using kit::Role;
+    const std::vector<kit::Recommendation> allInverted { make(Role::overhead, true, false), make(Role::kickIn, true, true), make(Role::kickOut, true, true),
+        make(Role::snareTop, true, true), make(Role::snareBottom, true, true), make(Role::room, true, true), make(Role::floorTom, true, false), make(Role::hiHat, false, false) };
+    const auto hint = kit::KitSession::overheadPolarityHint(allInverted);
+    check(hint.contains("5 of 6 tracks") && hint.contains("inverting the overheads"), "Most tracks inverted against the overheads: the overheads are named");
+    check(kit::KitSession::overheadPolarityHint({ make(Role::overhead, true, false), make(Role::kickIn, true, true), make(Role::snareTop, true, true), make(Role::room, true, false) }).isEmpty(),
+        "Two inverted tracks are not a pattern");
+    check(kit::KitSession::overheadPolarityHint({ make(Role::overhead, true, false), make(Role::kickIn, true, true), make(Role::kickOut, true, true), make(Role::snareTop, true, true),
+        make(Role::snareBottom, true, false), make(Role::room, true, false), make(Role::floorTom, true, false) }).isEmpty(), "Less than half inverted: no note");
+    check(kit::KitSession::overheadPolarityHint({ make(Role::kickIn, true, true), make(Role::kickOut, true, true), make(Role::snareTop, true, true) }).isEmpty(),
+        "Without overheads there is no reference to question");
+    check(kit::KitSession::overheadPolarityHint({ make(Role::overhead, true, false), make(Role::kickIn, false, true), make(Role::kickOut, false, true), make(Role::snareTop, false, true) }).isEmpty(),
+        "Tracks that were not measured count for nothing");
+}
+
 void testKit()
 {
+    testOverheadPolarityHint();
     testRoleNames();
     testAligner();
     testCapture();
@@ -1060,7 +1086,7 @@ void testKit()
     std::cout << "PASS: kit alignment, polarity, capture and multi-instance registry\n";
 }
 
-// Developer command: ZeroEffortDrumTests.exe --kit [--guards] [--start <s>] [--seconds <s>] <role>=<mono wav> ...
+// Developer command: ZeroEffortDrumTests.exe --kit [--guards] [--start <s>] [--seconds <s>] <role>=<wav> ...
 // Roles: kickin, kickout, snare, snarebottom, tom, floortom, hihat, oh, ohl, ohr, room. Analysis only, no playback.
 int runKitCommand(const juce::StringArray& commandLine)
 {
@@ -1101,7 +1127,7 @@ int runKitCommand(const juce::StringArray& commandLine)
             entries.push_back({ name, role, position, file });
         }
     }
-    if (entries.size() < 2) return fail("usage: --kit [--guards] [--start s] [--seconds s] <role>=<mono wav> ... (at least a close mic and an overhead)");
+    if (entries.size() < 2) return fail("usage: --kit [--guards] [--start s] [--seconds s] <role>=<wav> ... (at least a close mic and an overhead)");
     std::vector<std::vector<float>> audio(entries.size());
     std::vector<kit::TrackInput> inputs;
     double sampleRate = 0;
@@ -1113,7 +1139,7 @@ int runKitCommand(const juce::StringArray& commandLine)
         std::unique_ptr<juce::AudioFormatReader> reader(formats.createReaderFor(entries[index].file));
         if (reader == nullptr) return fail("cannot read " + entries[index].file.getFullPathName());
         fileRate = reader->sampleRate;
-        if (reader->numChannels != 1) return fail(entries[index].file.getFileName() + " must be mono");
+        if (reader->numChannels < 1 || reader->numChannels > 2) return fail(entries[index].file.getFileName() + " must be mono or stereo (the left channel is analysed)");
         if (index > 0 && fileRate != sampleRate) return fail("all files must share the sample rate");
         sampleRate = fileRate;
         const auto start = static_cast<juce::int64>(startSeconds * fileRate);
@@ -1133,6 +1159,8 @@ int runKitCommand(const juce::StringArray& commandLine)
                   << (std::isfinite(recommendation.crosstalkDb) ? juce::String(recommendation.crosstalkDb, 1) : juce::String("-")) << " | "
                   << recommendation.note << " |\n";
     std::cout << "\nCoherence de phase " << report.scores.phaseBefore << " -> " << report.scores.phaseAfter << ", frappes " << report.events << std::endl;
+    for (const auto& line : report.lines)
+        if (line.startsWith("Note :")) std::cout << "\n" << line << std::endl;
     if (detail)
     {
         std::cout << "\n| Paire | Evenements | Retard (ms) | r | valide | coherence pair/impair (ms) | hors fenetre / dans | r a 3 / 5 / 7 / 9 / 11 ms |\n|---|---|---|---|---|---|---|---|\n";

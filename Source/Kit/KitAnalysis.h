@@ -583,9 +583,28 @@ public:
             }
             result.lines.add(line);
         }
+        if (const auto hint = overheadPolarityHint(result.recommendations); hint.isNotEmpty()) result.lines.add(hint);
         result.valid = result.scores.phaseBefore >= 0 || result.scores.roomBefore >= 0 || result.scores.stereo >= 0;
         result.headline = result.valid ? juce::String(corrected) + " correction(s) proposed" : "Not enough measurements";
         return result;
+    }
+
+    // Every polarity is measured against the overheads, the kit time reference. When most of the other tracks come out inverted, the
+    // overheads are probably the one in opposite polarity (the room, a distant mic too, agrees with the close mics): inverting the
+    // overheads gives the same relative phase with fewer switches. Only a note: the corrections above are left as measured.
+    static juce::String overheadPolarityHint(const std::vector<Recommendation>& recommendations)
+    {
+        int measured = 0, inverted = 0;
+        bool reference = false;
+        for (const auto& recommendation : recommendations)
+        {
+            if (recommendation.role == Role::overhead) { reference = true; continue; }
+            if (!recommendation.measured) continue;
+            ++measured;
+            if (recommendation.invert) ++inverted;
+        }
+        if (!reference || inverted < 3 || inverted * 2 <= measured) return {};
+        return "Note : " + juce::String(inverted) + " of " + juce::String(measured) + " tracks come out inverted against the overheads. The overheads are probably the ones in opposite polarity: inverting the overheads instead gives the same relative phase with fewer switches (the tracks that are not inverted above would then be the ones to invert).";
     }
 
 private:

@@ -1534,7 +1534,7 @@ int main(int argumentCount, char** arguments)
             "ARA plugin name must match ZeroEffort Drum");
         require(factory->manufacturerName != nullptr && juce::String(factory->manufacturerName).isNotEmpty(),
             "ARA manufacturer must be present");
-        require(factory->version != nullptr && juce::String(factory->version) == "0.11.7",
+        require(factory->version != nullptr && juce::String(factory->version) == "0.11.8",
             "ARA factory version must match the corrected prototype");
         require(juce::String(factory->factoryID) == "com.robin.zeroeffortdrum.factory.1",
             "ARA identity must identify ZeroEffort Drum separately from the prototype and gain plugin");

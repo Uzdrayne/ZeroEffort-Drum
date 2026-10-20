@@ -6,7 +6,7 @@ Document de situation : **où on en est, ce qui est fait, ce qui manque**. Il r�
 
 | | |
 |---|---|
-| Version du plug-in | **0.11.7** (VST3 + ARA, Windows x64, JUCE 8.0.6) |
+| Version du plug-in | **0.11.8** (VST3 + ARA, Windows x64, JUCE 8.0.6) |
 | Versions d'analyse | `analysisVersion` **6**, `profileVersion` **4** |
 | Branche de travail | `main` directement, un commit par étape (depuis le 17/10) |
 | Tests | 3 suites CTest, **toutes vertes** : `RegionCacheTests`, `ZeroEffortDrumTests` (≈ 80-120 s), `ARADiscoveryTests` ; build VS 2019 sans avertissement |
