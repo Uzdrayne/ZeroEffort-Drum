@@ -89,6 +89,9 @@ inline bool expanderDiscouraged(int instrument) noexcept
 
 inline juce::String roleHint(int instrument)
 {
+    if (instrument == static_cast<int>(DrumInstrument::kickBus)) return "Kick Bus: sum of the kick mics";
+    if (instrument == static_cast<int>(DrumInstrument::snareBus)) return "Snare Bus: sum of the snare mics";
+    if (instrument == static_cast<int>(DrumInstrument::tomsBus)) return "Toms Bus: sum of the toms";
     switch (familyOf(instrument))
     {
         case Family::kick: return "Kick: weight, box, beater click";

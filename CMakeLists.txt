@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.22)
-project(ZeroEffortDrum VERSION 0.11.2 LANGUAGES C CXX)
+project(ZeroEffortDrum VERSION 0.11.3 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -23,7 +23,7 @@ include(cmake/PatchJuceARABuses.cmake)
 juce_add_plugin(ZeroEffortDrum
     COMPANY_NAME "Robin"
     COMPANY_WEBSITE "https://example.invalid/zeroeffort-drum"
-    VERSION 0.11.2
+    VERSION 0.11.3
     BUNDLE_ID "com.robin.zeroeffortdrum"
     PLUGIN_MANUFACTURER_CODE Rbin
     PLUGIN_CODE Zedr
@@ -72,7 +72,7 @@ if(BUILD_TESTING)
     add_test(NAME RegionCacheTests COMMAND RegionCacheTests)
 
     juce_add_console_app(ZeroEffortDrumTests PRODUCT_NAME "ZeroEffort Drum Tests")
-    target_sources(ZeroEffortDrumTests PRIVATE tests/ZeroEffortDrumProcessorTests.cpp tests/KitTests.cpp tests/SnapshotTests.cpp tests/PropertyTests.cpp tests/ReplayTests.cpp tests/MeasureTests.cpp tests/KnownProblemTests.cpp tests/RoleReferenceTests.cpp tests/PairTests.cpp tests/VersusTests.cpp tests/PresetTests.cpp tests/AutoRadarTests.cpp tests/SignalTests.cpp tests/EditorTests.cpp tests/Screenshots.cpp
+    target_sources(ZeroEffortDrumTests PRIVATE tests/ZeroEffortDrumProcessorTests.cpp tests/KitTests.cpp tests/SnapshotTests.cpp tests/PropertyTests.cpp tests/ReplayTests.cpp tests/MeasureTests.cpp tests/KnownProblemTests.cpp tests/RoleReferenceTests.cpp tests/PairTests.cpp tests/VersusTests.cpp tests/PresetTests.cpp tests/SubBusTests.cpp tests/AutoRadarTests.cpp tests/SignalTests.cpp tests/EditorTests.cpp tests/Screenshots.cpp
         "${juce_SOURCE_DIR}/modules/juce_audio_plugin_client/juce_audio_plugin_client_ARA.cpp")
     target_include_directories(ZeroEffortDrumTests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/Source")
     target_compile_definitions(ZeroEffortDrumTests PRIVATE JucePlugin_Build_VST3=1 JUCE_MODAL_LOOPS_PERMITTED=1)

@@ -73,7 +73,7 @@ struct DrumReplay
 {
     static juce::String roleLabel(int role)
     {
-        return instrumentName(static_cast<DrumInstrument>(juce::jlimit(0, 9, role)));
+        return instrumentName(static_cast<DrumInstrument>(juce::jlimit(0, instrumentCount - 1, role)));
     }
 
     static ReplayEntry makeEntry(const juce::String& file, const SnapshotContext& context, const DrumProposal& proposal,
@@ -193,7 +193,7 @@ struct DrumReplay
             if (object == nullptr) return juce::Result::fail("invalid entry");
             ReplayEntry entry;
             entry.file = object->getProperty("file").toString();
-            entry.role = juce::jlimit(0, 9, static_cast<int>(object->getProperty("role")));
+            entry.role = juce::jlimit(0, instrumentCount - 1, static_cast<int>(object->getProperty("role")));
             entry.style = object->getProperty("style").toString();
             entry.intensity = static_cast<float>(static_cast<double>(object->getProperty("intensity")));
             entry.valid = static_cast<bool>(object->getProperty("valid"));

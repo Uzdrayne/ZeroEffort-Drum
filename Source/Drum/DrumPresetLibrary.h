@@ -8,7 +8,7 @@
 namespace drum
 {
 // A user preset belongs to a family: the four toms share theirs, every other instrument has its own.
-enum class PresetFamily { kick, snare, toms, hiHat, overheads, room, bus };
+enum class PresetFamily { kick, snare, toms, hiHat, overheads, room, bus, kickBus, snareBus, tomsBus };
 
 inline PresetFamily presetFamilyOf(DrumInstrument instrument) noexcept
 {
@@ -22,13 +22,16 @@ inline PresetFamily presetFamilyOf(DrumInstrument instrument) noexcept
         case DrumInstrument::overheads: return PresetFamily::overheads;
         case DrumInstrument::room: return PresetFamily::room;
         case DrumInstrument::master: return PresetFamily::bus;
+        case DrumInstrument::kickBus: return PresetFamily::kickBus;
+        case DrumInstrument::snareBus: return PresetFamily::snareBus;
+        case DrumInstrument::tomsBus: return PresetFamily::tomsBus;
     }
     return PresetFamily::kick;
 }
 
 inline const char* presetFamilyName(PresetFamily family) noexcept
 {
-    constexpr std::array<const char*, 7> names { "Kick", "Snare", "Toms", "Hi-hat", "Overheads", "Room", "Bus" };
+    constexpr std::array<const char*, 10> names { "Kick", "Snare", "Toms", "Hi-hat", "Overheads", "Room", "Bus", "Kick Bus", "Snare Bus", "Toms Bus" };
     return names[static_cast<size_t>(family)];
 }
 

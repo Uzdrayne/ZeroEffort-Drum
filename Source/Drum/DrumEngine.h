@@ -119,7 +119,7 @@ inline const std::array<ControlSpec, controlCount> controlSpecs {{
     { "highMakeupDb", "High makeup", "dB", -12, 12, 0, 1 },
     { "highRangeDb", "High max GR", "dB", 0, 24, 6, 1 },
     { "highSolo", "Solo High", "", 0, 1, 0, 1, true },
-    { "drumInstrument", "Instrument", "", 0, 9, 0, 1 },
+    { "drumInstrument", "Instrument", "", 0, 12, 0, 1 },
     { "busGlueOn", "Bus Glue", "", 0, 1, 0, 1, true },
     { "busThresholdDb", "Glue threshold", "dB", -60, 0, -18, 1 },
     { "busRatio", "Glue ratio", ":1", 1, 10, 2, 0.6f },

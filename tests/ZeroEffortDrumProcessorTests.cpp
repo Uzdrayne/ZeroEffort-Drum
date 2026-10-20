@@ -29,6 +29,7 @@ void testVersus();
 void testPair();
 void testAutoRadar();
 void testPresets();
+void testSubBuses();
 void makeScreenshots(const juce::File& directory);
 void testEditor(ZeroEffortDrumProcessor& processor, const juce::File& imageFile);
 void testAutoRadarFlow(const juce::File& imageFile);
@@ -1374,6 +1375,7 @@ int main(int argumentCount, char** arguments)
         testPair();
         testAutoRadar();
         testPresets();
+        testSubBuses();
         testVersus();
         testSignals();
         testKickResponse();
@@ -1502,7 +1504,7 @@ int main(int argumentCount, char** arguments)
             "ARA plugin name must match ZeroEffort Drum");
         require(factory->manufacturerName != nullptr && juce::String(factory->manufacturerName).isNotEmpty(),
             "ARA manufacturer must be present");
-        require(factory->version != nullptr && juce::String(factory->version) == "0.11.2",
+        require(factory->version != nullptr && juce::String(factory->version) == "0.11.3",
             "ARA factory version must match the corrected prototype");
         require(juce::String(factory->factoryID) == "com.robin.zeroeffortdrum.factory.1",
             "ARA identity must identify ZeroEffort Drum separately from the prototype and gain plugin");

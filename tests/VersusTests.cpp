@@ -77,7 +77,7 @@ int runVersusCommand(const juce::StringArray& arguments)
     if (commandLine.size() < 6 || commandLine.size() > 7)
         return fail("usage: --vs-plugin <raw.wav> <role 0-9> <natural|rock|metal> <intensity 0-1> <mix.wav> [output prefix]");
     const auto role = commandLine[2].getIntValue();
-    if (role < 0 || role > 9 || !commandLine[2].containsOnly("0123456789")) return fail("role must be an integer from 0 to 9");
+    if (role < 0 || role >= drum::instrumentCount || !commandLine[2].containsOnly("0123456789")) return fail("role must be an integer from 0 to 12");
     const auto styleName = commandLine[3].toLowerCase();
     if (styleName != "natural" && styleName != "rock" && styleName != "metal") return fail("style must be natural, rock or metal");
     const auto style = styleName == "rock" ? drum::DrumStyle::rock : styleName == "metal" ? drum::DrumStyle::metal : drum::DrumStyle::natural;
@@ -378,7 +378,7 @@ void testVersus()
         "The comparison must cover enough reliable bands");
     expect(!static_cast<juce::var>(bright["plugin"]["forme_db_1_3_octave"]).isVoid(), "The plug-in curve must be written");
 
-    expect(runVersusCommand({ "--vs-plugin", folder.getChildFile("raw.wav").getFullPathName(), "12", "rock", "0.75",
+    expect(runVersusCommand({ "--vs-plugin", folder.getChildFile("raw.wav").getFullPathName(), "13", "rock", "0.75",
         folder.getChildFile("brighter.wav").getFullPathName() }) == 1, "An invalid role must be refused");
     expect(runVersusCommand({ "--vs-plugin", folder.getChildFile("raw.wav").getFullPathName(), "0", "disco", "0.75",
         folder.getChildFile("brighter.wav").getFullPathName() }) == 1, "An invalid style must be refused");

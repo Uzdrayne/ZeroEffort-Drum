@@ -324,10 +324,17 @@ DrumEditor::DrumEditor(ZeroEffortDrumProcessor& processor)
     : AudioProcessorEditor(processor), AudioProcessorEditorARAExtension(&processor), owner(processor)
 {
     setLookAndFeel(&look);
-    for (size_t index = 0; index < drum::instrumentNames.size(); ++index)
-        instrumentMenu.addItem(drum::instrumentNames[index], static_cast<int>(index) + 1);
+    // Microphones and single tracks first, then the buses: the sub-buses (sum of the mics of one instrument) and the drum master bus.
+    const auto addRole = [this](drum::DrumInstrument role) {
+        instrumentMenu.addItem(drum::instrumentName(role), static_cast<int>(role) + 1);
+    };
+    for (int index = 0; index <= static_cast<int>(drum::DrumInstrument::room); ++index) addRole(static_cast<drum::DrumInstrument>(index));
+    instrumentMenu.addSeparator();
+    instrumentMenu.addSectionHeading("Buses");
+    for (const auto role : { drum::DrumInstrument::kickBus, drum::DrumInstrument::snareBus, drum::DrumInstrument::tomsBus, drum::DrumInstrument::master })
+        addRole(role);
     instrumentMenu.setComponentID("drumInstrument");
-    instrumentMenu.setTooltip("Item handled by this instance: names the settings and selects the Auto profile. No audio change.");
+    instrumentMenu.setTooltip("Item handled by this instance: names the settings and selects the Auto profile. Buses: put the plug-in on the group track of an instrument (sum of its mics). No audio change.");
     instrumentMenu.onChange = [this] {
         owner.setControl(drum::instrument, static_cast<float>(instrumentMenu.getSelectedId() - 1));
         owner.cancelAutoPreset();
@@ -1334,7 +1341,7 @@ void DrumEditor::paintPage(juce::Graphics& graphics, const drum::Settings& setti
             const auto identity = owner.getKitIdentity();
             caption("GROUP", 30, 426, 200, palette::textFaint, 11.5f, true);
             caption("MIC", 30, 484, 200, palette::textFaint, 11.5f, true);
-            caption(identity.role == kit::Role::none ? juce::String("Outside kit (master bus)") : identity.name, 30, 502, 240, palette::text, 14.0f, true);
+            caption(identity.role == kit::Role::none ? juce::String("Outside kit (bus)") : identity.name, 30, 502, 240, palette::text, 14.0f, true);
             caption(juce::String("Role: ") + kit::roleName(identity.role), 30, 520, 240, palette::textDim, 12.0f);
             caption("MODE", 30, 540, 200, palette::textFaint, 11.5f, true);
             const auto* own = owner.findOwnRecommendation(kitView.report);

@@ -6,13 +6,13 @@ Document de situation : **où on en est, ce qui est fait, ce qui manque**. Il r�
 
 | | |
 |---|---|
-| Version du plug-in | **0.11.2** (VST3 + ARA, Windows x64, JUCE 8.0.6) |
+| Version du plug-in | **0.11.3** (VST3 + ARA, Windows x64, JUCE 8.0.6) |
 | Versions d'analyse | `analysisVersion` **6**, `profileVersion` **3** |
 | Branche de travail | `main` directement, un commit par étape (depuis le 17/10) |
 | Tests | 3 suites CTest, **toutes vertes** : `RegionCacheTests`, `ZeroEffortDrumTests` (≈ 80-120 s), `ARADiscoveryTests` ; build VS 2019 sans avertissement |
 | Corpus (hors dépôt) | `Database_drum` : 4 tracks (`Track_1`, `Track_2`, `track_3`, `track_4`) ; Track 2 = 8 paires brut / mixé acceptées (ingé A.H., post punk) ; Track 1 inexploitable en paires (samples) ; Tracks 3 et 4 = bus ; manifeste `corpus.json` (ancien dans `archive_v6`). **`raw2`, `raw3`, `raw4` ont disparu** (voir 5) |
 | Vérifié dans Cubase | l'**export JSON** d'une analyse Auto (Kick, région ARA). **Rien d'autre n'a été écouté** (voir 5) |
-| Dernier chantier | **presets utilisateur** (Presets : enregistrer / charger par instrument, voir 2) ; avant : interface en anglais (6), radar Auto |
+| Dernier chantier | **sous-bus SB1** (Kick Bus, Snare Bus, Toms Bus dans le menu d'instrument) ; avant : presets utilisateur (Presets : enregistrer / charger par instrument, voir 2) ; avant : interface en anglais (6), radar Auto |
 
 ## 2. Ce qui est fait
 

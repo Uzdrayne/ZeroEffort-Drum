@@ -5,7 +5,8 @@ namespace drum
 {
 struct MasterBusProfile
 {
-    static DrumProposal propose(const DrumAnalysis& analysis, const Settings& original, DrumStyle style, float intensity)
+    static DrumProposal propose(const DrumAnalysis& analysis, const Settings& original, DrumStyle style, float intensity,
+        bool subBus = false)
     {
         ProfileParameters profile {};
         profile.highPassHz = 20;
@@ -30,8 +31,14 @@ struct MasterBusProfile
         settings[glueAttack] = 30;
         settings[glueRelease] = style == DrumStyle::natural ? 200.0f : 100.0f;
         result.summary += " / Bus Glue: soft knee, sidechain HP 80 Hz, attack 30 ms, not an SSL emulation";
-        result.summary += "\nBUS: analysis of the sum only. No individual Kick/Snare/Tom level can be measured."
-            "\nCheck track levels and phase before compression. Ambience proposed from the role and measurements.";
+        // First version of the sub-bus profiles (document 08, SB1): the drum bus tuning, without ambience. Group profiles come from
+        // the raw / mixed pairs of the corpus (SB3).
+        if (subBus)
+            result.summary += "\nSUB-BUS: analysis of the sum of the mics of one instrument. No kit alignment here: align the mics on their own tracks."
+                "\nGroup profile in progress: the settings are those of the drum bus, without ambience.";
+        else
+            result.summary += "\nBUS: analysis of the sum only. No individual Kick/Snare/Tom level can be measured."
+                "\nCheck track levels and phase before compression. Ambience proposed from the role and measurements.";
         if (analysis.peak > juce::Decibels::decibelsToGain(-1.0f))
             result.summary += "\nSource peaks close to 0 dBFS: lower the group gain before the following processing.";
         const auto total = analysis.bandEnergy(20, juce::jmin(16000.0, analysis.rate * 0.45));

@@ -170,7 +170,7 @@ Un micro appartient à **au plus un** sous-bus.
 
 | Jalon | Contenu | Livrable |
 |---|---|---|
-| SB1 | `GroupDescriptor`, rattachement des micros à un sous-bus par le registre, type d'instance « Sous-bus » dans l'interface | Un sous-bus qui s'identifie et liste ses micros |
+| SB1 (**fait le 20/10/2026**, rôles et menu seulement, voir `docs/SUIVI_IMPLEMENTATION.md`) | `GroupDescriptor`, rattachement des micros à un sous-bus par le registre, type d'instance « Sous-bus » dans l'interface | Un sous-bus qui s'identifie et liste ses micros |
 | SB2 | Mesures `sb_` (SB01 à SB03, SB06 à SB08) en lecture seule, sans effet sur les presets | Rapport de groupe dans le Bilan |
 | SB3 | Tests S01 à S08 | Tests au vert |
 | SB4 | Presets de sous-bus : EQ de groupe et compression de groupe sur la somme | Sous-bus Kick et Snare utilisables |

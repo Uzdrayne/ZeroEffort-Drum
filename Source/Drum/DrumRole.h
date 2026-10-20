@@ -54,10 +54,12 @@ struct RoleProposers
     { return RoomProfile::propose(a, s, style, intensity); }
     static DrumProposal bus(const DrumAnalysis& a, const Settings& s, DrumStyle style, float intensity, const ProposalPolicy&)
     { return MasterBusProfile::propose(a, s, style, intensity); }
+    static DrumProposal subBus(const DrumAnalysis& a, const Settings& s, DrumStyle style, float intensity, const ProposalPolicy&)
+    { return MasterBusProfile::propose(a, s, style, intensity, true); }
 };
 
 // One row per DrumInstrument, in the order of the enum.
-inline constexpr std::array<RoleDescriptor, 10> roleDescriptors {{
+inline constexpr std::array<RoleDescriptor, instrumentCount> roleDescriptors {{
     //  id                       family                  propose                  close  tom    cymb   room   bus    measuredBody lowHz
     { DrumInstrument::kick,      RoleFamily::kick,       &RoleProposers::kick,      true,  false, false, false, false, false, 0.0f,
       24.0f, 8.0f, 8.0f, 110.0f, 35.0f, 8000.0f, 5.0f,   9.0f, 28.0f,   2.4f, -1.0f,   300.0f, 6500.0f,  0.035, 0.02, 1.8f,   6.0f, 32.0f,
@@ -89,6 +91,15 @@ inline constexpr std::array<RoleDescriptor, 10> roleDescriptors {{
     { DrumInstrument::master,    RoleFamily::bus,        &RoleProposers::bus,       false, false, false, false, true,  false, 0.0f,
       10.0f, 4.0f, 12.0f, 110.0f, 60.0f, 8000.0f, 7.0f,   5.0f, 14.0f,   3.0f, -1.0f,   650.0f, 6500.0f,  0.035, 0.06, 1.8f,   9.0f, 18.0f,
       18.0f, 10.0f,  70.0f, 400.0f, 35.0f,   true,  4.0f,   3.0f, 22.0f, 8.0f },
+    { DrumInstrument::kickBus,  RoleFamily::bus,        &RoleProposers::subBus,    false, false, false, false, true,  false, 0.0f,
+      10.0f, 4.0f, 12.0f, 110.0f, 60.0f, 8000.0f, 7.0f,   5.0f, 14.0f,   3.0f, -1.0f,   650.0f, 6500.0f,  0.035, 0.06, 1.8f,   9.0f, 18.0f,
+      18.0f, 10.0f,  70.0f, 400.0f, 35.0f,   false, 4.0f,   3.0f, 22.0f, 8.0f },
+    { DrumInstrument::snareBus,  RoleFamily::bus,        &RoleProposers::subBus,    false, false, false, false, true,  false, 0.0f,
+      10.0f, 4.0f, 12.0f, 110.0f, 60.0f, 8000.0f, 7.0f,   5.0f, 14.0f,   3.0f, -1.0f,   650.0f, 6500.0f,  0.035, 0.06, 1.8f,   9.0f, 18.0f,
+      18.0f, 10.0f,  70.0f, 400.0f, 35.0f,   false, 4.0f,   3.0f, 22.0f, 8.0f },
+    { DrumInstrument::tomsBus,  RoleFamily::bus,        &RoleProposers::subBus,    false, false, false, false, true,  false, 0.0f,
+      10.0f, 4.0f, 12.0f, 110.0f, 60.0f, 8000.0f, 7.0f,   5.0f, 14.0f,   3.0f, -1.0f,   650.0f, 6500.0f,  0.035, 0.06, 1.8f,   9.0f, 18.0f,
+      18.0f, 10.0f,  70.0f, 400.0f, 35.0f,   false, 4.0f,   3.0f, 22.0f, 8.0f },
 }};
 
 inline const RoleDescriptor& roleDescriptor(DrumInstrument role) noexcept

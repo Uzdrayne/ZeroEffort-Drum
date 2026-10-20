@@ -9,7 +9,7 @@ Légende : ⬜ à faire · 🔄 en cours · ✅ terminé · ⏸ en réserve
 
 | Élément | État |
 |---|---|
-| Version du plug-in | **0.11.2** (`CMakeLists.txt`, depuis le 19/10/2026) ; `analysisVersion` 6, `profileVersion` 3 |
+| Version du plug-in | **0.11.3** (`CMakeLists.txt`, depuis le 20/10/2026) ; `analysisVersion` 6, `profileVersion` 3 |
 | `main` | vagues 1 et 2 fusionnées (pull requests #1 et #2, commit `b1dbabd`) : phase 0, build VS 2019 / 2022, J1, T1, T2, J2, J3, T3, T4 |
 | Branches de travail | aucune ouverte (`feature/t3-kit-phase` fusionnée) |
 | Passation | [REPRISE_PROCHAINE_SESSION.md](REPRISE_PROCHAINE_SESSION.md) : prompt à coller, état, décisions, menu des prochaines étapes, pièges |
@@ -155,6 +155,17 @@ Aucun code modifié (banc d'essai temporaire retiré). Sur deux vrais Kicks en R
 ### Style Auto par défaut : Rock 75 % (18/10/2026)
 
 Demandé par l'utilisateur. Une nouvelle instance démarre en **Rock, 75 %** au lieu de Natural, 100 % : valeurs initiales de `autoStyleOption` (1) et `autoIntensityOption` (75) dans `controlSpecs`, et de `AutoSession` (`style`, `intensity`). Identifiants inchangés ; les projets enregistrés restent comme ils étaient (l'état stocke les valeurs) ; le repli d'un état sans propriétés `autoStyle` / `autoIntensity` reste Natural / 100 %. **Changement audible au prochain Analyze d'une nouvelle instance** (la proposition est plus marquée) mais aucune proposition ne change pour un style et une intensité donnés : les 270 hachages du filet de rôles sont inchangés (le test fixe maintenant les options d'origine à Natural / 100 %, car la proposition les recopie). Test ajouté : une instance neuve est en Rock 75 %. Version du plug-in non incrémentée (0.11.0).
+
+### Sous-bus, étape SB1 (20/10/2026)
+
+Document 08, étape SB1 : l'instance peut être posée sur la **piste de groupe d'un instrument** (somme de ses micros). Décisions prises par défaut après l'avis donné à l'utilisateur (menu étendu, pas de Hi-hat Bus) :
+- **Trois nouveaux rôles** `Kick Bus`, `Snare Bus`, `Toms Bus` (valeurs 10 à 12, après « Drum Master Bus » ; les valeurs 0 à 9 sont enregistrées dans les projets et ne bougent pas, test dédié). `instrumentFromValue` : en dessous de 0, Kick ; au-delà du dernier, Drum Master Bus comme avant (rien ne change pour les valeurs invalides). Le paramètre `drumInstrument` (même identifiant) passe de 0-9 à 0-12.
+- **Menu d'instrument** : les rôles micro / piste d'abord, puis une section « Buses » : Kick Bus, Snare Bus, Toms Bus, Drum Master Bus. Pas de liste séparée.
+- **Hors Kit / Phase** : un sous-bus n'a pas de position de micro ni de page Nettoyage, et ne participe pas à l'alignement (`Role::none`, comme le bus maître).
+- **Profil provisoire** : le réglage du bus de batterie, **sans ambiance**, résumé « SUB-BUS » (`MasterBusProfile`, paramètre `subBus`) ; aucun gate, nettoyage ni module Kick. Ligne par rôle dans `roleDescriptors` (registre de rôles). Le profil propre à chaque groupe vient de SB3 (paires `KICK_IN+OUT`, `SNARE_TOP+BOTTOM`, bus du Track 3).
+- **Presets** : une famille par sous-bus (`Kick Bus`, `Snare Bus`, `Toms Bus`), séparée des micros et du bus maître.
+- **Aucun changement audible** pour les rôles existants : filet de 270 propositions et équivalence historique identiques. Tests : `tests/SubBusTests.cpp` (numéros, noms, absence d'ambiance et de gate, hors alignement, rechargement d'un projet, presets séparés), menu de l'éditeur (13 entrées, sélection des trois sous-bus). Mise en garde : l'automatisation hôte du paramètre « Instrument » (normalisée 0-1) change d'échelle puisque la liste passe de 10 à 13 choix ; les projets enregistrés gardent leur valeur (l'état la stocke en clair).
+- Reste : SB2 (mesures de groupe en lecture seule), SB3 (profils de groupe issus du corpus), SB4 (trims de balance proposés). Hi-hat Bus laissé de côté.
 
 ### Phases Calcul et Vérification du radar : pourquoi elles sont longues (20/10/2026)
 

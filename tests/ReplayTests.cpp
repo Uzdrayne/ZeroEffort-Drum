@@ -177,7 +177,7 @@ void testReplayCommands()
     const auto replayed = drum::DrumReplay::replayFolder(snapshots);
     check(replayed.current.entries.size() == 1 && replayed.current.entries[0].valid && replayed.current.entries[0].style == "rock",
         "The exported snapshot must replay as a valid rock kick");
-    check(run({ "--export-wav", wav.getFullPathName(), snapshots.getFullPathName(), "12" }) == 1, "An unknown role must fail");
+    check(run({ "--export-wav", wav.getFullPathName(), snapshots.getFullPathName(), "13" }) == 1, "An unknown role must fail");
     check(run({ "--export-wav", wav.getFullPathName(), snapshots.getFullPathName(), "0", "jazz" }) == 1, "An unknown style must fail");
 
     // J3 is the default: the export must record it, and the opt-out flag must record the former behaviour.
@@ -296,10 +296,10 @@ int runReplayCommand(const juce::StringArray& commandLine)
     if (command == "--export-wav")
     {
         if (arguments.size() < 4 || arguments.size() > 6)
-            return fail("usage: --export-wav <wav> <snapshot folder> <role 0-9> [natural|rock|metal] [intensity 0-1] [--position 0-3] [--no-exclude-lead-frames] [--no-active-crest] [--no-double-hits]");
+            return fail("usage: --export-wav <wav> <snapshot folder> <role 0-12> [natural|rock|metal] [intensity 0-1] [--position 0-3] [--no-exclude-lead-frames] [--no-active-crest] [--no-double-hits]");
         const juce::File wav(arguments[1]), folder(arguments[2]);
-        if (!arguments[3].containsOnly("0123456789") || arguments[3].isEmpty() || arguments[3].getIntValue() > 9)
-            return fail("role must be an integer from 0 to 9");
+        if (!arguments[3].containsOnly("0123456789") || arguments[3].isEmpty() || arguments[3].getIntValue() >= drum::instrumentCount)
+            return fail("role must be an integer from 0 to 12");
         drum::SnapshotContext context;
         context.original[drum::instrument] = arguments[3].getFloatValue();
         if (position.has_value()) context.original[drum::kitMic] = static_cast<float>(*position);

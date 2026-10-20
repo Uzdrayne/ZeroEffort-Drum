@@ -310,7 +310,7 @@ void testEditor(ZeroEffortDrumProcessor& processor, const juce::File& imageFile)
         toggle(editor, "multibandOn", false);
 
         auto* menu = child<juce::ComboBox>(editor, "drumInstrument");
-        require(menu != nullptr && menu->getNumItems() == 10, "Instrument menu must expose all ten drum roles");
+        require(menu != nullptr && menu->getNumItems() == 13, "Instrument menu must expose the ten drum roles and the three sub-buses");
         const auto choose = [&](int id) { menu->setSelectedId(id, juce::dontSendNotification); menu->onChange(); };
         const auto before = processor.getSettings();
         choose(10);
@@ -318,6 +318,15 @@ void testEditor(ZeroEffortDrumProcessor& processor, const juce::File& imageFile)
         expectedSettings[drum::instrument] = 9;
         require(processor.getSettings() == expectedSettings, "Choosing Master must not alter any audio treatment");
         auto* position = child<juce::ComboBox>(editor, "kitMic");
+        for (const auto id : { 11, 12, 13 })
+        {
+            choose(id);
+            require(static_cast<int>(processor.getSettings()[drum::instrument]) == id - 1, "A sub-bus must be selectable from the menu");
+            require(!position->isVisible() && !child<juce::TextButton>(editor, "pageFocus")->isVisible(),
+                "A sub-bus has no microphone position and no cleanup page");
+        }
+        require(juce::String(drum::instrumentName(drum::instrumentFromValue(processor.getSettings()[drum::instrument]))) == "Toms Bus",
+            "The last sub-bus is the Toms Bus");
         choose(2);
         require(bodyGain->getTooltip().startsWith("Body") && tab(editor, "pageFocus").getButtonText() == "Cleanup",
             "Snare must rename EQ bands and the cleanup page");
