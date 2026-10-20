@@ -13,12 +13,14 @@ Les détails des anciennes livraisons et les résultats chiffrés restent dans l
 critères de test et les décisions. Les anciens CodeUpdate et le plan produit
 sont archivés, pas à relire à chaque reprise.
 
-> **À retenir :** version **0.11.9**, analyse **6**, profils **4**. Le traitement
+> **À retenir :** version **0.11.10**, analyse **7**, profils **4**. Le traitement
 > par instrument, le radar Auto, Kit / Phase, les presets et les sous-bus avec
 > balance sur validation sont implémentés. **La base musicale précédente a été
 > validée par l'utilisateur sur Track 2 dans Cubase** ; son équilibre Auto est
 > conservé. L'identité des presets est restaurée en 0.11.9 et **validée par
-> l'utilisateur dans Cubase**. Suite du [plan ciblé](#plan-cible) : hi-hat, puis stabilisation.
+> l'utilisateur dans Cubase**. Un correctif de re-mesure des trims de sous-bus
+> est ajouté en 0.11.10, testé automatiquement et à confirmer dans Cubase.
+> Suite du [plan ciblé](#plan-cible) : hi-hat, puis stabilisation.
 
 ## Sommaire
 
@@ -44,15 +46,15 @@ sont archivés, pas à relire à chaque reprise.
 |---|---|
 | Produit | Effet batterie **VST3 + ARA pour Cubase**, Windows x64, mono/stéréo ; pas de Standalone |
 | Socle | C++17, JUCE 8.0.6, SDK ARA 2.2.0, CMake |
-| Version | **0.11.9**, vérifiée dans [CMakeLists.txt](../CMakeLists.txt) |
-| Versions internes | `analysisVersion = 6`, `profileVersion = 4`, vérifiées dans le code |
+| Version | **0.11.10**, vérifiée dans [CMakeLists.txt](../CMakeLists.txt) |
+| Versions internes | `analysisVersion = 7`, `profileVersion = 4`, vérifiées dans le code |
 | État Git de référence | Branche `main`, dernier commit avant consolidation : `31391ec` (note de polarité des overheads) |
-| Dernières livraisons | F17 : presets avec instrument/micro, Revert complet et invalidation des rapports Kit obsolètes |
-| Tests automatiques | **Exécutés le 20/10 sur 0.11.9 : CTest 3/3**, Build and Test Release, VS2019 ; nouveaux tests bibliothèque/processeur/éditeur/Kit au vert |
+| Dernières livraisons | F20 : re-mesure des sous-bus avec gains Input ; F17 : presets avec instrument/micro validés |
+| Tests automatiques | **Exécutés le 20/10 sur 0.11.10 : CTest 3/3**, Build and Test Release, VS2019 ; cycle mesure/Apply/re-mesure/Undo vérifié |
 | Couverture réelle | Deux familles d'essais kit réel **ignorées** (WAV non disponibles via `ZED_WAV_DIRECTORY`) ; essai utilisateur F17 confirmé, sans remplacer ces tests automatisés |
 | Validation dans Cubase | Base musicale approuvée sur Track 2 ; identité des presets 0.11.9 testée et validée le 20/10 ; détection hi-hat réservée et généralisation non certifiée |
 | Corpus | Hors dépôt, dernier inventaire documenté : 4 tracks ; données et résultats non réexaminés pendant cette consolidation |
-| Travail en cours | F17 terminé, tests et validation utilisateur acquis ; prochain chantier : hi-hat (F18), puis stabilisation (F19). Aucun changement des règles Auto ou de l'équilibre Kick |
+| Travail en cours | Correctif de balance F20 testé, essai Cubase restant ; puis hi-hat (F18) et stabilisation (F19). Profils Auto et équilibre Kick inchangés |
 
 **Légende des statuts**
 
@@ -150,13 +152,18 @@ pas le nombre de tests actuels ni une validation musicale.
 - Sous-bus : rapport des micros du même groupe et instrument sur l'audio récent :
   niveaux actifs, corrélation grave, gain de somme, polarité, retard résiduel,
   marge avant écrêtage. Les retards/polarités des instances sont pris en compte.
-  La somme est reconstruite depuis les captures corrigées en phase : ce n'est
+  Depuis 0.11.10, la somme tient aussi compte des gains **Input** courants ;
+  les captures restent brutes pour l'analyse de phase. Ce n'est
   pas une observation complète des faders et traitements du bus de l'hôte.
   Corrélation et gain de somme ne couvrent pas encore toutes les bandes prévues.
 - **Measure balance / Apply trims / Undo trims** : proposition de balance
   uniquement hors plages plausibles, bornée à **±6 dB**, sans proposition sous
   0,5 dB. Chaque micro applique son propre gain d'entrée **après clic** ; Undo
   restaure le gain mémorisé. Refus si polarité, retard ou somme grave douteux.
+- Les trims sont ajoutés à **Input sur chaque plug-in micro adressé**, pas aux
+  faders Cubase ni à Input sur le sous-bus. Après application, laisser les micros
+  recevoir la demande et rejouer le passage avant de mesurer. Un trim résiduel
+  plus faible est normal : la correction est volontairement partielle.
 - Pas de trim pour les toms faute de référence ; pas de chiffres inter-micros
   inventés avec un seul micro. Le sous-bus peut néanmoins traiter sa somme.
 
@@ -307,6 +314,7 @@ Ne pas extrapoler ce retour à une certification de tous les cas.
 | P10 | Générateurs de référence signalés périmés après traduction anglaise | Ne pas régénérer aveuglément les références avec les anciens scripts ; contrôler avant utilisation |
 | P11 | Automatisation Instrument : plage passée de 10 à 13 choix ; ancien changement de plage Output en 0.6 | États en valeurs conservés, mais vérifier les anciennes courbes normalisées dans l'hôte |
 | P12 | Souci de détection hi-hat signalé par l'utilisateur sur Track 2 le 20/10 | Symptôme et passage à reproduire avant diagnostic ; lien possible avec P05/F07, pas une cause établie ; chantier ciblé F18 |
+| P13 | En 0.11.9, Apply trims change Input sur le micro mais la re-mesure ignore ce gain et repropose la même correction | **Corrigé en 0.11.10 (F20)** : gain publié et intégré à la somme ; test complet au vert, confirmation Cubase restante ; éviter de cumuler les anciens trims à l'aveugle |
 
 **Détail P04.** Sur deux Kicks en Rock 80 %, source Attack 9,8 / 11,1 dB,
 cible 13,4 / 14,7, obtenu 4,8 / 2,6. L'axe mesure l'énergie **0-70 ms contre
@@ -344,10 +352,16 @@ est une option d'affichage à décider séparément d'une révision du compresse
 Les étapes 1 et 2 sont terminées, **validation utilisateur dans Cubase comprise**.
 Hi-hat et stabilisation restent planifiés.
 
+**Correctif intercalé à la demande de l'utilisateur : F20, balance des sous-bus.**
+Après validation F17, une re-mesure identique après Apply a été signalée.
+Le test a confirmé que l'application fonctionne mais que la mesure relisait
+les captures brutes à gain unitaire. Ce correctif précède la reprise de F18.
+
 | Étape | ID | Statut | Travail et critère de clôture |
 |---|---|---|---|
 | 1 · Valider la base | V08 | **Fait** | Retour utilisateur consigné sur Track 2 ; équilibre actuel conservé, Kick classé comme préférence artistique et hi-hat identifié comme réserve |
 | 2 · Identité des presets | F17 | **Terminé et validé · 0.11.9** | Instrument/micro restaurés, affichage et Revert testés, formats 1/2 compatibles en lecture, Kit de session conservé et résultats obsolètes invalidés ; utilisateur satisfait après essai Cubase le 20/10 |
+| 2 bis · Re-mesure des trims | F20 | **Corrigé et testé · 0.11.10 ; à valider dans Cubase** | Gain Input pris en compte dans le niveau micro et la somme ; Apply/Undo vérifiés avec de vraies instances processeur et audio synthétique |
 | 3 · Détection hi-hat | F18 | **À faire, prochain chantier** | Reproduire P12 sur Track 2, identifier le mécanisme, écrire un test puis corriger le cas ; vérifier l'absence de régression sur les autres instruments sans engager tout F07 |
 | 4 · Stabilisation | F19 | **À faire après F18** | Tests ciblés puis trois suites CTest avec SKIP signalés ; valider le passage hi-hat et la non-régression des presets sur le build final ; validation F17 déjà acquise |
 
@@ -368,6 +382,29 @@ localement, non installé automatiquement, aucune lecture audio lancée par l'as
 Le correctif est accepté dans Cubase après proposition du parcours Kick In →
 Kick Out → chargement → vérification de l'identité → Revert. F17 est clôturé ;
 ce retour ne certifie pas tous les autres scénarios de la checklist technique.
+
+**Résultat F20 :** gain Input publié par chaque micro (insert et chemin ARA)
+et appliqué à la reconstruction de groupe, sans modifier les captures de phase.
+Input est ignoré par la balance lorsque le micro est bypassé. Les traitements
+aval, Output et les faders hôte ne sont pas reconstruits. Les suggestions peuvent
+donc changer avec les gains Input ; ce n'est pas une nouvelle calibration des profils.
+Les paramètres restent dans leurs bornes et seul le micro adressé reçoit le trim.
+
+**Comparaison de régression F20, 48 kHz, même signal :** avant, Kick In à
+**-10,8814 dB**, proposition **+2,1 dB** ; après Apply, Input à +2,1 dB et mesure
+à **-9,4349 dB**, proposition réduite à **+1,6 dB** ; Undo restaure Input à 0 et
+la mesure à **-10,8814 dB**. Kick Out et Input du bus restent inchangés. Le test
+échouait sur la re-mesure avant le correctif. Bypass et retour sont aussi testés.
+Le test UI F17 attend désormais le rafraîchissement avec un délai borné plutôt
+qu'une pause fixe de 80 ms, qui s'est révélée insuffisante sur cette exécution.
+
+**Validation technique 0.11.10 :** Build and Test Release, **CTest 3/3**, deux
+familles kit réel SKIP faute de WAV ; 540 rejeux synthétiques et 270 propositions
+Auto de référence inchangées. `analysisVersion` passe à **7** pour tracer le
+changement des mesures/propositions de balance ; `profileVersion` reste **4**.
+Le rejeu Auto ne contient pas la balance inter-micros : la comparaison chiffrée
+ci-dessus est la preuve dédiée. VST3 et ressource Windows vérifiés en 0.11.10 ;
+aucune installation ni lecture audio lancée par l'assistant.
 
 **Périmètre F18 :** ne pas présumer que le problème est un mauvais comptage de
 frappes, un refus Auto ou un réglage incorrect. Il faudra identifier le passage
@@ -458,8 +495,8 @@ fonctionnalités annoncées pour la prochaine version.
 
 | Numéro | Signification | Valeur |
 |---|---|---|
-| Version du plug-in | Livraison visible, build et compatibilité | **0.11.9** |
-| `analysisVersion` | Mesures, constantes ou état d'analyse sérialisé | **6** |
+| Version du plug-in | Livraison visible, build et compatibilité | **0.11.10** |
+| `analysisVersion` | Mesures, constantes ou état d'analyse sérialisé | **7** |
 | `profileVersion` | Règles qui construisent les propositions | **4** |
 
 `analysisVersion` ne versionne **pas le cache ARA**. Le format d'un snapshot et
@@ -471,6 +508,7 @@ le retour et comparer ses résultats selon les règles du chantier.
 
 | Version / date documentée | Contenu principal | Repère |
 |---|---|---|
+| 0.11.10 · 20/10 | F20 : mesure des sous-bus avec gain Input, messages précisant la destination des trims ; analyse 7, profils 4 | Build Release + CTest 3/3 ; boucle Apply/re-mesure/Undo testée ; confirmation Cubase restante |
 | 0.11.9 · 20/10 | F17 : presets son + identité, compatibilité format 1, Revert et rapports Kit invalidés après changement d'identité ; règles Auto inchangées | Build Release + CTest 3/3 ; validé par l'utilisateur dans Cubase ; 2 familles réelles SKIP |
 | 0.11.8 · 20/10 | Note sur les polarités relatives aux OH ; `--kit` accepte le stéréo en lisant le canal gauche | `31391ec` |
 | 0.11.7 · 20/10 | Refus de trims plus précis, niveaux lisibles ; test de portée du Makeup | `3d21911` |
@@ -516,6 +554,10 @@ le retour et comparer ses résultats selon les règles du chantier.
 6. Pour un sous-bus : instance sur la vraie piste de groupe, rôle de bus correct,
    même groupe Kit que ses micros ; pendant la lecture, consulter Report puis
    Measure balance. Appliquer les trims seulement après vérification.
+   Vérifier **Input dans le plug-in de chaque micro adressé**, pas les faders
+   Cubase. Rejouer le même passage, puis mesurer à nouveau ; Undo trims revient
+   au gain d'avant la première demande. Ne pas empiler des corrections sur la
+   base de la mesure figée des versions antérieures à 0.11.10.
 
 Une extension ARA sur un événement ne reçoit pas la somme du groupe de mixage :
 utiliser un **insert sur le groupe** pour traiter un bus.
@@ -711,7 +753,8 @@ Prochaine action :
 ### Point de reprise
 
 **V08 consignée ; F17 terminé et validé dans Cubase en 0.11.9, sans changement des règles Auto.**
-Reprendre le [plan ciblé](#plan-cible) à **F18 : détection hi-hat**, puis F19
+**F20 corrigé et testé en 0.11.10 : confirmer la re-mesure des trims dans Cubase.**
+Reprendre ensuite le [plan ciblé](#plan-cible) à **F18 : détection hi-hat**, puis F19
 (stabilisation). Ne pas redemander la validation F17 déjà reçue ; prévoir seulement
 sa non-régression avec les prochains changements. Ne pas réouvrir la calibration
 générale ni le Kick sans nouvelle décision. Vérifier versions et état Git avant le code.

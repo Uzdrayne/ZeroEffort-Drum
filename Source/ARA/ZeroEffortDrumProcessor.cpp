@@ -1244,6 +1244,7 @@ kit::Identity ZeroEffortDrumProcessor::getKitIdentity() const
     identity.key = memberKey();
     identity.delayMs = settings[drum::kitDelay];
     identity.inverted = settings[drum::kitPolarity] > 0.5f;
+    identity.inputGainDb = settings[drum::bypass] > 0.5f ? 0.0f : settings[drum::input];
     return identity;
 }
 
@@ -1303,7 +1304,7 @@ bool ZeroEffortDrumProcessor::applyBalanceTrims()
     balanceUndoable = true;
     lastBalance = {};
     lastBalance.valid = true;
-    lastBalance.note = "Trims sent to the microphones. Play again, then measure to check the result.";
+    lastBalance.note = "Trims sent to Input on the microphone plug-ins (not Cubase faders). Play again, then measure.";
     kitTick();
     return true;
 }
@@ -1316,7 +1317,7 @@ bool ZeroEffortDrumProcessor::undoBalanceTrims()
     balanceUndoable = false;
     lastBalance = {};
     lastBalance.valid = true;
-    lastBalance.note = "The microphones got their previous input gain back.";
+    lastBalance.note = "Undo sent to Input on the microphone plug-ins. Play again, then measure.";
     kitTick();
     return true;
 }
@@ -1327,18 +1328,26 @@ void ZeroEffortDrumProcessor::writeOwnInput(float db)
     if (!isBoundToARA())
     {
         setControl(drum::input, db);
-        return;
     }
-    std::vector<DrumModification*> written;
-    if (const auto* renderer = getPlaybackRenderer())
-        for (auto* region : renderer->getPlaybackRegions())
-        {
-            auto* modification = static_cast<DrumModification*>(region->getAudioModification());
-            if (std::find(written.begin(), written.end(), modification) != written.end()) continue;
-            written.push_back(modification);
-            modification->settings.values[drum::input].store(db);
-            modification->notifyContentChanged(juce::ARAContentUpdateScopes::samplesAreAffected(), true);
-        }
+    else
+    {
+        std::vector<DrumModification*> written;
+        if (const auto* renderer = getPlaybackRenderer())
+            for (auto* region : renderer->getPlaybackRegions())
+            {
+                auto* modification = static_cast<DrumModification*>(region->getAudioModification());
+                if (std::find(written.begin(), written.end(), modification) != written.end()) continue;
+                written.push_back(modification);
+                modification->settings.values[drum::input].store(db);
+                modification->notifyContentChanged(juce::ARAContentUpdateScopes::samplesAreAffected(), true);
+            }
+    }
+    if (kitMember != nullptr)
+    {
+        publishedIdentity = getKitIdentity();
+        kitRegistry->setIdentity(*kitMember, publishedIdentity);
+        identityPublished = true;
+    }
 }
 kit::GroupView ZeroEffortDrumProcessor::getKitView() const
 {

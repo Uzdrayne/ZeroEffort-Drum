@@ -412,6 +412,95 @@ void testBalanceApply()
     registry->leave(strong);
     registry->leave(weakBottom);
 }
+
+void testBalanceRemeasure()
+{
+    struct PlayHead final : juce::AudioPlayHead
+    {
+        juce::int64 sample = 0;
+        juce::Optional<PositionInfo> getPosition() const override
+        {
+            PositionInfo info;
+            info.setIsPlaying(true);
+            info.setTimeInSamples(sample);
+            return info;
+        }
+    } head;
+    constexpr double rate = 48000;
+    constexpr int blockSize = 512;
+    ZeroEffortDrumProcessor kickIn, kickOut, bus;
+    for (auto* processor : { &kickIn, &kickOut, &bus })
+    {
+        processor->setRateAndBufferSizeDetails(rate, blockSize);
+        processor->prepareToPlay(rate, blockSize);
+        processor->setKitControl(ZeroEffortDrumProcessor::kitGroup, 7);
+        processor->setPlayHead(&head);
+    }
+    kickOut.setKitControl(ZeroEffortDrumProcessor::kitMic, 1);
+    bus.setControl(drum::instrument, static_cast<float>(drum::DrumInstrument::kickBus));
+    bus.kitTick();
+    const auto audio = lowHits(rate, 4);
+    const auto capture = [&] {
+        juce::AudioBuffer<float> block(1, blockSize);
+        juce::MidiBuffer midi;
+        for (size_t offset = 0; offset + blockSize <= audio.size(); offset += blockSize)
+        {
+            head.sample = static_cast<juce::int64>(offset);
+            block.copyFrom(0, 0, audio.data() + offset, blockSize);
+            block.applyGain(0.4f);
+            kickIn.processBlock(block, midi);
+            block.copyFrom(0, 0, audio.data() + offset, blockSize);
+            kickOut.processBlock(block, midi);
+        }
+    };
+    const auto line = [&](const kit::BalanceProposal& proposal) -> const kit::BalanceLine& {
+        const auto found = std::find_if(proposal.lines.begin(), proposal.lines.end(), [&](const auto& item) {
+            return item.id == kickIn.getKitMemberId();
+        });
+        check(found != proposal.lines.end(), "The real Kick In instance must be measured");
+        return *found;
+    };
+    capture();
+    const auto before = bus.measureBalance();
+    const auto initial = line(before);
+    check(before.valid && initial.trimDb > 0 && bus.applyBalanceTrims(), "A weak Kick In must receive a proposed trim");
+    kickIn.kitTick();
+    kickOut.kitTick();
+    check(std::abs(kickIn.getSettings()[drum::input] - initial.trimDb) < 0.01f
+        && kickOut.getSettings()[drum::input] == 0 && bus.getSettings()[drum::input] == 0,
+        "Apply must change only Input on the addressed microphone, not the other mic or bus");
+    capture();
+    const auto after = bus.measureBalance();
+    const auto corrected = line(after);
+    const auto gain = 0.4f * juce::Decibels::decibelsToGain(initial.trimDb);
+    const auto expected = juce::Decibels::gainToDecibels(gain / (1.0f + gain));
+    check(std::abs(corrected.levelDb - expected) < 0.02f && corrected.levelDb > initial.levelDb + 0.5f,
+        "Remeasuring must include the applied Input trim in both the microphone and the sum");
+    check(corrected.trimDb < initial.trimDb, "The next suggestion must decrease rather than repeat the same trim");
+    kickIn.setControl(drum::bypass, 1);
+    kickIn.kitTick();
+    capture();
+    const auto bypassed = bus.measureBalance();
+    check(std::abs(line(bypassed).levelDb - initial.levelDb) < 0.02f,
+        "A bypassed microphone must not contribute an inactive Input gain to the balance");
+    kickIn.setControl(drum::bypass, 0);
+    kickIn.kitTick();
+    check(bus.undoBalanceTrims(), "The balance must remain undoable after remeasurement");
+    kickIn.kitTick();
+    kickOut.kitTick();
+    capture();
+    const auto undone = bus.measureBalance();
+    check(kickIn.getSettings()[drum::input] == 0 && std::abs(line(undone).levelDb - initial.levelDb) < 0.02f,
+        "Undo and remeasurement must restore the initial balance");
+    std::cout << "PASS: balance remeasurement, Kick In " << initial.levelDb << " -> " << corrected.levelDb
+        << " dB, Input +" << initial.trimDb << " dB, next trim " << corrected.trimDb
+        << " dB, Undo " << line(undone).levelDb << " dB; other mic and bus unchanged\n";
+    for (auto* processor : { &kickIn, &kickOut, &bus })
+    {
+        processor->setPlayHead(nullptr);
+        processor->releaseResources();
+    }
+}
 }
 void testSubBuses()
 {
@@ -422,5 +511,6 @@ void testSubBuses()
     testGroupAudio();
     testBalance();
     testBalanceApply();
+    testBalanceRemeasure();
     std::cout << "PASS: sub-buses (role numbers kept, kit-free, group EQ, reload, presets apart, group report, balance trims: bounds, refusals, apply and undo)" << std::endl;
 }

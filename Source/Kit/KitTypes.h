@@ -84,10 +84,12 @@ struct Identity
     juce::String key;           // track identity shared by the ARA editor and playback instances
     float delayMs = 0;          // correction applied by this instance (kit delay and polarity), read by the sub-bus group report
     bool inverted = false;
+    float inputGainDb = 0;      // effective input gain used to reconstruct the sub-bus balance from raw captures
     bool operator==(const Identity& other) const noexcept
     {
         return group == other.group && instrument == other.instrument && position == other.position
-            && role == other.role && name == other.name && key == other.key && delayMs == other.delayMs && inverted == other.inverted;
+            && role == other.role && name == other.name && key == other.key && delayMs == other.delayMs && inverted == other.inverted
+            && inputGainDb == other.inputGainDb;
     }
     bool operator!=(const Identity& other) const noexcept { return !(*this == other); }
 };

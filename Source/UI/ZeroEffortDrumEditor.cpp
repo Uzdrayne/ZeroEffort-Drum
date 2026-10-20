@@ -1765,8 +1765,8 @@ void DrumEditor::timerCallback()
         kitAnalyse.setButtonText("Measure balance");
         kitApply.setButtonText("Apply trims");
         kitReport.setButtonText("Undo trims");
-        kitAnalyse.setTooltip("Read the level of each microphone of this instrument against the sum, from the last seconds of playback (the microphones must be in the same Kit group)");
-        kitApply.setTooltip("Move the input gain of the microphones by the proposed trims. Nothing is applied before you click.");
+        kitAnalyse.setTooltip("Measure recent raw microphone captures with their current Input gains and phase corrections, not the full DSP or Cubase faders. Microphones must play in the same Kit group.");
+        kitApply.setTooltip("Add the proposed dB to Input on each addressed microphone plug-in, not the bus or Cubase faders. Nothing is applied before you click.");
         kitReport.setTooltip("Give the microphones back the input gain they had before the trims");
         kitApply.setEnabled(owner.getBalanceProposal().any());
         kitReport.setEnabled(owner.canUndoBalanceTrims());

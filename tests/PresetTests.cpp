@@ -275,21 +275,25 @@ void testPresetEditorIdentity()
     auto* position = dynamic_cast<juce::ComboBox*>(editor->findChildWithID("kitMic"));
     auto* instrument = dynamic_cast<juce::ComboBox*>(editor->findChildWithID("drumInstrument"));
     check(position != nullptr && instrument != nullptr, "Identity menus must exist");
+    const auto waitFor = [](const auto& ready) {
+        for (int attempt = 0; attempt < 20 && !ready(); ++attempt)
+            juce::MessageManager::getInstance()->runDispatchLoopUntil(50);
+    };
     check(processor.loadUserPreset("Kick In").wasOk(), "Kick In must load from Kick Out");
-    juce::MessageManager::getInstance()->runDispatchLoopUntil(80);
+    waitFor([&] { return position->getText() == "Kick In"; });
     check(position->isVisible() && position->getText() == "Kick In" && instrument->getSelectedId() == 1,
         "The editor header must display the loaded Kick In identity");
     check(processor.revertAutoPreset(), "Identity load must be undoable in the editor");
-    juce::MessageManager::getInstance()->runDispatchLoopUntil(80);
+    waitFor([&] { return position->getText() == "Kick Out"; });
     check(position->getText() == "Kick Out", "Revert must refresh the previous microphone label");
     processor.setControl(drum::instrument, static_cast<float>(drum::DrumInstrument::tom2));
     check(processor.saveUserPreset("Tom 2").wasOk(), "Tom identity fixture must save");
     processor.setControl(drum::instrument, static_cast<float>(drum::DrumInstrument::floorTom));
     check(processor.loadUserPreset("Tom 2").wasOk(), "Shared tom preset must load in the editor");
-    juce::MessageManager::getInstance()->runDispatchLoopUntil(80);
+    waitFor([&] { return instrument->getText() == "Tom 2"; });
     check(instrument->getText() == "Tom 2" && !position->isVisible(), "Loading must refresh the instrument menu and position visibility");
     check(processor.revertAutoPreset(), "Tom identity must be undoable");
-    juce::MessageManager::getInstance()->runDispatchLoopUntil(80);
+    waitFor([&] { return instrument->getText() == "Floor Tom"; });
     check(instrument->getText() == "Floor Tom", "Revert must refresh the original instrument label");
 }
 }

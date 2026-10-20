@@ -14,7 +14,7 @@ inline constexpr std::array<float, 3> kickGateReleases { 160, 100, 80 };
 // Version 4: lead frames excluded from the bleed by default (J3 activated).
 // Version 5: active window threshold P95 - 55 dB instead of P95 - 40 dB (01-Q1 calibrated).
 // Version 6: double hit detection on by default (J4a activated).
-inline constexpr int analysisVersion = 6;
+inline constexpr int analysisVersion = 7;
 
 // H: starting points to calibrate on a corpus (document 05, 01-Q1 and 01-Q5).
 struct MeasureConstants

@@ -10,8 +10,8 @@
 
 namespace kit
 {
-// Read-only measures of the microphones of one sub-bus (document 08, SB01 to SB03, SB06 to SB08). They look at what the bus receives:
-// the microphones after the correction of their own instance (delay and polarity), added with unit gain. Nothing here changes a
+// Read-only measures of the microphones of one sub-bus (document 08, SB01 to SB03, SB06 to SB08). They reconstruct the raw microphones
+// with their current input gain, delay and polarity, not the full downstream DSP or host faders. Nothing here changes a
 // setting; the numbers are H starting points to calibrate on the corpus (alert thresholds in GroupConstants).
 struct GroupConstants
 {
@@ -33,6 +33,7 @@ struct GroupMic
     bool inverted = false;
     Role role = Role::none;
     juce::uint32 id = 0;             // registry member, to address a balance trim to its instance
+    float inputGainDb = 0;
 };
 
 struct GroupMicMeasure
@@ -79,9 +80,12 @@ public:
         std::vector<std::vector<float>> aligned;
         for (size_t mic = 0; mic < mics.size(); ++mic)
         {
+            if (!std::isfinite(mics[mic].inputGainDb)) { report.reason = "invalid microphone input gain"; return report; }
             // Samples before `longest` are dropped for every mic: all of them have started by then.
             std::vector<float> shifted(length - longest);
-            const auto sign = mics[mic].inverted ? -1.0f : 1.0f;
+            const auto gain = juce::Decibels::decibelsToGain(mics[mic].inputGainDb);
+            if (!std::isfinite(gain)) { report.reason = "invalid microphone input gain"; return report; }
+            const auto sign = (mics[mic].inverted ? -1.0f : 1.0f) * gain;
             for (size_t index = 0; index < shifted.size(); ++index)
             {
                 const auto position = index + longest;

@@ -212,6 +212,7 @@ std::vector<GroupMic> Registry::recentAudio(int group, const std::vector<Role>& 
         mic.inverted = member->identity.inverted;
         mic.role = member->identity.role;
         mic.id = member->id();
+        mic.inputGainDb = member->identity.inputGainDb;
         mic.samples.assign(static_cast<size_t>(count), 0.0f);
         if (!member->read(2, start, count, mic.samples.data())) { result.clear(); rate = 0; return result; }
         result.push_back(std::move(mic));

@@ -1,6 +1,6 @@
 # ZeroEffort Drum
 
-Plugin batterie actuel : **ZeroEffort Drum 0.11.9**, VST3 avec extension ARA,
+Plugin batterie actuel : **ZeroEffort Drum 0.11.10**, VST3 avec extension ARA,
 profils instruments, **alignement de phase entre pistes (Kit / Phase)**,
 Bus Glue, ambiance et finitions manuelles.
 **Commencer par [le suivi du projet](docs/PROJET.md)** : fait, a faire,
@@ -11,6 +11,8 @@ Les nouveaux presets restaurent aussi l'instrument et la position du micro,
 sans importer le groupe Kit ni les corrections de phase. Les anciens presets
 restent lisibles et conservent l'identite courante ; les reenregistrer pour
 memoriser cette identite.
+La balance des sous-bus prend maintenant en compte les gains Input des micros :
+Apply trims agit sur Input dans chaque plug-in micro, pas sur les faders Cubase.
 Les anciens guides sont classes dans [les archives](docs/PROJET.md#archives).
 L'ancien exemple Cubase Gain et sa suite de tests ont ete retires du projet.
 

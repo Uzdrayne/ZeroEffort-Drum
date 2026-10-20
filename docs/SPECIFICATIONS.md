@@ -1,6 +1,6 @@
 # ZeroEffort Drum - spécifications de référence
 
-**Consolidation du 20 octobre 2026 · Révision documentaire 2**
+**Consolidation du 20 octobre 2026 · Révision documentaire 3**
 
 Ce document rassemble les exigences utiles des anciens documents 01 à 08 et du
 plan produit. Il décrit **ce que le système doit préserver ou permettre**, pas
@@ -344,8 +344,9 @@ Le format des presets est distinct des versions d'analyse/profil et des états h
 - Sous-bus identifié par famille d'instrument et groupe Kit. Une instance
   micro est nécessaire pour chaque contribution inter-micros observée.
   Sans ces instances, le bus peut traiter sa somme, pas inventer les détails.
-- Les rapports actuels reconstruisent une somme des captures avec retard et
-  polarité ; ne pas l'assimiler sans vérification à tout le mixage réel
+- Les rapports actuels reconstruisent une somme des captures brutes avec le
+  gain Input courant, le retard et la polarité de chaque micro ; ne pas
+  l'assimiler sans vérification à tout le mixage réel
   post-fader/post-traitements de l'hôte.
 
 ### 5.2 Mesures de groupe
@@ -370,6 +371,18 @@ de valeurs inter-micros inventées.
 - Proposer les trims, **jamais les appliquer silencieusement**. Chaque micro
   modifie son gain après validation ; application/annulation et isolation des
   groupes doivent être testées.
+- **Correctif 0.11.10 :** Apply trims ajoute les dB au paramètre **Input du
+  plug-in micro**, dans ses bornes, pas au fader Cubase ou au gain du sous-bus.
+  La nouvelle mesure doit utiliser ce gain pour le micro **et pour la somme**.
+  Le registre conserve l'audio brut pour Kit / Phase et publie le gain séparément ;
+  l'Undo rétablit le gain d'avant la première application. En bypass, le gain
+  Input ne contribue pas à la mesure. L'EQ, la compression, Output et les faders
+  hôte ne sont pas reconstruits : il s'agit d'une balance d'entrée, pas de la
+  balance complète post-traitements.
+- Preuve exigée : mesure → Apply → gain Input vérifié sur la bonne instance →
+  nouvelle mesure avec niveau attendu et trim réduit → Undo → retour au niveau
+  initial ; micro non adressé et sous-bus inchangés. Une correction est partielle :
+  un trim résiduel plus petit après application n'est pas en soi un échec.
 - Refuser la balance en cas de polarité douteuse, retard résiduel excessif ou
   annulation grave. Les seuils -0,25 de corrélation, 1 ms et -1,5 dB sont H.
 - La règle livrée corrige la **distance à une plage plausible**, pas à un niveau
